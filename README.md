@@ -20,6 +20,21 @@ corepack pnpm test
 corepack pnpm build
 ```
 
+## Database
+
+Start PostgreSQL + pgvector:
+
+```bash
+docker compose up -d postgres redis
+```
+
+Then copy `.env.example` to `.env`, set `FINANCE_HUB_USE_DATABASE=true`, and run:
+
+```bash
+corepack pnpm db:migrate
+corepack pnpm db:seed
+```
+
 ## Source Packs
 
 No SaaS connectors are used. Put files under `source-packs/`, then create a manifest:
@@ -27,3 +42,11 @@ No SaaS connectors are used. Put files under `source-packs/`, then create a mani
 ```bash
 corepack pnpm ingest source-packs/cours-master-2025
 ```
+
+## Production
+
+Apprentissage production is deployed at:
+
+https://finance-learning-hub.vercel.app
+
+Patrimoine is a separate project and must not be replaced from this repo.

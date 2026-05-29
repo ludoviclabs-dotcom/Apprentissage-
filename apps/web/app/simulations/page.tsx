@@ -1,31 +1,6 @@
 import { DomainBadge } from "@/components/domain-badge";
-
-const simulations = [
-  {
-    title: "Réunion DAF",
-    domainId: "controle-gestion" as const,
-    level: 3,
-    prompt: "Tu expliques pourquoi la marge baisse malgré une hausse du chiffre d'affaires."
-  },
-  {
-    title: "Justification auditeur",
-    domainId: "compta-generale" as const,
-    level: 2,
-    prompt: "Tu défends une provision devant un auditeur avec pièces et raisonnement."
-  },
-  {
-    title: "Note IFRS",
-    domainId: "ifrs-ias" as const,
-    level: 4,
-    prompt: "Tu rédiges une note courte sur l'impact d'IFRS 18."
-  },
-  {
-    title: "Audit interne ISO",
-    domainId: "iso" as const,
-    level: 2,
-    prompt: "Tu qualifies les constats et proposes actions correctives et preuves."
-  }
-];
+import { simulations } from "@/lib/simulations";
+import Link from "next/link";
 
 export default function SimulationsPage() {
   return (
@@ -47,7 +22,9 @@ export default function SimulationsPage() {
             </div>
             <h2>{simulation.title}</h2>
             <p>{simulation.prompt}</p>
-            <button type="button" className="secondary-action">Ouvrir le scénario</button>
+            <Link href={`/simulations/${simulation.id}`} className="secondary-action inline-link">
+              Ouvrir le scénario
+            </Link>
           </article>
         ))}
       </section>

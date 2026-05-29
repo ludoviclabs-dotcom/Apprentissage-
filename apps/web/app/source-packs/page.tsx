@@ -1,8 +1,10 @@
 import { DomainBadge } from "@/components/domain-badge";
-import { getSourceModel } from "@/lib/view-model";
+import { SourcePackImportForm } from "@/components/forms/source-pack-import-form";
+import { getSourcePacks } from "@finance/db";
+import Link from "next/link";
 
-export default function SourcePacksPage() {
-  const { sourcePacks } = getSourceModel();
+export default async function SourcePacksPage() {
+  const sourcePacks = await getSourcePacks();
 
   return (
     <div className="page-stack">
@@ -21,7 +23,9 @@ export default function SourcePacksPage() {
               <DomainBadge domainId={pack.domainId} />
               <span className={`state-token ${pack.status}`}>{pack.status}</span>
             </div>
-            <h2>{pack.name}</h2>
+            <h2>
+              <Link href={`/source-packs/${pack.id}`}>{pack.name}</Link>
+            </h2>
             <p>{pack.description}</p>
             <div className="pack-stats">
               <span>{pack.documentsCount} docs</span>
@@ -41,6 +45,8 @@ export default function SourcePacksPage() {
           les impacts sur tes fiches et exercices.
         </p>
       </section>
+
+      <SourcePackImportForm />
     </div>
   );
 }

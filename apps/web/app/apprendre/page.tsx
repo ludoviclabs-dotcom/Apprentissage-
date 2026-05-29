@@ -1,5 +1,7 @@
 import { LearningCard } from "@/components/learning-card";
 import { DomainBadge } from "@/components/domain-badge";
+import { DiagnosticForm } from "@/components/forms/diagnostic-form";
+import { TutorAskForm } from "@/components/forms/tutor-ask-form";
 import { getLearningModel } from "@/lib/view-model";
 import { getDomain } from "@finance/domain";
 
@@ -27,6 +29,10 @@ export default function LearnPage() {
       </section>
 
       <LearningCard lesson={currentLesson} />
+
+      <DiagnosticForm />
+
+      <TutorAskForm />
 
       <section className="panel">
         <div className="panel-heading">

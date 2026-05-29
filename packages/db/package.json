@@ -8,6 +8,14 @@
   },
   "scripts": {
     "migrate": "tsx src/migrate.ts",
+    "seed": "tsx src/seed.ts",
     "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "@finance/domain": "workspace:*",
+    "@finance/ingest": "workspace:*",
+    "drizzle-orm": "^0.45.2",
+    "postgres": "^3.4.9",
+    "zod": "^4.4.3"
   }
 }

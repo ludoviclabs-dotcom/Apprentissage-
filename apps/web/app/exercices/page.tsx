@@ -1,6 +1,8 @@
 import { ExercisePanel } from "@/components/exercise-panel";
 import { DomainBadge } from "@/components/domain-badge";
+import { ExerciseAttemptForm } from "@/components/forms/exercise-attempt-form";
 import { getExerciseModel } from "@/lib/view-model";
+import Link from "next/link";
 
 export default function ExercisesPage() {
   const { exercises } = getExerciseModel();
@@ -26,9 +28,16 @@ export default function ExercisesPage() {
 
       <div className="two-column">
         {exercises.map((exercise) => (
-          <ExercisePanel key={exercise.id} exercise={exercise} />
+          <div key={exercise.id} className="linked-panel">
+            <ExercisePanel exercise={exercise} />
+            <Link href={`/exercices/${exercise.id}`} className="secondary-action inline-link">
+              Ouvrir le détail
+            </Link>
+          </div>
         ))}
       </div>
+
+      <ExerciseAttemptForm exercise={exercises[0]} />
 
       <section className="panel">
         <div className="panel-heading">

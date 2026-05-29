@@ -10,6 +10,7 @@
     "test": "vitest run",
     "typecheck": "corepack pnpm -r --if-present typecheck",
     "db:migrate": "corepack pnpm --filter @finance/db migrate",
+    "db:seed": "corepack pnpm --filter @finance/db seed",
     "ingest": "corepack pnpm --filter @finance/ingest ingest"
   },
   "dependencies": {

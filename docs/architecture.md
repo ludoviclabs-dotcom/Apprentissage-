@@ -8,7 +8,7 @@ The MVP starts with seeded learning data and a navigable Next.js interface. Docu
 
 - `apps/web`: Next.js application.
 - `packages/domain`: domains, competencies, exercises, corrections and seeded learning paths.
-- `packages/db`: PostgreSQL/pgvector schema and migration SQL.
+- `packages/db`: PostgreSQL/pgvector schema, Drizzle table definitions, migration SQL, seed script and repository functions.
 - `packages/ai`: provider and agent contracts.
 - `packages/ingest`: source pack and document ingestion primitives.
 - `workers/ingestion-worker`: Docker boundary for future Docling/Python ingestion.
@@ -23,3 +23,12 @@ The cockpit is organized around guided learning. Retrieval and AI features suppo
 4. answer one exercise;
 5. read a structured correction;
 6. update competency strength.
+
+## Data Strategy
+
+The app can run in two modes:
+
+- Seeded fallback mode: default, no database required.
+- Database mode: set `FINANCE_HUB_USE_DATABASE=true` and `DATABASE_URL`, then run migrations and seed.
+
+Drizzle was chosen over Prisma for the MVP because the schema stays close to PostgreSQL/pgvector SQL, starts lighter in a monorepo, and keeps query code explicit while the domain model is still moving.

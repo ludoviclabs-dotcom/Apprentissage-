@@ -1,5 +1,6 @@
 import { CorrectionSummary } from "@/components/correction-summary";
 import { getExerciseModel } from "@/lib/view-model";
+import Link from "next/link";
 
 export default function CorrectionsPage() {
   const { corrections, attempts } = getExerciseModel();
@@ -30,7 +31,12 @@ export default function CorrectionsPage() {
       </section>
 
       {corrections.map((correction) => (
-        <CorrectionSummary key={correction.id} correction={correction} />
+        <section key={correction.id} className="linked-panel">
+          <CorrectionSummary correction={correction} label="Correction historisee" />
+          <Link className="secondary-action inline-link" href={`/corrections/${correction.id}`}>
+            Ouvrir le detail
+          </Link>
+        </section>
       ))}
 
       <section className="panel">

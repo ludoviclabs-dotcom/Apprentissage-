@@ -1,8 +1,9 @@
-import { DomainBadge } from "@/components/domain-badge";
-import { getSourceModel } from "@/lib/view-model";
+import { DocumentInventory } from "@/components/forms/document-inventory";
+import { DocumentUploadForm } from "@/components/forms/document-upload-form";
+import { getDocuments } from "@finance/db";
 
-export default function DocumentsPage() {
-  const { documents } = getSourceModel();
+export default async function DocumentsPage() {
+  const documents = await getDocuments();
   const ready = documents.filter((document) => document.status === "ready").length;
   const pages = documents.reduce((sum, document) => sum + document.pages, 0);
 
@@ -53,28 +54,9 @@ export default function DocumentsPage() {
         </article>
       </section>
 
-      <section className="panel">
-        <div className="panel-heading">
-          <div>
-            <span className="section-label">Inventaire</span>
-            <h2>Documents récents</h2>
-          </div>
-        </div>
-        <div className="document-table">
-          {documents.map((document) => (
-            <article key={document.id} className="document-row">
-              <DomainBadge domainId={document.domainId} />
-              <div>
-                <strong>{document.title}</strong>
-                <small>{document.originalPath}</small>
-              </div>
-              <span>{document.fileType.toUpperCase()}</span>
-              <span>{document.pages} pages</span>
-              <span className={`state-token ${document.status}`}>{document.status}</span>
-            </article>
-          ))}
-        </div>
-      </section>
+      <DocumentUploadForm />
+
+      <DocumentInventory documents={documents} />
     </div>
   );
 }

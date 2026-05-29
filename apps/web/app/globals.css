@@ -221,6 +221,14 @@ button {
 .domain-card p {
   color: var(--muted);
   line-height: 1.55;
+  overflow-wrap: anywhere;
+}
+
+.page-header > div,
+.focus-panel > div,
+.generator-panel > div,
+.panel-heading > div {
+  min-width: 0;
 }
 
 .page-header p {
@@ -731,6 +739,166 @@ button {
   font-weight: 750;
 }
 
+.linked-panel {
+  display: grid;
+  gap: 10px;
+}
+
+.inline-link {
+  justify-self: start;
+  display: inline-flex;
+  align-items: center;
+  text-decoration: none;
+}
+
+.detail-grid {
+  display: grid;
+  gap: 18px;
+}
+
+.detail-grid dl {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+  margin: 0;
+}
+
+.detail-grid div {
+  padding: 12px;
+  border: 1px solid var(--border);
+  background: #fbfcfe;
+  border-radius: var(--radius);
+}
+
+.detail-grid dt {
+  color: var(--muted);
+  font-size: 0.76rem;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.detail-grid dd {
+  margin: 6px 0 0;
+  overflow-wrap: anywhere;
+  font-weight: 750;
+}
+
+.action-form {
+  display: grid;
+  gap: 14px;
+}
+
+.action-form label {
+  display: grid;
+  gap: 7px;
+  color: #344054;
+  font-size: 0.86rem;
+  font-weight: 800;
+}
+
+.action-form input,
+.action-form select,
+.action-form textarea {
+  width: 100%;
+  border: 1px solid var(--border-strong);
+  background: #ffffff;
+  border-radius: var(--radius);
+  color: var(--text);
+  font: inherit;
+  font-size: 0.92rem;
+}
+
+.action-form input,
+.action-form select {
+  min-height: 42px;
+  padding: 0 12px;
+}
+
+.action-form textarea {
+  resize: vertical;
+  padding: 12px;
+  line-height: 1.55;
+}
+
+.action-form button:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.result-box {
+  display: grid;
+  gap: 4px;
+  padding: 12px;
+  border: 1px solid #bbf7d0;
+  background: #f0fdf4;
+  border-radius: var(--radius);
+}
+
+.result-box.error {
+  border-color: #fecdd3;
+  background: #fff1f2;
+}
+
+.result-box span {
+  color: var(--muted);
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+
+.slider-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.slider-grid label {
+  grid-template-columns: minmax(0, 1fr) minmax(120px, 0.7fr) 48px;
+  align-items: center;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  background: #fbfcfe;
+  border-radius: var(--radius);
+}
+
+.slider-grid input {
+  min-height: 24px;
+  padding: 0;
+}
+
+.form-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.filter-bar {
+  display: grid;
+  grid-template-columns: minmax(220px, 1fr) minmax(170px, 0.5fr) minmax(150px, 0.4fr);
+  gap: 12px;
+  margin-top: 16px;
+}
+
+.filter-bar label {
+  display: grid;
+  gap: 7px;
+  color: #344054;
+  font-size: 0.86rem;
+  font-weight: 800;
+}
+
+.filter-bar input,
+.filter-bar select {
+  width: 100%;
+  min-height: 42px;
+  padding: 0 12px;
+  border: 1px solid var(--border-strong);
+  background: #ffffff;
+  border-radius: var(--radius);
+  color: var(--text);
+  font: inherit;
+  font-size: 0.92rem;
+}
+
 @media (max-width: 1120px) {
   html,
   body {
@@ -789,6 +957,7 @@ button {
   }
 
   .content {
+    width: 100%;
     padding: 18px;
   }
 
@@ -808,7 +977,8 @@ button {
   .logic-grid,
   .correction-columns,
   .learning-days,
-  .metric-strip {
+  .metric-strip,
+  .detail-grid dl {
     grid-template-columns: 1fr;
   }
 
@@ -850,5 +1020,12 @@ button {
 
   .domain-card p {
     min-height: auto;
+  }
+
+  .slider-grid,
+  .slider-grid label,
+  .form-grid,
+  .filter-bar {
+    grid-template-columns: 1fr;
   }
 }

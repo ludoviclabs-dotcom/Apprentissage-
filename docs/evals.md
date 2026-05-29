@@ -7,3 +7,6 @@ Initial acceptance checks:
 - A 30-day path can display current day, progress and next action.
 - An exercise attempt can produce score, correction details and remediation.
 - Long source and competency names do not break the interface.
+- `POST /api/source-packs` returns a manifest for local folders.
+- `POST /api/exercises/attempts` returns a structured correction.
+- `POST /api/ai/tutor` refuses uncited answers and returns source references.

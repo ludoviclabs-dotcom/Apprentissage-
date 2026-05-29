@@ -1,0 +1,70 @@
+import { integer, jsonb, pgTable, text, timestamp, varchar } from "drizzle-orm/pg-core";
+
+export const sourcePacksTable = pgTable("source_packs", {
+  id: text("id").primaryKey(),
+  name: text("name").notNull(),
+  description: text("description").notNull().default(""),
+  domain: text("domain").notNull(),
+  versionLabel: text("version_label").notNull(),
+  effectiveDate: timestamp("effective_date", { mode: "string" }),
+  importedAt: timestamp("imported_at", { mode: "string" }).notNull().defaultNow(),
+  status: text("status").notNull()
+});
+
+export const documentsTable = pgTable("documents", {
+  id: text("id").primaryKey(),
+  sourcePackId: text("source_pack_id").notNull(),
+  filename: text("filename").notNull(),
+  fileType: varchar("file_type", { length: 16 }).notNull(),
+  domain: text("domain").notNull(),
+  title: text("title").notNull(),
+  author: text("author"),
+  originalPath: text("original_path").notNull(),
+  checksum: text("checksum").notNull(),
+  importedAt: timestamp("imported_at", { mode: "string" }).notNull().defaultNow()
+});
+
+export const chunksTable = pgTable("chunks", {
+  id: text("id").primaryKey(),
+  documentId: text("document_id").notNull(),
+  pageStart: integer("page_start").notNull(),
+  pageEnd: integer("page_end").notNull(),
+  sectionTitle: text("section_title").notNull().default(""),
+  content: text("content").notNull(),
+  contentHash: text("content_hash").notNull(),
+  domain: text("domain").notNull(),
+  topic: text("topic").notNull().default(""),
+  difficulty: integer("difficulty").notNull().default(1),
+  effectiveDate: timestamp("effective_date", { mode: "string" }),
+  sourceType: text("source_type").notNull()
+});
+
+export const competenciesTable = pgTable("competencies", {
+  id: text("id").primaryKey(),
+  domain: text("domain").notNull(),
+  name: text("name").notNull(),
+  levelMin: integer("level_min").notNull(),
+  levelMax: integer("level_max").notNull(),
+  status: text("status").notNull(),
+  strength: integer("strength").notNull()
+});
+
+export const exercisesTable = pgTable("exercises", {
+  id: text("id").primaryKey(),
+  domain: text("domain").notNull(),
+  topic: text("topic").notNull(),
+  level: integer("level").notNull(),
+  statement: text("statement").notNull(),
+  expectedAnswer: text("expected_answer").notNull(),
+  rubricJson: jsonb("rubric_json").notNull().default([]),
+  sourceChunkIds: text("source_chunk_ids").array().notNull().default([])
+});
+
+export const attemptsTable = pgTable("attempts", {
+  id: text("id").primaryKey(),
+  exerciseId: text("exercise_id").notNull(),
+  userAnswer: text("user_answer").notNull(),
+  score: integer("score").notNull(),
+  correctionJson: jsonb("correction_json").notNull().default({}),
+  createdAt: timestamp("created_at", { mode: "string" }).notNull().defaultNow()
+});

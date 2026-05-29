@@ -1,4 +1,4 @@
-export const migrationFiles = ["packages/db/migrations/0001_init.sql"] as const;
+export const migrationFiles = ["migrations/0001_init.sql"] as const;
 
 export const tables = [
   "source_packs",

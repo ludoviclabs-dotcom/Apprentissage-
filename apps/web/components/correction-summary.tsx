@@ -1,12 +1,18 @@
 import type { Correction } from "@finance/domain";
 import { SourceReference } from "./source-reference";
 
-export function CorrectionSummary({ correction }: { correction: Correction }) {
+export function CorrectionSummary({
+  correction,
+  label = "Derniere correction"
+}: {
+  correction: Correction;
+  label?: string;
+}) {
   return (
     <section className="panel correction-panel">
       <div className="panel-heading">
         <div>
-          <span className="section-label">Dernière correction</span>
+          <span className="section-label">{label}</span>
           <h2>Score {correction.score}/20</h2>
         </div>
       </div>
