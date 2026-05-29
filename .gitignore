@@ -13,3 +13,5 @@ data/backups/*
 !data/processed/.gitkeep
 !data/exports/.gitkeep
 !data/backups/.gitkeep
+
+.vercel
