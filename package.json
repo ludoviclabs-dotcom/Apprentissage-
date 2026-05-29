@@ -1,0 +1,24 @@
+{
+  "name": "finance-learning-hub",
+  "version": "0.1.0",
+  "private": true,
+  "packageManager": "pnpm@10.11.0",
+  "scripts": {
+    "dev": "corepack pnpm --filter @finance/web dev",
+    "build": "corepack pnpm --filter @finance/web build",
+    "lint": "corepack pnpm --filter @finance/web lint",
+    "test": "vitest run",
+    "typecheck": "corepack pnpm -r --if-present typecheck",
+    "db:migrate": "corepack pnpm --filter @finance/db migrate",
+    "ingest": "corepack pnpm --filter @finance/ingest ingest"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.30.0",
+    "@types/node": "^24.0.0",
+    "eslint": "^9.30.0",
+    "tsx": "^4.20.0",
+    "typescript": "^5.9.0",
+    "typescript-eslint": "^8.35.0",
+    "vitest": "^3.2.0"
+  }
+}

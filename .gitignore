@@ -1,0 +1,15 @@
+node_modules/
+.next/
+dist/
+coverage/
+.env
+.env.local
+*.log
+data/raw/*
+data/processed/*
+data/exports/*
+data/backups/*
+!data/raw/.gitkeep
+!data/processed/.gitkeep
+!data/exports/.gitkeep
+!data/backups/.gitkeep
