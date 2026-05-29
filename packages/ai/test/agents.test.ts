@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { createSourceAudit, createTutorResponse } from "../src";
+import { createAiProviderFromEnv, createSourceAudit, createTutorMessages, createTutorResponse } from "../src";
 
 const retrieval = [
   {
@@ -43,5 +43,21 @@ describe("AI agent contracts", () => {
         retrieval: []
       })
     ).toThrow("requires at least one source");
+  });
+
+  it("builds provider-neutral tutor messages with citations", () => {
+    const messages = createTutorMessages({
+      question: "Explique une provision.",
+      mode: "reprise",
+      retrieval
+    });
+
+    expect(messages[1]?.content).toContain("cours-master-2025");
+    expect(messages[1]?.content).toContain("p.42");
+  });
+
+  it("keeps AI disabled without explicit provider configuration", () => {
+    expect(createAiProviderFromEnv({}).name).toBe("none");
+    expect(createAiProviderFromEnv({ AI_PROVIDER: "openai" }).name).toBe("none");
   });
 });

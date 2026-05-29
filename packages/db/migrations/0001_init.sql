@@ -110,9 +110,11 @@ CREATE TABLE IF NOT EXISTS exercises (
   domain TEXT NOT NULL,
   topic TEXT NOT NULL,
   level INTEGER NOT NULL,
+  estimated_minutes INTEGER NOT NULL DEFAULT 20,
   statement TEXT NOT NULL,
   expected_answer TEXT NOT NULL,
   rubric_json JSONB NOT NULL DEFAULT '[]'::jsonb,
+  competency_ids TEXT[] NOT NULL DEFAULT '{}',
   source_chunk_ids TEXT[] NOT NULL DEFAULT '{}'
 );
 

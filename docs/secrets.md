@@ -20,7 +20,10 @@ Important variables:
 | `LEARNING_HUB_AUTH_USER` | Basic auth username. |
 | `LEARNING_HUB_AUTH_PASSWORD` | Basic auth password. Never commit a real value. |
 | `AI_PROVIDER` | `none`, `openai`, `anthropic`, or `ollama`. |
+| `OPENAI_API_KEY` | OpenAI key when `AI_PROVIDER=openai`. |
+| `OPENAI_MODEL` | OpenAI model name for tutor/corrector calls. |
 | `OLLAMA_BASE_URL` | Ollama API URL when local AI is used. |
+| `OLLAMA_MODEL` | Ollama model name. |
 
 ## Vercel
 

@@ -508,6 +508,25 @@ button {
   font-size: 0.86rem;
 }
 
+.source-search-row {
+  display: grid;
+  gap: 6px;
+  padding: 12px;
+  border: 1px solid var(--border);
+  background: #fbfcfe;
+  border-radius: var(--radius);
+}
+
+.source-search-row span {
+  color: var(--muted);
+  font-size: 0.82rem;
+  font-weight: 750;
+}
+
+.source-search-row p {
+  margin: 0;
+}
+
 .source-row span,
 .source-row small,
 .muted {

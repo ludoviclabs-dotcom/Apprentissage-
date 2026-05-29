@@ -32,3 +32,13 @@ The app can run in two modes:
 - Database mode: set `FINANCE_HUB_USE_DATABASE=true` and `DATABASE_URL`, then run migrations and seed.
 
 Drizzle was chosen over Prisma for the MVP because the schema stays close to PostgreSQL/pgvector SQL, starts lighter in a monorepo, and keeps query code explicit while the domain model is still moving.
+
+Current persistence coverage:
+
+- source packs and documents;
+- Markdown chunks during source-pack import;
+- exercises loaded from DB when enabled;
+- attempts and corrections;
+- competency strength updates after correction or diagnostic.
+
+The next persistence gap is full learning-path storage and revision item scheduling.

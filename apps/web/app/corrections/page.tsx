@@ -1,9 +1,13 @@
 import { CorrectionSummary } from "@/components/correction-summary";
-import { getExerciseModel } from "@/lib/view-model";
+import { getCorrectionHistory } from "@finance/db";
 import Link from "next/link";
 
-export default function CorrectionsPage() {
-  const { corrections, attempts } = getExerciseModel();
+export default async function CorrectionsPage() {
+  const { corrections, attempts } = await getCorrectionHistory();
+  const averageScore =
+    attempts.length > 0
+      ? Math.round(attempts.reduce((sum, attempt) => sum + attempt.score, 0) / attempts.length)
+      : 0;
 
   return (
     <div className="page-stack">
@@ -22,7 +26,7 @@ export default function CorrectionsPage() {
         </article>
         <article>
           <span>Score moyen</span>
-          <strong>{attempts[0]?.score ?? 0}/20</strong>
+          <strong>{averageScore}/20</strong>
         </article>
         <article>
           <span>Remédiations</span>

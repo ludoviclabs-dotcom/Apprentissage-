@@ -1,11 +1,12 @@
 import { ExercisePanel } from "@/components/exercise-panel";
 import { DomainBadge } from "@/components/domain-badge";
 import { ExerciseAttemptForm } from "@/components/forms/exercise-attempt-form";
-import { getExerciseModel } from "@/lib/view-model";
+import { getExercises } from "@finance/db";
 import Link from "next/link";
 
-export default function ExercisesPage() {
-  const { exercises } = getExerciseModel();
+export default async function ExercisesPage() {
+  const exercises = await getExercises();
+  const firstExercise = exercises[0];
 
   return (
     <div className="page-stack">
@@ -37,7 +38,7 @@ export default function ExercisesPage() {
         ))}
       </div>
 
-      <ExerciseAttemptForm exercise={exercises[0]} />
+      {firstExercise ? <ExerciseAttemptForm exercise={firstExercise} /> : null}
 
       <section className="panel">
         <div className="panel-heading">

@@ -11,6 +11,8 @@ corepack pnpm dev
 
 Open `http://localhost:3000`.
 
+Local secrets live in `.env`, which is ignored by Git. The default `.env` can keep `FINANCE_HUB_USE_DATABASE=false` until PostgreSQL is running.
+
 ## Checks
 
 ```bash
@@ -35,6 +37,8 @@ corepack pnpm db:migrate
 corepack pnpm db:seed
 ```
 
+When database mode is enabled, source-pack imports persist packs, documents and Markdown chunks; attempts persist corrections and update competency strength.
+
 ## Source Packs
 
 No SaaS connectors are used. Put files under `source-packs/`, then create a manifest:
@@ -42,6 +46,8 @@ No SaaS connectors are used. Put files under `source-packs/`, then create a mani
 ```bash
 corepack pnpm ingest source-packs/cours-master-2025
 ```
+
+The web app also exposes a local upload flow under `Documents` and a librarian search under `Apprendre`.
 
 ## Production
 

@@ -47,12 +47,16 @@ try {
 
   for (const exercise of exercises) {
     await sql`
-      INSERT INTO exercises (id, domain, topic, level, statement, expected_answer, rubric_json, source_chunk_ids)
-      VALUES (${exercise.id}, ${exercise.domainId}, ${exercise.title}, ${exercise.level}, ${exercise.statement}, ${exercise.expectedAnswer}, ${JSON.stringify(exercise.rubric)}::jsonb, ${exercise.sourceChunkIds})
+      INSERT INTO exercises (id, domain, topic, level, estimated_minutes, statement, expected_answer, rubric_json, competency_ids, source_chunk_ids)
+      VALUES (${exercise.id}, ${exercise.domainId}, ${exercise.title}, ${exercise.level}, ${exercise.estimatedMinutes}, ${exercise.statement}, ${exercise.expectedAnswer}, ${JSON.stringify(exercise.rubric)}::jsonb, ${exercise.competencyIds}, ${exercise.sourceChunkIds})
       ON CONFLICT (id) DO UPDATE SET
+        topic = EXCLUDED.topic,
+        level = EXCLUDED.level,
+        estimated_minutes = EXCLUDED.estimated_minutes,
         statement = EXCLUDED.statement,
         expected_answer = EXCLUDED.expected_answer,
         rubric_json = EXCLUDED.rubric_json,
+        competency_ids = EXCLUDED.competency_ids,
         source_chunk_ids = EXCLUDED.source_chunk_ids
     `;
   }

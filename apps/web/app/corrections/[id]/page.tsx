@@ -1,10 +1,10 @@
 import { CorrectionSummary } from "@/components/correction-summary";
-import { getExerciseModel } from "@/lib/view-model";
+import { getCorrectionHistory, getExercises } from "@finance/db";
 import { notFound } from "next/navigation";
 
 export default async function CorrectionDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const { corrections, attempts, exercises } = getExerciseModel();
+  const [{ corrections, attempts }, exercises] = await Promise.all([getCorrectionHistory(), getExercises()]);
   const correction = corrections.find((item) => item.id === id);
 
   if (!correction) {

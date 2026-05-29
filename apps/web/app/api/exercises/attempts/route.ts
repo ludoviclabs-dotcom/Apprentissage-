@@ -1,5 +1,4 @@
-import { exercises } from "@finance/domain";
-import { gradeExercise, recordAttempt } from "@finance/db";
+import { getExerciseById, gradeExercise, recordAttempt } from "@finance/db";
 import { z } from "zod";
 
 const attemptSchema = z.object({
@@ -14,14 +13,25 @@ export async function POST(request: Request) {
     return Response.json({ error: "Invalid attempt", details: body.error.flatten() }, { status: 400 });
   }
 
-  const exercise = exercises.find((item) => item.id === body.data.exerciseId);
+  const exercise = await getExerciseById(body.data.exerciseId);
 
   if (!exercise) {
     return Response.json({ error: "Exercise not found" }, { status: 404 });
   }
 
   const correction = gradeExercise(exercise, body.data.userAnswer);
-  await recordAttempt(exercise.id, body.data.userAnswer, correction);
+
+  try {
+    await recordAttempt(exercise.id, body.data.userAnswer, correction);
+  } catch (error) {
+    return Response.json(
+      {
+        error: "Unable to persist attempt",
+        details: error instanceof Error ? error.message : "Unknown error"
+      },
+      { status: 500 }
+    );
+  }
 
   return Response.json({ correction });
 }

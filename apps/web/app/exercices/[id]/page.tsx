@@ -1,11 +1,11 @@
 import { notFound } from "next/navigation";
-import { exercises } from "@finance/domain";
+import { getExerciseById } from "@finance/db";
 import { ExercisePanel } from "@/components/exercise-panel";
 import { ExerciseAttemptForm } from "@/components/forms/exercise-attempt-form";
 
 export default async function ExerciseDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const exercise = exercises.find((item) => item.id === id);
+  const exercise = await getExerciseById(id);
 
   if (!exercise) {
     notFound();

@@ -54,9 +54,11 @@ export const exercisesTable = pgTable("exercises", {
   domain: text("domain").notNull(),
   topic: text("topic").notNull(),
   level: integer("level").notNull(),
+  estimatedMinutes: integer("estimated_minutes").notNull().default(20),
   statement: text("statement").notNull(),
   expectedAnswer: text("expected_answer").notNull(),
   rubricJson: jsonb("rubric_json").notNull().default([]),
+  competencyIds: text("competency_ids").array().notNull().default([]),
   sourceChunkIds: text("source_chunk_ids").array().notNull().default([])
 });
 
@@ -67,4 +69,22 @@ export const attemptsTable = pgTable("attempts", {
   score: integer("score").notNull(),
   correctionJson: jsonb("correction_json").notNull().default({}),
   createdAt: timestamp("created_at", { mode: "string" }).notNull().defaultNow()
+});
+
+export const correctionsTable = pgTable("corrections", {
+  id: text("id").primaryKey(),
+  attemptId: text("attempt_id").notNull(),
+  score: integer("score").notNull(),
+  summary: text("summary").notNull(),
+  correctJson: jsonb("correct_json").notNull().default([]),
+  errorsJson: jsonb("errors_json").notNull().default([]),
+  remediation: text("remediation").notNull()
+});
+
+export const revisionItemsTable = pgTable("revision_items", {
+  id: text("id").primaryKey(),
+  competencyId: text("competency_id").notNull(),
+  dueAt: timestamp("due_at", { mode: "string" }).notNull(),
+  strength: integer("strength").notNull(),
+  lastReviewedAt: timestamp("last_reviewed_at", { mode: "string" })
 });

@@ -1,4 +1,5 @@
 import { domains, learningPath, type DomainId } from "@finance/domain";
+import { recordDiagnostic } from "@finance/db";
 import { z } from "zod";
 
 const diagnosticSchema = z.object({
@@ -36,6 +37,18 @@ export async function POST(request: Request) {
       };
     })
     .sort((left, right) => left.level - right.level);
+
+  try {
+    await recordDiagnostic(body.data.levels);
+  } catch (error) {
+    return Response.json(
+      {
+        error: "Unable to persist diagnostic",
+        details: error instanceof Error ? error.message : "Unknown error"
+      },
+      { status: 500 }
+    );
+  }
 
   return Response.json({
     recommendedStart: priorities[0],

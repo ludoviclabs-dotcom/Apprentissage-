@@ -1,18 +1,33 @@
-import { desc, eq } from "drizzle-orm";
+import { basename } from "node:path";
+import { desc, eq, ilike, inArray } from "drizzle-orm";
 import {
+  attempts as seedAttempts,
   competencies,
+  corrections as seedCorrections,
   documents as seedDocuments,
   exercises,
   learningPath,
   sourcePacks as seedSourcePacks,
+  type Attempt,
+  type Competency,
+  type CompetencyStatus,
   type Correction,
   type DocumentRecord,
   type Exercise,
+  type RubricItem,
   type SourcePack
 } from "@finance/domain";
-import type { SourcePackManifest } from "@finance/ingest";
+import { chunkMarkdown, extractDocument, type SourcePackManifest } from "@finance/ingest";
 import { createDb, canUseDatabase } from "./client";
-import { attemptsTable, documentsTable, sourcePacksTable } from "./drizzle-schema";
+import {
+  attemptsTable,
+  chunksTable,
+  competenciesTable,
+  correctionsTable,
+  documentsTable,
+  exercisesTable,
+  sourcePacksTable
+} from "./drizzle-schema";
 
 function toSourcePack(row: typeof sourcePacksTable.$inferSelect): SourcePack {
   return {
@@ -45,6 +60,118 @@ function toDocument(row: typeof documentsTable.$inferSelect): DocumentRecord {
   };
 }
 
+function parseRubric(value: unknown): RubricItem[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return value
+    .filter((item): item is RubricItem => {
+      return (
+        typeof item === "object" &&
+        item !== null &&
+        "label" in item &&
+        "points" in item &&
+        typeof item.label === "string" &&
+        typeof item.points === "number"
+      );
+    })
+    .map((item) => ({ label: item.label, points: item.points }));
+}
+
+function toExercise(row: typeof exercisesTable.$inferSelect): Exercise {
+  return {
+    id: row.id,
+    domainId: row.domain as Exercise["domainId"],
+    title: row.topic,
+    level: row.level,
+    estimatedMinutes: row.estimatedMinutes,
+    statement: row.statement,
+    expectedAnswer: row.expectedAnswer,
+    rubric: parseRubric(row.rubricJson),
+    competencyIds: row.competencyIds,
+    sourceChunkIds: row.sourceChunkIds
+  };
+}
+
+function toCompetency(row: typeof competenciesTable.$inferSelect): Competency {
+  return {
+    id: row.id,
+    domainId: row.domain as Competency["domainId"],
+    name: row.name,
+    levelMin: row.levelMin,
+    levelMax: row.levelMax,
+    status: row.status as CompetencyStatus,
+    strength: row.strength,
+    focus: ""
+  };
+}
+
+function toAttempt(row: typeof attemptsTable.$inferSelect): Attempt {
+  const correctionJson = row.correctionJson as Partial<Correction>;
+
+  return {
+    id: row.id,
+    exerciseId: row.exerciseId,
+    userAnswer: row.userAnswer,
+    score: row.score,
+    correctionId: correctionJson.id ?? `corr-${row.id}`,
+    createdAt: row.createdAt
+  };
+}
+
+function toCorrection(row: typeof attemptsTable.$inferSelect): Correction | null {
+  const correctionJson = row.correctionJson as Partial<Correction>;
+
+  if (!correctionJson.id || !correctionJson.exerciseId || typeof correctionJson.score !== "number") {
+    return null;
+  }
+
+  return {
+    id: correctionJson.id,
+    exerciseId: correctionJson.exerciseId,
+    score: correctionJson.score,
+    summary: correctionJson.summary ?? "",
+    correct: correctionJson.correct ?? [],
+    errors: correctionJson.errors ?? [],
+    remediation: correctionJson.remediation ?? "",
+    sourceReferences: correctionJson.sourceReferences ?? []
+  };
+}
+
+function clampStrength(value: number) {
+  return Math.max(0, Math.min(100, Math.round(value)));
+}
+
+function statusFromStrength(strength: number): CompetencyStatus {
+  if (strength >= 75) {
+    return "mastered";
+  }
+
+  if (strength >= 45) {
+    return "in-progress";
+  }
+
+  if (strength > 0) {
+    return "fragile";
+  }
+
+  return "not-started";
+}
+
+export interface KnowledgeHit {
+  content: string;
+  confidence: number;
+  source: {
+    pack: string;
+    document: string;
+    sourceType: "course" | "official-reference" | "personal-note" | "exercise";
+    pageStart?: number;
+    pageEnd?: number;
+    effectiveDate?: string;
+  };
+}
+
 export async function getSourcePacks(): Promise<SourcePack[]> {
   if (!canUseDatabase()) {
     return seedSourcePacks;
@@ -70,6 +197,34 @@ export async function getDocuments(): Promise<DocumentRecord[]> {
     return rows.map(toDocument);
   } catch {
     return seedDocuments;
+  }
+}
+
+export async function getExercises(): Promise<Exercise[]> {
+  if (!canUseDatabase()) {
+    return exercises;
+  }
+
+  try {
+    const db = createDb();
+    const rows = await db.select().from(exercisesTable).orderBy(desc(exercisesTable.level));
+    return rows.map(toExercise);
+  } catch {
+    return exercises;
+  }
+}
+
+export async function getCompetencies(): Promise<Competency[]> {
+  if (!canUseDatabase()) {
+    return competencies;
+  }
+
+  try {
+    const db = createDb();
+    const rows = await db.select().from(competenciesTable);
+    return rows.map(toCompetency);
+  } catch {
+    return competencies;
   }
 }
 
@@ -116,13 +271,67 @@ export async function recordManifest(manifest: SourcePackManifest): Promise<Sour
       }
     });
 
+  for (const file of manifest.files) {
+    const documentId = `${pack.id}-${file.checksum.slice(0, 12)}`;
+    const title = basename(file.path).replace(/\.[^.]+$/, "").replaceAll("-", " ");
+    await db
+      .insert(documentsTable)
+      .values({
+        id: documentId,
+        sourcePackId: pack.id,
+        filename: basename(file.path),
+        fileType: file.extension.slice(1),
+        domain: pack.domainId,
+        title,
+        originalPath: `${manifest.rootPath}/${file.path}`.replaceAll("\\", "/"),
+        checksum: file.checksum,
+        importedAt: now
+      })
+      .onConflictDoUpdate({
+        target: documentsTable.id,
+        set: {
+          title,
+          originalPath: `${manifest.rootPath}/${file.path}`.replaceAll("\\", "/"),
+          checksum: file.checksum,
+          importedAt: now
+        }
+      });
+
+    if (file.extension !== ".md") {
+      continue;
+    }
+
+    const extracted = await extractDocument(manifest.rootPath, file);
+    const chunks = chunkMarkdown(extracted);
+
+    for (const chunk of chunks) {
+      await db
+        .insert(chunksTable)
+        .values({
+          id: chunk.id,
+          documentId,
+          pageStart: chunk.pageStart,
+          pageEnd: chunk.pageEnd,
+          sectionTitle: chunk.sectionTitle,
+          content: chunk.content,
+          contentHash: chunk.contentHash,
+          domain: pack.domainId,
+          topic: chunk.sectionTitle,
+          difficulty: 1,
+          effectiveDate: pack.effectiveDate,
+          sourceType: "personal-note"
+        })
+        .onConflictDoNothing();
+    }
+  }
+
   return pack;
 }
 
-export function getLearningState() {
+export async function getLearningState() {
   return {
-    competencies,
-    exercises,
+    competencies: await getCompetencies(),
+    exercises: await getExercises(),
     learningPath
   };
 }
@@ -159,14 +368,139 @@ export async function recordAttempt(exerciseId: string, userAnswer: string, corr
   }
 
   const db = createDb();
+  const attemptId = `attempt-${Date.now()}`;
   await db.insert(attemptsTable).values({
-    id: `attempt-${Date.now()}`,
+    id: attemptId,
     exerciseId,
     userAnswer,
     score: correction.score,
     correctionJson: correction,
     createdAt: new Date().toISOString()
   });
+  await db.insert(correctionsTable).values({
+    id: correction.id,
+    attemptId,
+    score: correction.score,
+    summary: correction.summary,
+    correctJson: correction.correct,
+    errorsJson: correction.errors,
+    remediation: correction.remediation
+  });
+
+  const exercise = await getExerciseById(exerciseId);
+
+  if (!exercise || exercise.competencyIds.length === 0) {
+    return;
+  }
+
+  const competencyRows = await db
+    .select()
+    .from(competenciesTable)
+    .where(inArray(competenciesTable.id, exercise.competencyIds));
+
+  for (const competency of competencyRows) {
+    const delta = correction.score >= 14 ? 8 : correction.score >= 10 ? 3 : -6;
+    const nextStrength = clampStrength(competency.strength + delta);
+    await db
+      .update(competenciesTable)
+      .set({
+        strength: nextStrength,
+        status: statusFromStrength(nextStrength)
+      })
+      .where(eq(competenciesTable.id, competency.id));
+  }
+}
+
+export async function recordDiagnostic(levels: Record<string, number>) {
+  if (!canUseDatabase()) {
+    return;
+  }
+
+  const db = createDb();
+
+  for (const competency of competencies) {
+    const domainLevel = levels[competency.domainId];
+
+    if (typeof domainLevel !== "number") {
+      continue;
+    }
+
+    const nextStrength = clampStrength((competency.strength + domainLevel) / 2);
+    await db
+      .update(competenciesTable)
+      .set({
+        strength: nextStrength,
+        status: statusFromStrength(nextStrength)
+      })
+      .where(eq(competenciesTable.id, competency.id));
+  }
+}
+
+export async function getCorrectionHistory(): Promise<{
+  attempts: Attempt[];
+  corrections: Correction[];
+}> {
+  if (!canUseDatabase()) {
+    return {
+      attempts: seedAttempts,
+      corrections: seedCorrections
+    };
+  }
+
+  try {
+    const db = createDb();
+    const rows = await db.select().from(attemptsTable).orderBy(desc(attemptsTable.createdAt));
+
+    return {
+      attempts: rows.map(toAttempt),
+      corrections: rows.map(toCorrection).filter((correction): correction is Correction => correction !== null)
+    };
+  } catch {
+    return {
+      attempts: seedAttempts,
+      corrections: seedCorrections
+    };
+  }
+}
+
+export async function searchKnowledge(query: string, limit = 5): Promise<KnowledgeHit[]> {
+  if (!canUseDatabase() || query.trim().length < 3) {
+    return [];
+  }
+
+  try {
+    const db = createDb();
+    const rows = await db
+      .select({
+        content: chunksTable.content,
+        pageStart: chunksTable.pageStart,
+        pageEnd: chunksTable.pageEnd,
+        sourceType: chunksTable.sourceType,
+        effectiveDate: chunksTable.effectiveDate,
+        documentTitle: documentsTable.title,
+        packName: sourcePacksTable.name
+      })
+      .from(chunksTable)
+      .innerJoin(documentsTable, eq(chunksTable.documentId, documentsTable.id))
+      .innerJoin(sourcePacksTable, eq(documentsTable.sourcePackId, sourcePacksTable.id))
+      .where(ilike(chunksTable.content, `%${query.trim()}%`))
+      .limit(limit);
+
+    return rows.map((row, index) => ({
+      content: row.content,
+      confidence: Math.max(0.45, 0.9 - index * 0.08),
+      source: {
+        pack: row.packName,
+        document: row.documentTitle,
+        sourceType: row.sourceType as KnowledgeHit["source"]["sourceType"],
+        pageStart: row.pageStart,
+        pageEnd: row.pageEnd,
+        effectiveDate: row.effectiveDate?.slice(0, 10)
+      }
+    }));
+  } catch {
+    return [];
+  }
 }
 
 export async function getExerciseById(exerciseId: string) {
@@ -174,8 +508,11 @@ export async function getExerciseById(exerciseId: string) {
     return exercises.find((exercise) => exercise.id === exerciseId);
   }
 
-  const db = createDb();
-  const rows = await db.select().from(attemptsTable).where(eq(attemptsTable.exerciseId, exerciseId)).limit(1);
-  void rows;
-  return exercises.find((exercise) => exercise.id === exerciseId);
+  try {
+    const db = createDb();
+    const rows = await db.select().from(exercisesTable).where(eq(exercisesTable.id, exerciseId)).limit(1);
+    return rows[0] ? toExercise(rows[0]) : exercises.find((exercise) => exercise.id === exerciseId);
+  } catch {
+    return exercises.find((exercise) => exercise.id === exerciseId);
+  }
 }
