@@ -4,6 +4,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "start": "python worker.py"
+    "start": "python worker.py",
+    "convert": "python worker.py"
   }
 }

@@ -12,12 +12,17 @@ interface ImportResult {
   details?: string;
 }
 
-export function SourcePackImportForm() {
+export function SourcePackImportForm({ disabled = false }: { disabled?: boolean }) {
   const [path, setPath] = useState("C:\\Users\\Ludo\\Apprentissage\\source-packs");
   const [isPending, setIsPending] = useState(false);
   const [result, setResult] = useState<ImportResult | null>(null);
 
   async function submitImport() {
+    if (disabled) {
+      setResult({ error: "Import désactivé en démo publique." });
+      return;
+    }
+
     setIsPending(true);
     setResult(null);
 
@@ -40,12 +45,13 @@ export function SourcePackImportForm() {
         <span className="section-label">Import local</span>
         <h2>Analyser un dossier source-pack</h2>
         <p>Le MVP crée un manifeste validable. L'extraction Docling et les embeddings viennent ensuite.</p>
+        {disabled ? <p className="muted">Lecture seule : active auth + base privée pour autoriser l'import.</p> : null}
       </div>
       <label>
         Chemin du dossier
-        <input value={path} onChange={(event) => setPath(event.target.value)} />
+        <input value={path} disabled={disabled} onChange={(event) => setPath(event.target.value)} />
       </label>
-      <button type="button" className="primary-action" onClick={submitImport} disabled={isPending}>
+      <button type="button" className="primary-action" onClick={submitImport} disabled={isPending || disabled}>
         {isPending ? "Analyse..." : "Analyser le pack"}
       </button>
       {result?.manifest ? (

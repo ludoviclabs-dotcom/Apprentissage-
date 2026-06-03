@@ -18,7 +18,7 @@ interface UploadResult {
   supported?: string[];
 }
 
-export function DocumentUploadForm() {
+export function DocumentUploadForm({ disabled = false }: { disabled?: boolean }) {
   const [domainId, setDomainId] = useState("compta-generale");
   const [file, setFile] = useState<File | null>(null);
   const [isPending, setIsPending] = useState(false);
@@ -27,6 +27,11 @@ export function DocumentUploadForm() {
   async function submitUpload() {
     if (!file) {
       setResult({ error: "Choisis d'abord un fichier." });
+      return;
+    }
+
+    if (disabled) {
+      setResult({ error: "Upload désactivé en démo publique." });
       return;
     }
 
@@ -55,6 +60,7 @@ export function DocumentUploadForm() {
         <span className="section-label">Upload web</span>
         <h2>Ajouter un document local</h2>
         <p>Le fichier est copie dans data/uploads. Les fichiers Markdown sont prets pour le chunking, les autres attendent Docling.</p>
+        {disabled ? <p className="muted">Lecture seule : active auth + base privée pour autoriser l'upload.</p> : null}
       </div>
       <div className="form-grid">
         <label>
@@ -72,11 +78,12 @@ export function DocumentUploadForm() {
           <input
             type="file"
             accept=".pdf,.docx,.pptx,.xlsx,.md"
+            disabled={disabled}
             onChange={(event) => setFile(event.target.files?.[0] ?? null)}
           />
         </label>
       </div>
-      <button type="button" className="primary-action" onClick={submitUpload} disabled={isPending}>
+      <button type="button" className="primary-action" onClick={submitUpload} disabled={isPending || disabled}>
         {isPending ? "Upload..." : "Uploader"}
       </button>
       {result?.file ? (

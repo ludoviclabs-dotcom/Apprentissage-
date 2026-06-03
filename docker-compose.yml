@@ -34,6 +34,7 @@ services:
     build:
       context: .
       dockerfile: workers/ingestion-worker/Dockerfile
+    command: ["python", "worker.py", "/app/source-packs", "--out", "/app/data/processed/docling"]
     env_file:
       - .env
     depends_on:

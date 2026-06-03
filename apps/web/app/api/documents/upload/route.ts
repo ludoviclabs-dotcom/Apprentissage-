@@ -3,6 +3,7 @@ import { mkdir, writeFile } from "node:fs/promises";
 import { basename, extname, join } from "node:path";
 import type { DomainId } from "@finance/domain";
 import { isSupportedExtension } from "@finance/ingest";
+import { getPublicDemoWriteResponse, getRuntimeFlags } from "@/lib/runtime-flags";
 import { NextResponse } from "next/server";
 
 export const runtime = "nodejs";
@@ -31,6 +32,10 @@ function parseDomainId(value: FormDataEntryValue | null): DomainId {
 }
 
 export async function POST(request: Request) {
+  if (getRuntimeFlags().publicDemo) {
+    return getPublicDemoWriteResponse();
+  }
+
   const formData = await request.formData();
   const file = formData.get("file");
 

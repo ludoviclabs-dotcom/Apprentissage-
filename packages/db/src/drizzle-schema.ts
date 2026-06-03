@@ -24,6 +24,15 @@ export const documentsTable = pgTable("documents", {
   importedAt: timestamp("imported_at", { mode: "string" }).notNull().defaultNow()
 });
 
+export const documentPagesTable = pgTable("document_pages", {
+  id: text("id").primaryKey(),
+  documentId: text("document_id").notNull(),
+  pageNumber: integer("page_number").notNull(),
+  rawText: text("raw_text").notNull().default(""),
+  markdownText: text("markdown_text").notNull().default(""),
+  extractedTablesJson: jsonb("extracted_tables_json").notNull().default([])
+});
+
 export const chunksTable = pgTable("chunks", {
   id: text("id").primaryKey(),
   documentId: text("document_id").notNull(),
@@ -47,6 +56,50 @@ export const competenciesTable = pgTable("competencies", {
   levelMax: integer("level_max").notNull(),
   status: text("status").notNull(),
   strength: integer("strength").notNull()
+});
+
+export const learningPathsTable = pgTable("learning_paths", {
+  id: text("id").primaryKey(),
+  name: text("name").notNull(),
+  durationDays: integer("duration_days").notNull(),
+  currentDay: integer("current_day").notNull().default(1),
+  goal: text("goal").notNull()
+});
+
+export const lessonsTable = pgTable("lessons", {
+  id: text("id").primaryKey(),
+  domain: text("domain").notNull(),
+  title: text("title").notNull(),
+  concept: text("concept").notNull(),
+  rule: text("rule").notNull(),
+  reasoning: text("reasoning").notNull(),
+  example: text("example").notNull(),
+  frequentError: text("frequent_error").notNull(),
+  linkedExerciseId: text("linked_exercise_id")
+});
+
+export const lessonSourcesTable = pgTable("lesson_sources", {
+  id: text("id").primaryKey(),
+  lessonId: text("lesson_id").notNull(),
+  pack: text("pack").notNull(),
+  document: text("document").notNull(),
+  sourceType: text("source_type").notNull(),
+  pageStart: integer("page_start"),
+  pageEnd: integer("page_end"),
+  effectiveDate: timestamp("effective_date", { mode: "string" })
+});
+
+export const learningDaysTable = pgTable("learning_days", {
+  id: text("id").primaryKey(),
+  learningPathId: text("learning_path_id").notNull(),
+  dayNumber: integer("day_number").notNull(),
+  title: text("title").notNull(),
+  domain: text("domain").notNull(),
+  competencyIds: text("competency_ids").array().notNull().default([]),
+  lessonId: text("lesson_id").notNull(),
+  exerciseId: text("exercise_id").notNull(),
+  minutes: integer("minutes").notNull(),
+  status: text("status").notNull()
 });
 
 export const exercisesTable = pgTable("exercises", {

@@ -1,8 +1,10 @@
 import { DocumentInventory } from "@/components/forms/document-inventory";
 import { DocumentUploadForm } from "@/components/forms/document-upload-form";
+import { getRuntimeFlags } from "@/lib/runtime-flags";
 import { getDocuments } from "@finance/db";
 
 export default async function DocumentsPage() {
+  const runtime = getRuntimeFlags();
   const documents = await getDocuments();
   const ready = documents.filter((document) => document.status === "ready").length;
   const pages = documents.reduce((sum, document) => sum + document.pages, 0);
@@ -54,7 +56,7 @@ export default async function DocumentsPage() {
         </article>
       </section>
 
-      <DocumentUploadForm />
+      <DocumentUploadForm disabled={runtime.publicDemo} />
 
       <DocumentInventory documents={documents} />
     </div>

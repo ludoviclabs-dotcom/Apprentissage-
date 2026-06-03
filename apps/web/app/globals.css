@@ -170,6 +170,27 @@ button {
   background: var(--success);
 }
 
+.demo-banner {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 28px;
+  border-bottom: 1px solid #fecdd3;
+  background: #fff1f2;
+  color: #9f1239;
+}
+
+.demo-banner strong {
+  flex: 0 0 auto;
+  font-size: 0.86rem;
+  text-transform: uppercase;
+}
+
+.demo-banner span {
+  color: #4b5563;
+  line-height: 1.45;
+}
+
 .content {
   width: min(1280px, 100%);
   margin: 0 auto;
@@ -981,6 +1002,7 @@ button {
   }
 
   .topbar,
+  .demo-banner,
   .page-header,
   .focus-panel,
   .generator-panel {

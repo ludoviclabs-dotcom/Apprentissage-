@@ -1,24 +1,35 @@
 import {
-  attempts,
-  competencies,
-  corrections,
   dashboardPriorities,
-  documents,
   domains,
-  exercises,
   getDomainAverage,
   getWeakestCompetencies,
-  learningPath,
-  lessons,
-  sourcePacks
 } from "@finance/domain";
+import {
+  getCompetencies,
+  getCorrectionHistory,
+  getDocuments,
+  getExercises,
+  getLearningPath,
+  getLessons,
+  getSourcePacks
+} from "@finance/db";
 
-export function getDashboardModel() {
+export async function getDashboardModel() {
+  const [competencies, exercises, lessons, learningPath, correctionHistory, sourcePacks, documents] =
+    await Promise.all([
+      getCompetencies(),
+      getExercises(),
+      getLessons(),
+      getLearningPath(),
+      getCorrectionHistory(),
+      getSourcePacks(),
+      getDocuments()
+    ]);
   const currentDay = learningPath.days.find((day) => day.status === "today") ?? learningPath.days[0];
-  const currentLesson = lessons.find((lesson) => lesson.id === currentDay.lessonId) ?? lessons[0];
+  const currentLesson = lessons.find((lesson) => lesson.id === currentDay?.lessonId) ?? lessons[0];
   const currentExercise =
-    exercises.find((exercise) => exercise.id === currentDay.exerciseId) ?? exercises[0];
-  const latestCorrection = corrections[0];
+    exercises.find((exercise) => exercise.id === currentDay?.exerciseId) ?? exercises[0];
+  const latestCorrection = correctionHistory.corrections[0];
 
   return {
     domains: domains.map((domain) => ({
@@ -36,13 +47,19 @@ export function getDashboardModel() {
     priorities: dashboardPriorities,
     weakestCompetencies: getWeakestCompetencies(competencies, 5),
     learningPath,
-    attempts,
+    attempts: correctionHistory.attempts,
     sourcePacks,
     documents
   };
 }
 
-export function getLearningModel() {
+export async function getLearningModel() {
+  const [learningPath, lessons, exercises, competencies] = await Promise.all([
+    getLearningPath(),
+    getLessons(),
+    getExercises(),
+    getCompetencies()
+  ]);
   const currentDay = learningPath.days.find((day) => day.status === "today") ?? learningPath.days[0];
 
   return {
@@ -55,17 +72,25 @@ export function getLearningModel() {
   };
 }
 
-export function getExerciseModel() {
+export async function getExerciseModel() {
+  const [exercises, correctionHistory, competencies] = await Promise.all([
+    getExercises(),
+    getCorrectionHistory(),
+    getCompetencies()
+  ]);
+
   return {
     exercises,
-    corrections,
-    attempts,
+    corrections: correctionHistory.corrections,
+    attempts: correctionHistory.attempts,
     domains,
     competencies
   };
 }
 
-export function getSourceModel() {
+export async function getSourceModel() {
+  const [sourcePacks, documents] = await Promise.all([getSourcePacks(), getDocuments()]);
+
   return {
     sourcePacks,
     documents,

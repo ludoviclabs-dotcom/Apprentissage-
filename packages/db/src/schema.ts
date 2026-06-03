@@ -11,6 +11,8 @@ export const tables = [
   "competencies",
   "learning_paths",
   "lessons",
+  "lesson_sources",
+  "learning_days",
   "exercises",
   "attempts",
   "corrections",

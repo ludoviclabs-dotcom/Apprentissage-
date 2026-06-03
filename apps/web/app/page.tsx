@@ -7,8 +7,12 @@ import { ProgressMeter } from "@/components/progress-meter";
 import { getDashboardModel } from "@/lib/view-model";
 import { getDomain } from "@finance/domain";
 
-export default function DashboardPage() {
-  const model = getDashboardModel();
+export default async function DashboardPage() {
+  const model = await getDashboardModel();
+
+  if (!model.currentDay || !model.currentLesson || !model.currentExercise || !model.latestCorrection) {
+    return null;
+  }
 
   return (
     <div className="page-stack">

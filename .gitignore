@@ -5,6 +5,8 @@ coverage/
 .env
 .env.local
 *.log
+__pycache__/
+*.pyc
 data/raw/*
 data/processed/*
 data/exports/*

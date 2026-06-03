@@ -36,9 +36,15 @@ Drizzle was chosen over Prisma for the MVP because the schema stays close to Pos
 Current persistence coverage:
 
 - source packs and documents;
-- Markdown chunks during source-pack import;
+- document pages and Markdown chunks during source-pack import;
+- learning path, learning days, lessons and lesson source references;
 - exercises loaded from DB when enabled;
 - attempts and corrections;
-- competency strength updates after correction or diagnostic.
+- competency strength updates after correction or diagnostic;
+- revision items scheduled after exercise correction.
 
-The next persistence gap is full learning-path storage and revision item scheduling.
+The next persistence gap is durable user profiles and cohort-level analytics.
+
+## Public Demo Safeguard
+
+Production without auth is read-only by default. The app shows a demo banner and blocks write routes for uploads and source-pack imports. Private mode requires auth plus a private database.

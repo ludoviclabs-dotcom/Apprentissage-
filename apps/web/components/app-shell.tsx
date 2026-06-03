@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import type { ReactNode } from "react";
+import type { RuntimeFlags } from "@/lib/runtime-flags";
 import {
   BookOpen,
   BriefcaseBusiness,
@@ -24,8 +25,13 @@ const navigation = [
   { href: "/simulations", label: "Simulations", icon: BriefcaseBusiness }
 ];
 
-export function AppShell({ children }: { children: ReactNode }) {
+export function AppShell({ children, runtime }: { children: ReactNode; runtime: RuntimeFlags }) {
   const pathname = usePathname();
+  const statusLabel = runtime.publicDemo
+    ? "Démo publique lecture seule"
+    : runtime.databaseActive
+      ? "Base privée active"
+      : "Données locales seedées";
 
   return (
     <div className="app-shell">
@@ -68,9 +74,18 @@ export function AppShell({ children }: { children: ReactNode }) {
           </div>
           <div className="topbar-status">
             <span className="status-dot" aria-hidden="true" />
-            Données locales seedées
+            {statusLabel}
           </div>
         </header>
+        {runtime.publicDemo ? (
+          <section className="demo-banner" aria-label="Statut de la démonstration">
+            <strong>Démo publique</strong>
+            <span>
+              Les imports et uploads sont bloqués en production publique. Ne dépose aucun document réel tant que
+              l'authentification et la base privée ne sont pas activées.
+            </span>
+          </section>
+        ) : null}
         <main className="content">{children}</main>
       </div>
     </div>

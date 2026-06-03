@@ -1,9 +1,11 @@
 import { DomainBadge } from "@/components/domain-badge";
 import { SourcePackImportForm } from "@/components/forms/source-pack-import-form";
+import { getRuntimeFlags } from "@/lib/runtime-flags";
 import { getSourcePacks } from "@finance/db";
 import Link from "next/link";
 
 export default async function SourcePacksPage() {
+  const runtime = getRuntimeFlags();
   const sourcePacks = await getSourcePacks();
 
   return (
@@ -46,7 +48,7 @@ export default async function SourcePacksPage() {
         </p>
       </section>
 
-      <SourcePackImportForm />
+      <SourcePackImportForm disabled={runtime.publicDemo} />
     </div>
   );
 }

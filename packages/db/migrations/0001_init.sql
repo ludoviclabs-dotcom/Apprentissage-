@@ -105,6 +105,31 @@ CREATE TABLE IF NOT EXISTS lessons (
   linked_exercise_id TEXT
 );
 
+CREATE TABLE IF NOT EXISTS lesson_sources (
+  id TEXT PRIMARY KEY,
+  lesson_id TEXT NOT NULL REFERENCES lessons(id) ON DELETE CASCADE,
+  pack TEXT NOT NULL,
+  document TEXT NOT NULL,
+  source_type TEXT NOT NULL CHECK (source_type IN ('course', 'official-reference', 'personal-note', 'exercise')),
+  page_start INTEGER,
+  page_end INTEGER,
+  effective_date DATE
+);
+
+CREATE TABLE IF NOT EXISTS learning_days (
+  id TEXT PRIMARY KEY,
+  learning_path_id TEXT NOT NULL REFERENCES learning_paths(id) ON DELETE CASCADE,
+  day_number INTEGER NOT NULL,
+  title TEXT NOT NULL,
+  domain TEXT NOT NULL,
+  competency_ids TEXT[] NOT NULL DEFAULT '{}',
+  lesson_id TEXT NOT NULL,
+  exercise_id TEXT NOT NULL,
+  minutes INTEGER NOT NULL,
+  status TEXT NOT NULL CHECK (status IN ('done', 'today', 'next', 'locked')),
+  UNIQUE (learning_path_id, day_number)
+);
+
 CREATE TABLE IF NOT EXISTS exercises (
   id TEXT PRIMARY KEY,
   domain TEXT NOT NULL,
@@ -152,3 +177,6 @@ CREATE TABLE IF NOT EXISTS revision_items (
   strength INTEGER NOT NULL CHECK (strength BETWEEN 0 AND 100),
   last_reviewed_at TIMESTAMPTZ
 );
+
+ALTER TABLE IF EXISTS exercises ADD COLUMN IF NOT EXISTS estimated_minutes INTEGER NOT NULL DEFAULT 20;
+ALTER TABLE IF EXISTS exercises ADD COLUMN IF NOT EXISTS competency_ids TEXT[] NOT NULL DEFAULT '{}';

@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
 import { AppShell } from "@/components/app-shell";
+import { getRuntimeFlags } from "@/lib/runtime-flags";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -9,10 +10,12 @@ export const metadata: Metadata = {
 };
 
 export default function RootLayout({ children }: { children: ReactNode }) {
+  const runtime = getRuntimeFlags();
+
   return (
     <html lang="fr">
       <body>
-        <AppShell>{children}</AppShell>
+        <AppShell runtime={runtime}>{children}</AppShell>
       </body>
     </html>
   );

@@ -1,5 +1,5 @@
 import { basename } from "node:path";
-import { desc, eq, ilike, inArray } from "drizzle-orm";
+import { asc, desc, eq, ilike, inArray } from "drizzle-orm";
 import {
   attempts as seedAttempts,
   competencies,
@@ -7,6 +7,7 @@ import {
   documents as seedDocuments,
   exercises,
   learningPath,
+  lessons,
   sourcePacks as seedSourcePacks,
   type Attempt,
   type Competency,
@@ -14,7 +15,11 @@ import {
   type Correction,
   type DocumentRecord,
   type Exercise,
+  type LearningDay,
+  type LearningPath,
+  type Lesson,
   type RubricItem,
+  type SourceReference,
   type SourcePack
 } from "@finance/domain";
 import { chunkMarkdown, extractDocument, type SourcePackManifest } from "@finance/ingest";
@@ -23,9 +28,15 @@ import {
   attemptsTable,
   chunksTable,
   competenciesTable,
+  documentPagesTable,
   correctionsTable,
   documentsTable,
   exercisesTable,
+  learningDaysTable,
+  learningPathsTable,
+  lessonsTable,
+  lessonSourcesTable,
+  revisionItemsTable,
   sourcePacksTable
 } from "./drizzle-schema";
 
@@ -104,6 +115,48 @@ function toCompetency(row: typeof competenciesTable.$inferSelect): Competency {
     status: row.status as CompetencyStatus,
     strength: row.strength,
     focus: ""
+  };
+}
+
+function toLesson(
+  row: typeof lessonsTable.$inferSelect,
+  sourceReferences: SourceReference[] = []
+): Lesson {
+  return {
+    id: row.id,
+    domainId: row.domain as Lesson["domainId"],
+    title: row.title,
+    concept: row.concept,
+    rule: row.rule,
+    reasoning: row.reasoning,
+    example: row.example,
+    frequentError: row.frequentError,
+    linkedExerciseId: row.linkedExerciseId ?? "",
+    sourceReferences
+  };
+}
+
+function toSourceReference(row: typeof lessonSourcesTable.$inferSelect): SourceReference {
+  return {
+    pack: row.pack,
+    document: row.document,
+    sourceType: row.sourceType as SourceReference["sourceType"],
+    pageStart: row.pageStart ?? undefined,
+    pageEnd: row.pageEnd ?? undefined,
+    effectiveDate: row.effectiveDate?.slice(0, 10)
+  };
+}
+
+function toLearningDay(row: typeof learningDaysTable.$inferSelect): LearningDay {
+  return {
+    day: row.dayNumber,
+    title: row.title,
+    domainId: row.domain as LearningDay["domainId"],
+    competencyIds: row.competencyIds,
+    lessonId: row.lessonId,
+    exerciseId: row.exerciseId,
+    minutes: row.minutes,
+    status: row.status as LearningDay["status"]
   };
 }
 
@@ -228,6 +281,71 @@ export async function getCompetencies(): Promise<Competency[]> {
   }
 }
 
+export async function getLessons(): Promise<Lesson[]> {
+  if (!canUseDatabase()) {
+    return lessons;
+  }
+
+  try {
+    const db = createDb();
+    const lessonRows = await db.select().from(lessonsTable).orderBy(asc(lessonsTable.title));
+
+    if (lessonRows.length === 0) {
+      return lessons;
+    }
+
+    const sourceRows = await db
+      .select()
+      .from(lessonSourcesTable)
+      .where(inArray(lessonSourcesTable.lessonId, lessonRows.map((lesson) => lesson.id)));
+
+    const sourcesByLesson = new Map<string, SourceReference[]>();
+
+    for (const source of sourceRows) {
+      const existing = sourcesByLesson.get(source.lessonId) ?? [];
+      existing.push(toSourceReference(source));
+      sourcesByLesson.set(source.lessonId, existing);
+    }
+
+    return lessonRows.map((lesson) => toLesson(lesson, sourcesByLesson.get(lesson.id) ?? []));
+  } catch {
+    return lessons;
+  }
+}
+
+export async function getLearningPath(): Promise<LearningPath> {
+  if (!canUseDatabase()) {
+    return learningPath;
+  }
+
+  try {
+    const db = createDb();
+    const pathRows = await db.select().from(learningPathsTable).limit(1);
+    const path = pathRows[0];
+
+    if (!path) {
+      return learningPath;
+    }
+
+    const dayRows = await db
+      .select()
+      .from(learningDaysTable)
+      .where(eq(learningDaysTable.learningPathId, path.id))
+      .orderBy(asc(learningDaysTable.dayNumber));
+
+    return {
+      id: path.id,
+      name: path.name,
+      durationDays: path.durationDays,
+      currentDay: path.currentDay,
+      goal: path.goal,
+      days: dayRows.length > 0 ? dayRows.map(toLearningDay) : learningPath.days
+    };
+  } catch {
+    return learningPath;
+  }
+}
+
 export async function recordManifest(manifest: SourcePackManifest): Promise<SourcePack> {
   const id = manifest.rootPath.replaceAll("\\", "/").split("/").filter(Boolean).at(-1) ?? "source-pack";
   const now = new Date().toISOString();
@@ -303,6 +421,24 @@ export async function recordManifest(manifest: SourcePackManifest): Promise<Sour
 
     const extracted = await extractDocument(manifest.rootPath, file);
     const chunks = chunkMarkdown(extracted);
+    await db
+      .insert(documentPagesTable)
+      .values({
+        id: `${documentId}-page-1`,
+        documentId,
+        pageNumber: 1,
+        rawText: extracted.rawText,
+        markdownText: extracted.markdownText,
+        extractedTablesJson: []
+      })
+      .onConflictDoUpdate({
+        target: documentPagesTable.id,
+        set: {
+          rawText: extracted.rawText,
+          markdownText: extracted.markdownText,
+          extractedTablesJson: []
+        }
+      });
 
     for (const chunk of chunks) {
       await db
@@ -332,7 +468,8 @@ export async function getLearningState() {
   return {
     competencies: await getCompetencies(),
     exercises: await getExercises(),
-    learningPath
+    learningPath: await getLearningPath(),
+    lessons: await getLessons()
   };
 }
 
@@ -408,6 +545,17 @@ export async function recordAttempt(exerciseId: string, userAnswer: string, corr
         status: statusFromStrength(nextStrength)
       })
       .where(eq(competenciesTable.id, competency.id));
+
+    const dueDate = new Date();
+    dueDate.setDate(dueDate.getDate() + (correction.score >= 14 ? 7 : correction.score >= 10 ? 3 : 1));
+
+    await db.insert(revisionItemsTable).values({
+      id: `revision-${competency.id}-${Date.now()}`,
+      competencyId: competency.id,
+      dueAt: dueDate.toISOString(),
+      strength: nextStrength,
+      lastReviewedAt: new Date().toISOString()
+    });
   }
 }
 

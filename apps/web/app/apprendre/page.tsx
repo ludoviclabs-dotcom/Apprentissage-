@@ -6,9 +6,13 @@ import { TutorAskForm } from "@/components/forms/tutor-ask-form";
 import { getLearningModel } from "@/lib/view-model";
 import { getDomain } from "@finance/domain";
 
-export default function LearnPage() {
-  const { learningPath, currentDay, lessons } = getLearningModel();
-  const currentLesson = lessons.find((lesson) => lesson.id === currentDay.lessonId) ?? lessons[0];
+export default async function LearnPage() {
+  const { learningPath, currentDay, lessons } = await getLearningModel();
+  const currentLesson = lessons.find((lesson) => lesson.id === currentDay?.lessonId) ?? lessons[0];
+
+  if (!currentDay || !currentLesson) {
+    return null;
+  }
 
   return (
     <div className="page-stack">

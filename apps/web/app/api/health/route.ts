@@ -1,16 +1,26 @@
-import { getDbHealth } from "@finance/db";
+import { checkDatabaseConnection, getDbHealth } from "@finance/db";
+import { getRuntimeFlags } from "@/lib/runtime-flags";
 
 export async function GET() {
+  const runtime = getRuntimeFlags();
+  const connection = await checkDatabaseConnection();
+
   return Response.json({
     app: "Finance Learning Hub",
     status: "ok",
+    mode: runtime.publicDemo ? "public-demo" : "private",
     database: {
-      configured: Boolean(process.env.DATABASE_URL),
-      active: process.env.FINANCE_HUB_USE_DATABASE === "true",
+      configured: runtime.databaseConfigured,
+      active: runtime.databaseActive,
+      reachable: connection.reachable,
+      reason: connection.reason,
       ...getDbHealth()
     },
     auth: {
-      enabled: process.env.LEARNING_HUB_AUTH_ENABLED === "true"
+      enabled: runtime.authEnabled
+    },
+    safeguards: {
+      writesBlocked: runtime.publicDemo
     }
   });
 }

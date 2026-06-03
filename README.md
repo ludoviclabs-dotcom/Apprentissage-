@@ -13,6 +13,8 @@ Open `http://localhost:3000`.
 
 Local secrets live in `.env`, which is ignored by Git. The default `.env` can keep `FINANCE_HUB_USE_DATABASE=false` until PostgreSQL is running.
 
+Production without auth is treated as a read-only public demo. Uploads and source-pack imports are blocked until auth and a private database are enabled.
+
 ## Checks
 
 ```bash
@@ -48,6 +50,12 @@ corepack pnpm ingest source-packs/cours-master-2025
 ```
 
 The web app also exposes a local upload flow under `Documents` and a librarian search under `Apprendre`.
+
+Docling worker conversion:
+
+```bash
+docker compose run --rm ingestion-worker python worker.py /app/source-packs/cours-master-2025 --out /app/data/processed/docling
+```
 
 ## Production
 

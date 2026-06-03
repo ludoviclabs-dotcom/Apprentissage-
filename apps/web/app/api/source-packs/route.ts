@@ -1,3 +1,4 @@
+import { getPublicDemoWriteResponse, getRuntimeFlags } from "@/lib/runtime-flags";
 import { getSourcePacks, recordManifest } from "@finance/db";
 import { createSourcePackManifest } from "@finance/ingest";
 import { z } from "zod";
@@ -12,6 +13,10 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
+  if (getRuntimeFlags().publicDemo) {
+    return getPublicDemoWriteResponse();
+  }
+
   const body = importRequestSchema.safeParse(await request.json());
 
   if (!body.success) {
