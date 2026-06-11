@@ -195,11 +195,40 @@ export const corrections: Correction[] = [
     id: "corr-provision-litige",
     exerciseId: "ex-provision-litige",
     score: 14,
+    rubricScores: [
+      {
+        criterion: "Qualification obligation/probabilite/estimation",
+        maxPoints: 8,
+        awardedPoints: 6,
+        justification: "La provision est identifiee, mais les trois conditions ne sont pas toutes explicitees."
+      },
+      {
+        criterion: "Rattachement a la cloture",
+        maxPoints: 4,
+        awardedPoints: 4,
+        justification: "Le fait generateur au 31/12 est correctement rattache a l'exercice."
+      },
+      {
+        criterion: "Ecriture et justification",
+        maxPoints: 6,
+        awardedPoints: 4,
+        justification: "L'ecriture est plausible, mais le montant retenu doit etre mieux documente."
+      },
+      {
+        criterion: "Limites et annexe",
+        maxPoints: 2,
+        awardedPoints: 0,
+        justification: "L'information en annexe n'est pas traitee."
+      }
+    ],
     summary: "La logique de provision est comprise, mais la justification doit mieux isoler l'obligation actuelle et la meilleure estimation.",
     correct: [
       "Le rattachement à la clôture est identifié.",
       "La probabilité de sortie de ressources est bien utilisée.",
       "L'écriture proposée est cohérente avec le traitement attendu."
+    ],
+    partialPoints: [
+      "La meilleure estimation est suggeree, mais la fourchette 12 000-16 000 EUR n'est pas discutee."
     ],
     errors: [
       "La fourchette n'est pas discutée pour justifier le montant retenu.",
@@ -215,7 +244,28 @@ export const corrections: Correction[] = [
         pageEnd: 44,
         effectiveDate: "2025-09-01"
       }
-    ]
+    ],
+    calculationErrors: [],
+    accountingTreatmentErrors: [
+      "L'annexe n'est pas mentionnee alors que l'incertitude doit etre documentee."
+    ],
+    reasoningErrors: [
+      "La reponse conclut trop vite sans isoler obligation, probabilite et estimation fiable."
+    ],
+    sourceQualityIssues: [
+      "La justification ne cite pas explicitement le document ou la page utilisee."
+    ],
+    missingElements: [
+      "Discussion de la fourchette d'estimation.",
+      "Mention de l'information en annexe."
+    ],
+    remediationPlan: {
+      microLesson: "Reprendre la sequence fait generateur, obligation actuelle, sortie probable, estimation fiable, puis annexe.",
+      nextAction: "Refaire la reponse en quatre blocs et justifier le montant retenu dans la fourchette.",
+      competencyTags: ["cg-provisions", "cg-cutoff"],
+      expectedAnswer: "Constater une provision si l'obligation est nee avant cloture, la sortie probable et l'incertitude.",
+      nextExerciseId: "ex-ias37-comparison"
+    }
   }
 ];
 

@@ -18,7 +18,9 @@ import {
   type LearningDay,
   type LearningPath,
   type Lesson,
+  type RemediationPlan,
   type RubricItem,
+  type RubricScore,
   type SourceReference,
   type SourcePack
 } from "@finance/domain";
@@ -180,16 +182,7 @@ function toCorrection(row: typeof attemptsTable.$inferSelect): Correction | null
     return null;
   }
 
-  return {
-    id: correctionJson.id,
-    exerciseId: correctionJson.exerciseId,
-    score: correctionJson.score,
-    summary: correctionJson.summary ?? "",
-    correct: correctionJson.correct ?? [],
-    errors: correctionJson.errors ?? [],
-    remediation: correctionJson.remediation ?? "",
-    sourceReferences: correctionJson.sourceReferences ?? []
-  };
+  return completeCorrection(correctionJson);
 }
 
 function clampStrength(value: number) {
@@ -210,6 +203,40 @@ function statusFromStrength(strength: number): CompetencyStatus {
   }
 
   return "not-started";
+}
+
+function defaultRemediationPlan(correction: Partial<Correction>): RemediationPlan {
+  return {
+    microLesson:
+      "Reprendre la reponse en quatre blocs : fait, regle, traitement, conclusion sourcee.",
+    nextAction: correction.remediation ?? "Refaire un mini-cas court avec le meme bareme.",
+    competencyTags: [],
+    expectedAnswer: "Comparer la reponse au corrige attendu puis citer les sources utiles."
+  };
+}
+
+function completeCorrection(correction: Partial<Correction>): Correction {
+  const correct = correction.correct ?? [];
+  const errors = correction.errors ?? [];
+
+  return {
+    id: correction.id ?? `corr-fallback-${Date.now()}`,
+    exerciseId: correction.exerciseId ?? "",
+    score: correction.score ?? 0,
+    summary: correction.summary ?? "",
+    rubricScores: correction.rubricScores ?? [],
+    correct,
+    partialPoints: correction.partialPoints ?? [],
+    errors,
+    calculationErrors: correction.calculationErrors ?? [],
+    accountingTreatmentErrors: correction.accountingTreatmentErrors ?? errors,
+    reasoningErrors: correction.reasoningErrors ?? [],
+    sourceQualityIssues: correction.sourceQualityIssues ?? [],
+    missingElements: correction.missingElements ?? [],
+    remediation: correction.remediation ?? "",
+    remediationPlan: correction.remediationPlan ?? defaultRemediationPlan(correction),
+    sourceReferences: correction.sourceReferences ?? []
+  };
 }
 
 export interface KnowledgeHit {
@@ -473,7 +500,7 @@ export async function getLearningState() {
   };
 }
 
-export function gradeExercise(exercise: Exercise, userAnswer: string): Correction {
+function _gradeExerciseLegacy(exercise: Exercise, userAnswer: string) {
   const normalized = userAnswer.toLowerCase();
   const rubricScore = exercise.rubric.reduce((score, item) => {
     const keyword = item.label.toLowerCase().split(" ")[0];
@@ -496,6 +523,305 @@ export function gradeExercise(exercise: Exercise, userAnswer: string): Correctio
         : ["La justification normative est trop courte.", "La conclusion opérationnelle reste insuffisante."],
     remediation: "Refaire la réponse en quatre blocs : fait, règle, calcul ou traitement, conclusion sourcée.",
     sourceReferences: []
+  };
+}
+
+const STOP_WORDS = new Set([
+  "avec",
+  "dans",
+  "des",
+  "du",
+  "elle",
+  "est",
+  "les",
+  "pour",
+  "que",
+  "qui",
+  "sur",
+  "une"
+]);
+
+const CRITERION_TERMS: Record<string, string[]> = {
+  "ex-provision-litige:qualification obligation/probabilite/estimation": [
+    "obligation",
+    "probable",
+    "probabilite",
+    "sortie de ressources",
+    "estimation fiable",
+    "provision"
+  ],
+  "ex-provision-litige:rattachement a la cloture": [
+    "31/12",
+    "cloture",
+    "avant la cloture",
+    "fait generateur",
+    "periode"
+  ],
+  "ex-provision-litige:ecriture et justification": [
+    "dotation",
+    "debit",
+    "credit",
+    "compte",
+    "14000",
+    "14 000",
+    "12 000",
+    "16 000"
+  ],
+  "ex-provision-litige:limites et annexe": [
+    "annexe",
+    "incertitude",
+    "fourchette",
+    "information",
+    "limite"
+  ],
+  "ex-ias37-comparison:criteres ias 37": [
+    "ias 37",
+    "obligation actuelle",
+    "sortie probable",
+    "estimation fiable",
+    "passif eventuel",
+    "provision"
+  ],
+  "ex-ias37-comparison:comparaison pcg": [
+    "pcg",
+    "prudence",
+    "francais",
+    "regle comptable",
+    "comptabilite generale"
+  ],
+  "ex-ias37-comparison:qualite de la justification": [
+    "source",
+    "preuve",
+    "document",
+    "page",
+    "citer",
+    "justification"
+  ],
+  "ex-ias37-comparison:conclusion operationnelle": [
+    "conclusion",
+    "comptabiliser",
+    "annexe",
+    "traitement",
+    "recommandation"
+  ]
+};
+
+function normalizeForMatch(value: string) {
+  return value
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[’']/g, "'")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function uniqueSources(sources: SourceReference[]) {
+  const seen = new Set<string>();
+
+  return sources.filter((source) => {
+    const key = `${source.pack}:${source.document}:${source.pageStart ?? ""}:${source.effectiveDate ?? ""}`;
+
+    if (seen.has(key)) {
+      return false;
+    }
+
+    seen.add(key);
+    return true;
+  });
+}
+
+function getExerciseSourceReferences(exercise: Exercise): SourceReference[] {
+  const linkedLessons = lessons.filter((lesson) => lesson.linkedExerciseId === exercise.id);
+
+  if (linkedLessons.length > 0) {
+    return uniqueSources(linkedLessons.flatMap((lesson) => lesson.sourceReferences));
+  }
+
+  return uniqueSources(
+    lessons
+      .filter((lesson) => lesson.domainId === exercise.domainId)
+      .flatMap((lesson) => lesson.sourceReferences)
+  );
+}
+
+function genericCriterionTerms(exercise: Exercise, item: RubricItem) {
+  const terms = `${item.label} ${exercise.expectedAnswer}`
+    .split(/[^A-Za-z0-9]+/)
+    .map((part) => normalizeForMatch(part))
+    .filter((part) => part.length > 3 && !STOP_WORDS.has(part));
+
+  return [...new Set(terms)].slice(0, 8);
+}
+
+function termsForCriterion(exercise: Exercise, item: RubricItem) {
+  return CRITERION_TERMS[`${exercise.id}:${normalizeForMatch(item.label)}`] ?? genericCriterionTerms(exercise, item);
+}
+
+function countMatches(answer: string, terms: string[]) {
+  return terms.filter((term) => answer.includes(normalizeForMatch(term))).length;
+}
+
+function scoreRubricItem(exercise: Exercise, item: RubricItem, normalizedAnswer: string): RubricScore {
+  const terms = termsForCriterion(exercise, item);
+  const matches = countMatches(normalizedAnswer, terms);
+  const ratio = terms.length === 0 ? 0 : matches / terms.length;
+  const awardedPoints =
+    ratio >= 0.65
+      ? item.points
+      : ratio >= 0.4
+        ? Math.ceil(item.points * 0.7)
+        : ratio >= 0.2
+          ? Math.ceil(item.points * 0.4)
+          : 0;
+
+  return {
+    criterion: item.label,
+    maxPoints: item.points,
+    awardedPoints,
+    justification:
+      awardedPoints === item.points
+        ? "Critere traite avec les notions attendues."
+        : awardedPoints > 0
+          ? "Critere partiellement traite : la logique est presente mais certains mots-preuves manquent."
+          : "Critere non etaye dans la reponse."
+  };
+}
+
+function hasAny(answer: string, terms: string[]) {
+  return terms.some((term) => answer.includes(normalizeForMatch(term)));
+}
+
+function classifyErrors(exercise: Exercise, normalizedAnswer: string) {
+  const calculationErrors: string[] = [];
+  const accountingTreatmentErrors: string[] = [];
+  const reasoningErrors: string[] = [];
+  const sourceQualityIssues: string[] = [];
+  const missingElements: string[] = [];
+
+  if (exercise.id === "ex-provision-litige") {
+    if (!hasAny(normalizedAnswer, ["14 000", "14000", "12 000", "12000", "16 000", "16000"])) {
+      missingElements.push("Montant ou fourchette d'estimation non exploite.");
+    }
+
+    if (hasAny(normalizedAnswer, ["18 000", "18000"]) && !hasAny(normalizedAnswer, ["14 000", "14000", "fourchette"])) {
+      calculationErrors.push("Le montant reclame de 18 000 EUR semble repris sans discuter la meilleure estimation.");
+    }
+
+    if (!hasAny(normalizedAnswer, ["obligation", "probable", "estimation", "sortie"])) {
+      accountingTreatmentErrors.push("Les conditions de provision ne sont pas separees : obligation, sortie probable, estimation fiable.");
+    }
+
+    if (!hasAny(normalizedAnswer, ["annexe", "incertitude", "fourchette"])) {
+      accountingTreatmentErrors.push("L'information en annexe ou l'incertitude n'est pas mentionnee.");
+      missingElements.push("Mention de l'annexe lorsque l'incertitude reste significative.");
+    }
+  }
+
+  if (exercise.id === "ex-ias37-comparison") {
+    if (hasAny(normalizedAnswer, ["identique", "toujours", "sans distinguer"])) {
+      accountingTreatmentErrors.push("La reponse ecrase les differences PCG/IAS 37 ou automatise trop vite la provision.");
+    }
+
+    if (!hasAny(normalizedAnswer, ["ias 37", "obligation actuelle", "sortie probable", "estimation fiable"])) {
+      accountingTreatmentErrors.push("Les criteres IAS 37 ne sont pas cites de facon exploitable.");
+    }
+
+    if (!hasAny(normalizedAnswer, ["pcg", "prudence", "francais"])) {
+      missingElements.push("Comparaison explicite avec le PCG.");
+    }
+
+    if (!hasAny(normalizedAnswer, ["annexe", "passif eventuel", "information"])) {
+      accountingTreatmentErrors.push("La distinction provision, passif eventuel et information en annexe manque.");
+    }
+  }
+
+  if (!hasAny(normalizedAnswer, ["car", "parce", "donc", "justifie", "preuve", "conclusion"])) {
+    reasoningErrors.push("Le raisonnement ne relie pas assez les faits, la regle et la conclusion.");
+  }
+
+  if (!hasAny(normalizedAnswer, ["source", "page", "document", "pack", "cours"])) {
+    sourceQualityIssues.push("La reponse ne cite pas explicitement de document, page ou pack.");
+  }
+
+  return {
+    calculationErrors,
+    accountingTreatmentErrors,
+    reasoningErrors,
+    sourceQualityIssues,
+    missingElements: [...new Set(missingElements)]
+  };
+}
+
+function buildRemediationPlan(exercise: Exercise, categories: ReturnType<typeof classifyErrors>): RemediationPlan {
+  const firstGap =
+    categories.accountingTreatmentErrors[0] ??
+    categories.calculationErrors[0] ??
+    categories.reasoningErrors[0] ??
+    categories.missingElements[0] ??
+    "Renforcer la justification sourcee.";
+  const nextExerciseId = learningPath.days.find((day) => day.exerciseId !== exercise.id)?.exerciseId;
+
+  return {
+    microLesson: `Point a reprendre : ${firstGap}`,
+    nextAction: "Reecrire la reponse en quatre blocs : fait, regle, traitement, conclusion sourcee.",
+    competencyTags: exercise.competencyIds,
+    expectedAnswer: exercise.expectedAnswer,
+    nextExerciseId
+  };
+}
+
+export function gradeExercise(exercise: Exercise, userAnswer: string): Correction {
+  const normalizedAnswer = normalizeForMatch(userAnswer);
+  const rubricScores = exercise.rubric.map((item) => scoreRubricItem(exercise, item, normalizedAnswer));
+  const score = Math.max(
+    0,
+    Math.min(
+      20,
+      rubricScores.reduce((sum, item) => sum + item.awardedPoints, 0)
+    )
+  );
+  const categories = classifyErrors(exercise, normalizedAnswer);
+  const partialPoints = rubricScores
+    .filter((item) => item.awardedPoints > 0 && item.awardedPoints < item.maxPoints)
+    .map((item) => `${item.criterion} : ${item.awardedPoints}/${item.maxPoints}. ${item.justification}`);
+  const correct = rubricScores
+    .filter((item) => item.awardedPoints === item.maxPoints)
+    .map((item) => `${item.criterion} : critere acquis.`);
+  const missingFromRubric = rubricScores
+    .filter((item) => item.awardedPoints === 0)
+    .map((item) => `${item.criterion} non traite.`);
+  const errors = [
+    ...categories.calculationErrors,
+    ...categories.accountingTreatmentErrors,
+    ...categories.reasoningErrors,
+    ...categories.sourceQualityIssues
+  ];
+  const sourceReferences = getExerciseSourceReferences(exercise);
+  const remediationPlan = buildRemediationPlan(exercise, categories);
+
+  return {
+    id: `corr-${exercise.id}-${Date.now()}`,
+    exerciseId: exercise.id,
+    score,
+    summary:
+      score >= 16
+        ? "Reponse solide : le bareme est largement couvert et les points de preuve sont exploitables."
+        : score >= 10
+          ? "Reponse partielle : la logique principale existe, mais la justification doit etre mieux structuree."
+          : "Reponse fragile : reprendre les criteres du bareme avant de conclure.",
+    rubricScores,
+    correct: correct.length > 0 ? correct : ["Le sujet est aborde, mais aucun critere n'est completement acquis."],
+    partialPoints,
+    errors,
+    calculationErrors: categories.calculationErrors,
+    accountingTreatmentErrors: categories.accountingTreatmentErrors,
+    reasoningErrors: categories.reasoningErrors,
+    sourceQualityIssues: categories.sourceQualityIssues,
+    missingElements: [...new Set([...categories.missingElements, ...missingFromRubric])],
+    remediation: remediationPlan.nextAction,
+    remediationPlan,
+    sourceReferences
   };
 }
 

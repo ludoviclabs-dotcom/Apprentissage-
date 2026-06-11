@@ -66,6 +66,21 @@ export interface RubricItem {
   points: number;
 }
 
+export interface RubricScore {
+  criterion: string;
+  maxPoints: number;
+  awardedPoints: number;
+  justification: string;
+}
+
+export interface RemediationPlan {
+  microLesson: string;
+  nextAction: string;
+  competencyTags: string[];
+  expectedAnswer: string;
+  nextExerciseId?: string;
+}
+
 export interface Exercise {
   id: string;
   domainId: DomainId;
@@ -84,9 +99,17 @@ export interface Correction {
   exerciseId: string;
   score: number;
   summary: string;
+  rubricScores: RubricScore[];
   correct: string[];
+  partialPoints: string[];
   errors: string[];
+  calculationErrors: string[];
+  accountingTreatmentErrors: string[];
+  reasoningErrors: string[];
+  sourceQualityIssues: string[];
+  missingElements: string[];
   remediation: string;
+  remediationPlan: RemediationPlan;
   sourceReferences: SourceReference[];
 }
 

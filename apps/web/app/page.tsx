@@ -4,11 +4,13 @@ import { DomainBadge } from "@/components/domain-badge";
 import { ExercisePanel } from "@/components/exercise-panel";
 import { LearningCard } from "@/components/learning-card";
 import { ProgressMeter } from "@/components/progress-meter";
+import { getRuntimeFlags } from "@/lib/runtime-flags";
 import { getDashboardModel } from "@/lib/view-model";
 import { getDomain } from "@finance/domain";
 
 export default async function DashboardPage() {
   const model = await getDashboardModel();
+  const runtime = getRuntimeFlags();
 
   if (!model.currentDay || !model.currentLesson || !model.currentExercise || !model.latestCorrection) {
     return null;
@@ -29,6 +31,24 @@ export default async function DashboardPage() {
           <span>Niveau global</span>
           <strong>{model.overallAverage}%</strong>
         </div>
+      </section>
+
+      <section className="demo-proof-grid" aria-label="Garanties de la demonstration">
+        <article>
+          <span>Mode</span>
+          <strong>{runtime.publicDemo ? "Lecture seule" : "Prive local"}</strong>
+          <p>Imports, uploads et donnees personnelles restent bloques en demo publique.</p>
+        </article>
+        <article>
+          <span>Sources</span>
+          <strong>{model.documents.length} documents</strong>
+          <p>{model.sourcePacks.length} packs locaux ou importes manuellement alimentent les citations.</p>
+        </article>
+        <article>
+          <span>Correction</span>
+          <strong>{model.latestCorrection.rubricScores.length} criteres</strong>
+          <p>Le score separe bareme, erreurs, remediation et preuves citees.</p>
+        </article>
       </section>
 
       <section className="domain-overview" aria-label="Niveau par domaine">

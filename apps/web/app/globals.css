@@ -296,6 +296,39 @@ button {
   gap: 14px;
 }
 
+.demo-proof-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.demo-proof-grid article {
+  min-width: 0;
+  padding: 16px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  border-radius: var(--radius);
+}
+
+.demo-proof-grid span {
+  color: var(--muted);
+  font-size: 0.76rem;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.demo-proof-grid strong {
+  display: block;
+  margin-top: 6px;
+  font-size: 1.25rem;
+}
+
+.demo-proof-grid p {
+  margin: 8px 0 0;
+  color: var(--muted);
+  line-height: 1.5;
+}
+
 .domain-card,
 .pack-card,
 .simulation-card,
@@ -608,6 +641,44 @@ button {
   border-bottom: 0;
 }
 
+.rubric-score-list {
+  display: grid;
+  gap: 10px;
+  margin-top: 16px;
+}
+
+.rubric-score-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 64px;
+  gap: 12px;
+  align-items: center;
+  padding: 12px;
+  border: 1px solid var(--border);
+  background: #f8fafc;
+  border-radius: var(--radius);
+}
+
+.rubric-score-row strong,
+.rubric-score-row span {
+  display: block;
+}
+
+.rubric-score-row span {
+  margin-top: 4px;
+  color: var(--muted);
+  font-size: 0.84rem;
+  line-height: 1.45;
+}
+
+.rubric-score-row b {
+  justify-self: end;
+  padding: 6px 8px;
+  border-radius: 6px;
+  background: #e8eef8;
+  color: #1d4ed8;
+  font-size: 0.88rem;
+}
+
 .correction-columns {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -615,8 +686,13 @@ button {
   margin: 16px 0;
 }
 
+.error-columns {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
 .correction-columns > div,
-.remediation {
+.remediation,
+.expected-answer {
   padding: 14px;
   border: 1px solid var(--border);
   background: #fbfcfe;
@@ -639,8 +715,102 @@ button {
   margin: 6px 0 0;
 }
 
+.expected-answer {
+  margin-bottom: 16px;
+}
+
+.expected-answer summary {
+  cursor: pointer;
+  font-weight: 800;
+}
+
+.expected-answer p {
+  margin: 10px 0 0;
+}
+
 .competency-row {
   grid-template-columns: minmax(0, 1fr) minmax(150px, 0.4fr);
+}
+
+.skill-tree {
+  display: grid;
+  gap: 10px;
+  margin-top: 16px;
+}
+
+.skill-node {
+  position: relative;
+  display: grid;
+  grid-template-columns: 32px minmax(0, 1fr);
+  gap: 12px;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-left: 4px solid var(--skill-color);
+  background: #fbfcfe;
+  border-radius: var(--radius);
+}
+
+.skill-node:not(:last-child)::after {
+  position: absolute;
+  left: 26px;
+  bottom: -11px;
+  width: 2px;
+  height: 10px;
+  background: #d9e1ea;
+  content: "";
+}
+
+.skill-node-index {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 999px;
+  background: var(--skill-color);
+  color: #ffffff;
+  font-size: 0.78rem;
+  font-weight: 800;
+}
+
+.skill-node-title {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.skill-node-title strong {
+  line-height: 1.35;
+}
+
+.skill-node p {
+  margin: 8px 0;
+  color: var(--muted);
+}
+
+.skill-node small {
+  display: block;
+  margin-bottom: 8px;
+  color: #344054;
+  font-size: 0.78rem;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.skill-node.blocked {
+  background: #fff1f2;
+}
+
+.skill-node.fragile {
+  background: #fffbeb;
+}
+
+.skill-node.ok {
+  background: #f8fafc;
+}
+
+.skill-node.strong {
+  background: #f0fdf4;
 }
 
 .metric-strip {
@@ -777,6 +947,15 @@ button {
   color: #344054;
   font-size: 0.84rem;
   font-weight: 750;
+}
+
+.tag-cloud.compact {
+  margin-top: 12px;
+}
+
+.tag-cloud.compact > span {
+  min-height: 28px;
+  font-size: 0.78rem;
 }
 
 .linked-panel {
@@ -1013,10 +1192,12 @@ button {
   .dashboard-grid,
   .two-column,
   .three-column,
+  .demo-proof-grid,
   .pack-grid,
   .simulation-grid,
   .logic-grid,
   .correction-columns,
+  .error-columns,
   .learning-days,
   .metric-strip,
   .detail-grid dl {
@@ -1025,8 +1206,13 @@ button {
 
   .document-row,
   .source-row,
+  .rubric-score-row,
   .competency-row {
     grid-template-columns: 1fr;
+  }
+
+  .rubric-score-row b {
+    justify-self: start;
   }
 
   .domain-overview {
