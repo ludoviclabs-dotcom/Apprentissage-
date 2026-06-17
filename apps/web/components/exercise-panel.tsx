@@ -9,7 +9,10 @@ export function ExercisePanel({ exercise }: { exercise: Exercise }) {
           <DomainBadge domainId={exercise.domainId} />
           <h2>{exercise.title}</h2>
         </div>
-        <span className="time-chip">{exercise.estimatedMinutes} min</span>
+        <div className="module-meta">
+          <span>{exercise.type}</span>
+          <span>{exercise.estimatedMinutes} min</span>
+        </div>
       </div>
 
       <p className="statement">{exercise.statement}</p>

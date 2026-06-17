@@ -1118,6 +1118,94 @@ button {
   font-size: 0.92rem;
 }
 
+.tier-grid,
+.module-grid,
+.concept-grid,
+.flashcard-grid,
+.exercise-type-grid {
+  display: grid;
+  gap: 18px;
+}
+
+.tier-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.module-grid,
+.concept-grid,
+.flashcard-grid,
+.exercise-type-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.course-list {
+  display: grid;
+  gap: 18px;
+}
+
+.module-card,
+.concept-card,
+.flashcard,
+.business-case-panel {
+  display: grid;
+  gap: 14px;
+}
+
+.module-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.module-meta span {
+  display: inline-flex;
+  align-items: center;
+  min-height: 28px;
+  padding: 0 9px;
+  border: 1px solid var(--border);
+  background: #f8fafc;
+  border-radius: 6px;
+  color: #344054;
+  font-size: 0.8rem;
+  font-weight: 800;
+}
+
+.compact-grid {
+  margin: 0;
+}
+
+.compact-grid article {
+  min-height: auto;
+}
+
+.review-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.review-actions .secondary-action {
+  min-height: 34px;
+  padding: 0 10px;
+}
+
+.result-inline {
+  color: var(--success);
+  font-size: 0.82rem;
+  font-weight: 800;
+}
+
+.result-inline.error {
+  color: var(--danger);
+}
+
+.exam-runner {
+  display: grid;
+  gap: 14px;
+  margin-top: 16px;
+}
+
 @media (max-width: 1120px) {
   html,
   body {
@@ -1166,6 +1254,14 @@ button {
   .domain-overview {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
+
+  .tier-grid,
+  .module-grid,
+  .concept-grid,
+  .flashcard-grid,
+  .exercise-type-grid {
+    grid-template-columns: 1fr;
+  }
 }
 
 @media (max-width: 820px) {
@@ -1200,7 +1296,7 @@ button {
   .error-columns,
   .learning-days,
   .metric-strip,
-  .detail-grid dl {
+    .detail-grid dl {
     grid-template-columns: 1fr;
   }
 

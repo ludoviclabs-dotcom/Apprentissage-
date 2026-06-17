@@ -19,6 +19,27 @@ export type SourceType = "course" | "official-reference" | "personal-note" | "ex
 
 export type SourcePackStatus = "ready" | "processing" | "needs-review";
 
+export type LearningTier = "fondations" | "application" | "maitrise";
+
+export type ExerciseType = "qcm" | "short-answer" | "calculation" | "journal-entry" | "justification" | "mini-case";
+
+export type FlashcardType = "concept" | "formula" | "journal-entry" | "frequent-error" | "diagnostic";
+
+export type FlashcardStatus = "new" | "learning" | "due" | "mastered";
+
+export type ReviewRating = "forgotten" | "partial" | "correct" | "mastered";
+
+export type ErrorCategory =
+  | "calculation"
+  | "accounting-treatment"
+  | "reasoning"
+  | "source-quality"
+  | "missing-element";
+
+export type ExamSessionStatus = "draft" | "in-progress" | "submitted";
+
+export type BusinessCaseStatus = "locked" | "available" | "completed";
+
 export interface Domain {
   id: DomainId;
   name: string;
@@ -46,6 +67,40 @@ export interface SourceReference {
   pageStart?: number;
   pageEnd?: number;
   effectiveDate?: string;
+}
+
+export interface LearningModule {
+  id: string;
+  title: string;
+  domainId: DomainId;
+  tier: LearningTier;
+  description: string;
+  objective: string;
+  prerequisites: string[];
+  competencyIds: string[];
+  conceptIds: string[];
+  lessonIds: string[];
+  exerciseIds: string[];
+  flashcardIds: string[];
+  estimatedMinutes: number;
+  status: CompetencyStatus;
+  progress: number;
+  nextAction: string;
+}
+
+export interface Concept {
+  id: string;
+  moduleId: string;
+  domainId: DomainId;
+  title: string;
+  shortDefinition: string;
+  formula?: string;
+  frequentTrap: string;
+  miniExample: string;
+  competencyIds: string[];
+  status: CompetencyStatus;
+  strength: number;
+  sourceReferences: SourceReference[];
 }
 
 export interface Lesson {
@@ -84,6 +139,7 @@ export interface RemediationPlan {
 export interface Exercise {
   id: string;
   domainId: DomainId;
+  type: ExerciseType;
   title: string;
   level: number;
   estimatedMinutes: number;
@@ -111,6 +167,101 @@ export interface Correction {
   remediation: string;
   remediationPlan: RemediationPlan;
   sourceReferences: SourceReference[];
+}
+
+export interface Flashcard {
+  id: string;
+  moduleId: string;
+  conceptId: string;
+  domainId: DomainId;
+  type: FlashcardType;
+  front: string;
+  back: string;
+  explanation: string;
+  competencyIds: string[];
+  status: FlashcardStatus;
+  dueAt: string;
+  intervalDays: number;
+  sourceReferences: SourceReference[];
+}
+
+export interface RevisionSession {
+  id: string;
+  generatedAt: string;
+  dueCount: number;
+  newCount: number;
+  fragileCount: number;
+  masteredCount: number;
+  cards: Flashcard[];
+}
+
+export interface RevisionReview {
+  flashcardId: string;
+  rating: ReviewRating;
+  reviewedAt: string;
+  nextDueAt: string;
+  intervalDays: number;
+  nextStatus: FlashcardStatus;
+}
+
+export interface ErrorJournalEntry {
+  id: string;
+  exerciseId: string;
+  correctionId: string;
+  category: ErrorCategory;
+  summary: string;
+  competencyIds: string[];
+  nextAction: string;
+  createdAt: string;
+}
+
+export interface ExamSession {
+  id: string;
+  title: string;
+  exerciseIds: string[];
+  durationMinutes: number;
+  status: ExamSessionStatus;
+  startedAt?: string;
+  submittedAt?: string;
+  score?: number;
+}
+
+export interface BusinessCaseQuestion {
+  id: string;
+  prompt: string;
+  competencyIds: string[];
+  expectedPoints: string[];
+}
+
+export interface BusinessCaseDocument {
+  id: string;
+  title: string;
+  summary: string;
+  sourceReferences: SourceReference[];
+}
+
+export interface BusinessCase {
+  id: string;
+  title: string;
+  domainId: DomainId;
+  level: number;
+  status: BusinessCaseStatus;
+  description: string;
+  dossier: string;
+  documents: BusinessCaseDocument[];
+  questions: BusinessCaseQuestion[];
+  expectedDeliverable: string;
+  competencyIds: string[];
+  sourceReferences: SourceReference[];
+}
+
+export interface BusinessCaseAttempt {
+  id: string;
+  businessCaseId: string;
+  userMemo: string;
+  score: number;
+  correction: string;
+  createdAt: string;
 }
 
 export interface Attempt {

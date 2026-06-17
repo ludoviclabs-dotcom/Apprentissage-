@@ -2,23 +2,42 @@ import { basename } from "node:path";
 import { asc, desc, eq, ilike, inArray } from "drizzle-orm";
 import {
   attempts as seedAttempts,
+  buildRevisionSession,
+  businessCases as seedBusinessCases,
   competencies,
+  concepts as seedConcepts,
   corrections as seedCorrections,
+  createErrorJournalEntries,
   documents as seedDocuments,
+  errorJournalEntries as seedErrorJournalEntries,
+  examSessions as seedExamSessions,
   exercises,
+  flashcards as seedFlashcards,
   learningPath,
+  learningModules as seedLearningModules,
   lessons,
+  reviewFlashcardSchedule,
+  scoreBusinessCase,
   sourcePacks as seedSourcePacks,
+  startExamSession,
   type Attempt,
+  type BusinessCase,
+  type BusinessCaseAttempt,
   type Competency,
   type CompetencyStatus,
+  type Concept,
   type Correction,
   type DocumentRecord,
+  type ErrorJournalEntry,
+  type ExamSession,
   type Exercise,
+  type Flashcard,
   type LearningDay,
   type LearningPath,
+  type LearningModule,
   type Lesson,
   type RemediationPlan,
+  type ReviewRating,
   type RubricItem,
   type RubricScore,
   type SourceReference,
@@ -28,16 +47,23 @@ import { chunkMarkdown, extractDocument, type SourcePackManifest } from "@financ
 import { createDb, canUseDatabase } from "./client";
 import {
   attemptsTable,
+  businessCaseAttemptsTable,
+  businessCasesTable,
   chunksTable,
   competenciesTable,
   documentPagesTable,
   correctionsTable,
   documentsTable,
+  errorJournalTable,
+  examSessionsTable,
   exercisesTable,
+  flashcardsTable,
   learningDaysTable,
   learningPathsTable,
   lessonsTable,
   lessonSourcesTable,
+  modulesTable,
+  revisionReviewsTable,
   revisionItemsTable,
   sourcePacksTable
 } from "./drizzle-schema";
@@ -96,6 +122,7 @@ function toExercise(row: typeof exercisesTable.$inferSelect): Exercise {
   return {
     id: row.id,
     domainId: row.domain as Exercise["domainId"],
+    type: row.type as Exercise["type"],
     title: row.topic,
     level: row.level,
     estimatedMinutes: row.estimatedMinutes,
@@ -160,6 +187,66 @@ function toLearningDay(row: typeof learningDaysTable.$inferSelect): LearningDay 
     minutes: row.minutes,
     status: row.status as LearningDay["status"]
   };
+}
+
+function parseJsonObject<T>(value: unknown, fallback: T): T {
+  return typeof value === "object" && value !== null ? (value as T) : fallback;
+}
+
+function parseJsonArray<T>(value: unknown): T[] {
+  return Array.isArray(value) ? (value as T[]) : [];
+}
+
+function toLearningModule(row: typeof modulesTable.$inferSelect): LearningModule {
+  return parseJsonObject(row.payloadJson, seedLearningModules.find((module) => module.id === row.id) ?? seedLearningModules[0]);
+}
+
+function toFlashcard(row: typeof flashcardsTable.$inferSelect): Flashcard {
+  return {
+    id: row.id,
+    moduleId: row.moduleId,
+    conceptId: row.conceptId,
+    domainId: row.domain as Flashcard["domainId"],
+    type: row.type as Flashcard["type"],
+    front: row.front,
+    back: row.back,
+    explanation: row.explanation,
+    competencyIds: row.competencyIds,
+    status: row.status as Flashcard["status"],
+    dueAt: row.dueAt,
+    intervalDays: row.intervalDays,
+    sourceReferences: parseJsonArray<SourceReference>(row.sourceReferencesJson)
+  };
+}
+
+function toErrorJournalEntry(row: typeof errorJournalTable.$inferSelect): ErrorJournalEntry {
+  return {
+    id: row.id,
+    exerciseId: row.exerciseId,
+    correctionId: row.correctionId,
+    category: row.category as ErrorJournalEntry["category"],
+    summary: row.summary,
+    competencyIds: row.competencyIds,
+    nextAction: row.nextAction,
+    createdAt: row.createdAt
+  };
+}
+
+function toExamSession(row: typeof examSessionsTable.$inferSelect): ExamSession {
+  return {
+    id: row.id,
+    title: row.title,
+    exerciseIds: row.exerciseIds,
+    durationMinutes: row.durationMinutes,
+    status: row.status as ExamSession["status"],
+    startedAt: row.startedAt ?? undefined,
+    submittedAt: row.submittedAt ?? undefined,
+    score: row.score ?? undefined
+  };
+}
+
+function toBusinessCase(row: typeof businessCasesTable.$inferSelect): BusinessCase {
+  return parseJsonObject(row.payloadJson, seedBusinessCases.find((businessCase) => businessCase.id === row.id) ?? seedBusinessCases[0]);
 }
 
 function toAttempt(row: typeof attemptsTable.$inferSelect): Attempt {
@@ -496,7 +583,211 @@ export async function getLearningState() {
     competencies: await getCompetencies(),
     exercises: await getExercises(),
     learningPath: await getLearningPath(),
-    lessons: await getLessons()
+    lessons: await getLessons(),
+    modules: await getLearningModules(),
+    concepts: await getConcepts(),
+    flashcards: await getFlashcards()
+  };
+}
+
+export async function getLearningModules(): Promise<LearningModule[]> {
+  if (!canUseDatabase()) {
+    return seedLearningModules;
+  }
+
+  try {
+    const db = createDb();
+    const rows = await db.select().from(modulesTable).orderBy(asc(modulesTable.title));
+    return rows.length > 0 ? rows.map(toLearningModule) : seedLearningModules;
+  } catch {
+    return seedLearningModules;
+  }
+}
+
+export async function getConcepts(): Promise<Concept[]> {
+  return seedConcepts;
+}
+
+export async function getFlashcards(): Promise<Flashcard[]> {
+  if (!canUseDatabase()) {
+    return seedFlashcards;
+  }
+
+  try {
+    const db = createDb();
+    const rows = await db.select().from(flashcardsTable).orderBy(asc(flashcardsTable.dueAt));
+    return rows.length > 0 ? rows.map(toFlashcard) : seedFlashcards;
+  } catch {
+    return seedFlashcards;
+  }
+}
+
+export async function getRevisionSession(now = new Date()) {
+  return buildRevisionSession(await getFlashcards(), now);
+}
+
+export async function reviewFlashcard(flashcardId: string, rating: ReviewRating) {
+  const review = reviewFlashcardSchedule(flashcardId, rating);
+
+  if (!canUseDatabase()) {
+    return review;
+  }
+
+  const db = createDb();
+  await db
+    .update(flashcardsTable)
+    .set({
+      status: review.nextStatus,
+      dueAt: review.nextDueAt,
+      intervalDays: review.intervalDays
+    })
+    .where(eq(flashcardsTable.id, flashcardId));
+  await db.insert(revisionReviewsTable).values({
+    id: `review-${flashcardId}-${Date.now()}`,
+    flashcardId,
+    rating,
+    reviewedAt: review.reviewedAt,
+    nextDueAt: review.nextDueAt,
+    intervalDays: review.intervalDays
+  });
+
+  return review;
+}
+
+export async function getErrorJournal(): Promise<ErrorJournalEntry[]> {
+  if (!canUseDatabase()) {
+    return seedErrorJournalEntries;
+  }
+
+  try {
+    const db = createDb();
+    const rows = await db.select().from(errorJournalTable).orderBy(desc(errorJournalTable.createdAt));
+    return rows.length > 0 ? rows.map(toErrorJournalEntry) : seedErrorJournalEntries;
+  } catch {
+    return seedErrorJournalEntries;
+  }
+}
+
+export async function getExamSessions(): Promise<ExamSession[]> {
+  if (!canUseDatabase()) {
+    return seedExamSessions;
+  }
+
+  try {
+    const db = createDb();
+    const rows = await db.select().from(examSessionsTable).orderBy(asc(examSessionsTable.title));
+    return rows.length > 0 ? rows.map(toExamSession) : seedExamSessions;
+  } catch {
+    return seedExamSessions;
+  }
+}
+
+export async function startExam(examId: string) {
+  const template = (await getExamSessions()).find((exam) => exam.id === examId) ?? seedExamSessions[0];
+  const session = startExamSession(template);
+
+  if (!canUseDatabase()) {
+    return session;
+  }
+
+  const db = createDb();
+  await db.insert(examSessionsTable).values({
+    id: session.id,
+    title: session.title,
+    exerciseIds: session.exerciseIds,
+    durationMinutes: session.durationMinutes,
+    status: session.status,
+    startedAt: session.startedAt,
+    submittedAt: session.submittedAt,
+    score: session.score
+  });
+
+  return session;
+}
+
+export async function submitExamAnswers(
+  exerciseAnswers: Array<{ exerciseId: string; userAnswer: string }>
+) {
+  const corrections = [];
+
+  for (const answer of exerciseAnswers) {
+    const exercise = await getExerciseById(answer.exerciseId);
+
+    if (!exercise) {
+      continue;
+    }
+
+    corrections.push(gradeExercise(exercise, answer.userAnswer));
+  }
+
+  const score =
+    corrections.length === 0
+      ? 0
+      : Math.round(corrections.reduce((sum, correction) => sum + correction.score, 0) / corrections.length);
+
+  return {
+    score,
+    corrections,
+    submittedAt: new Date().toISOString()
+  };
+}
+
+export async function getBusinessCases(): Promise<BusinessCase[]> {
+  if (!canUseDatabase()) {
+    return seedBusinessCases;
+  }
+
+  try {
+    const db = createDb();
+    const rows = await db.select().from(businessCasesTable).orderBy(desc(businessCasesTable.level));
+    return rows.length > 0 ? rows.map(toBusinessCase) : seedBusinessCases;
+  } catch {
+    return seedBusinessCases;
+  }
+}
+
+export async function submitBusinessCaseAttempt(
+  businessCaseId: string,
+  userMemo: string
+): Promise<BusinessCaseAttempt | null> {
+  const businessCase = (await getBusinessCases()).find((item) => item.id === businessCaseId);
+
+  if (!businessCase) {
+    return null;
+  }
+
+  const attempt = scoreBusinessCase(businessCase, userMemo);
+
+  if (canUseDatabase()) {
+    const db = createDb();
+    await db.insert(businessCaseAttemptsTable).values({
+      id: attempt.id,
+      businessCaseId: attempt.businessCaseId,
+      userMemo: attempt.userMemo,
+      score: attempt.score,
+      correction: attempt.correction,
+      createdAt: attempt.createdAt
+    });
+  }
+
+  return attempt;
+}
+
+export async function getProgressSnapshot() {
+  const [competencies, modules, concepts, errorJournal, revisionSession] = await Promise.all([
+    getCompetencies(),
+    getLearningModules(),
+    getConcepts(),
+    getErrorJournal(),
+    getRevisionSession()
+  ]);
+
+  return {
+    competencies,
+    modules,
+    concepts,
+    errorJournal,
+    revisionSession
   };
 }
 
@@ -849,6 +1140,19 @@ export async function recordAttempt(exerciseId: string, userAnswer: string, corr
     errorsJson: correction.errors,
     remediation: correction.remediation
   });
+
+  for (const entry of createErrorJournalEntries(correction)) {
+    await db.insert(errorJournalTable).values({
+      id: entry.id,
+      exerciseId: entry.exerciseId,
+      correctionId: entry.correctionId,
+      category: entry.category,
+      summary: entry.summary,
+      competencyIds: entry.competencyIds,
+      nextAction: entry.nextAction,
+      createdAt: entry.createdAt
+    });
+  }
 
   const exercise = await getExerciseById(exerciseId);
 

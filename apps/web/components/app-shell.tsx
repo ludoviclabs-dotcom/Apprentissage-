@@ -8,21 +8,25 @@ import {
   BookOpen,
   BriefcaseBusiness,
   ClipboardCheck,
-  FileText,
-  FolderArchive,
   GraduationCap,
-  LayoutDashboard,
-  MessageSquare
+  Home,
+  Library,
+  LineChart,
+  NotebookTabs,
+  Repeat,
+  Route
 } from "lucide-react";
 
 const navigation = [
-  { href: "/", label: "Tableau de bord", icon: LayoutDashboard },
-  { href: "/documents", label: "Documents", icon: FileText },
-  { href: "/source-packs", label: "Source packs", icon: FolderArchive },
-  { href: "/apprendre", label: "Apprendre", icon: BookOpen },
+  { href: "/", label: "Accueil", icon: Home },
+  { href: "/parcours", label: "Parcours", icon: Route },
+  { href: "/cours", label: "Cours", icon: BookOpen },
+  { href: "/connaissances", label: "Connaissances", icon: Library },
   { href: "/exercices", label: "Exercices", icon: ClipboardCheck },
-  { href: "/corrections", label: "Corrections", icon: MessageSquare },
-  { href: "/simulations", label: "Simulations", icon: BriefcaseBusiness }
+  { href: "/annales-concours", label: "Annales & Concours", icon: NotebookTabs },
+  { href: "/business-cases", label: "Business Cases", icon: BriefcaseBusiness },
+  { href: "/revisions", label: "Revisions", icon: Repeat },
+  { href: "/progression", label: "Progression", icon: LineChart }
 ];
 
 export function AppShell({ children, runtime }: { children: ReactNode; runtime: RuntimeFlags }) {

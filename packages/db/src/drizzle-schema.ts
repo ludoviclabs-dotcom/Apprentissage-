@@ -105,6 +105,7 @@ export const learningDaysTable = pgTable("learning_days", {
 export const exercisesTable = pgTable("exercises", {
   id: text("id").primaryKey(),
   domain: text("domain").notNull(),
+  type: text("type").notNull().default("short-answer"),
   topic: text("topic").notNull(),
   level: integer("level").notNull(),
   estimatedMinutes: integer("estimated_minutes").notNull().default(20),
@@ -140,4 +141,79 @@ export const revisionItemsTable = pgTable("revision_items", {
   dueAt: timestamp("due_at", { mode: "string" }).notNull(),
   strength: integer("strength").notNull(),
   lastReviewedAt: timestamp("last_reviewed_at", { mode: "string" })
+});
+
+export const modulesTable = pgTable("modules", {
+  id: text("id").primaryKey(),
+  title: text("title").notNull(),
+  domain: text("domain").notNull(),
+  tier: text("tier").notNull(),
+  description: text("description").notNull(),
+  objective: text("objective").notNull(),
+  payloadJson: jsonb("payload_json").notNull().default({})
+});
+
+export const flashcardsTable = pgTable("flashcards", {
+  id: text("id").primaryKey(),
+  moduleId: text("module_id").notNull(),
+  conceptId: text("concept_id").notNull(),
+  domain: text("domain").notNull(),
+  type: text("type").notNull(),
+  front: text("front").notNull(),
+  back: text("back").notNull(),
+  explanation: text("explanation").notNull(),
+  competencyIds: text("competency_ids").array().notNull().default([]),
+  status: text("status").notNull(),
+  dueAt: timestamp("due_at", { mode: "string" }).notNull(),
+  intervalDays: integer("interval_days").notNull().default(0),
+  sourceReferencesJson: jsonb("source_references_json").notNull().default([])
+});
+
+export const revisionReviewsTable = pgTable("revision_reviews", {
+  id: text("id").primaryKey(),
+  flashcardId: text("flashcard_id").notNull(),
+  rating: text("rating").notNull(),
+  reviewedAt: timestamp("reviewed_at", { mode: "string" }).notNull(),
+  nextDueAt: timestamp("next_due_at", { mode: "string" }).notNull(),
+  intervalDays: integer("interval_days").notNull()
+});
+
+export const errorJournalTable = pgTable("error_journal", {
+  id: text("id").primaryKey(),
+  exerciseId: text("exercise_id").notNull(),
+  correctionId: text("correction_id").notNull(),
+  category: text("category").notNull(),
+  summary: text("summary").notNull(),
+  competencyIds: text("competency_ids").array().notNull().default([]),
+  nextAction: text("next_action").notNull(),
+  createdAt: timestamp("created_at", { mode: "string" }).notNull().defaultNow()
+});
+
+export const examSessionsTable = pgTable("exam_sessions", {
+  id: text("id").primaryKey(),
+  title: text("title").notNull(),
+  exerciseIds: text("exercise_ids").array().notNull().default([]),
+  durationMinutes: integer("duration_minutes").notNull(),
+  status: text("status").notNull(),
+  startedAt: timestamp("started_at", { mode: "string" }),
+  submittedAt: timestamp("submitted_at", { mode: "string" }),
+  score: integer("score")
+});
+
+export const businessCasesTable = pgTable("business_cases", {
+  id: text("id").primaryKey(),
+  title: text("title").notNull(),
+  domain: text("domain").notNull(),
+  level: integer("level").notNull(),
+  status: text("status").notNull(),
+  payloadJson: jsonb("payload_json").notNull().default({})
+});
+
+export const businessCaseAttemptsTable = pgTable("business_case_attempts", {
+  id: text("id").primaryKey(),
+  businessCaseId: text("business_case_id").notNull(),
+  userMemo: text("user_memo").notNull(),
+  score: integer("score").notNull(),
+  correction: text("correction").notNull(),
+  createdAt: timestamp("created_at", { mode: "string" }).notNull().defaultNow()
 });

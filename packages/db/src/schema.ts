@@ -17,7 +17,14 @@ export const tables = [
   "attempts",
   "corrections",
   "simulations",
-  "revision_items"
+  "revision_items",
+  "modules",
+  "flashcards",
+  "revision_reviews",
+  "error_journal",
+  "exam_sessions",
+  "business_cases",
+  "business_case_attempts"
 ] as const;
 
 export type TableName = (typeof tables)[number];

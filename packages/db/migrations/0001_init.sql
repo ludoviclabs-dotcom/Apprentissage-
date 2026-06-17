@@ -180,3 +180,79 @@ CREATE TABLE IF NOT EXISTS revision_items (
 
 ALTER TABLE IF EXISTS exercises ADD COLUMN IF NOT EXISTS estimated_minutes INTEGER NOT NULL DEFAULT 20;
 ALTER TABLE IF EXISTS exercises ADD COLUMN IF NOT EXISTS competency_ids TEXT[] NOT NULL DEFAULT '{}';
+ALTER TABLE IF EXISTS exercises ADD COLUMN IF NOT EXISTS type TEXT NOT NULL DEFAULT 'short-answer';
+
+CREATE TABLE IF NOT EXISTS modules (
+  id TEXT PRIMARY KEY,
+  title TEXT NOT NULL,
+  domain TEXT NOT NULL,
+  tier TEXT NOT NULL,
+  description TEXT NOT NULL,
+  objective TEXT NOT NULL,
+  payload_json JSONB NOT NULL DEFAULT '{}'::jsonb
+);
+
+CREATE TABLE IF NOT EXISTS flashcards (
+  id TEXT PRIMARY KEY,
+  module_id TEXT NOT NULL,
+  concept_id TEXT NOT NULL,
+  domain TEXT NOT NULL,
+  type TEXT NOT NULL,
+  front TEXT NOT NULL,
+  back TEXT NOT NULL,
+  explanation TEXT NOT NULL,
+  competency_ids TEXT[] NOT NULL DEFAULT '{}',
+  status TEXT NOT NULL CHECK (status IN ('new', 'learning', 'due', 'mastered')),
+  due_at TIMESTAMPTZ NOT NULL,
+  interval_days INTEGER NOT NULL DEFAULT 0,
+  source_references_json JSONB NOT NULL DEFAULT '[]'::jsonb
+);
+
+CREATE TABLE IF NOT EXISTS revision_reviews (
+  id TEXT PRIMARY KEY,
+  flashcard_id TEXT NOT NULL REFERENCES flashcards(id) ON DELETE CASCADE,
+  rating TEXT NOT NULL CHECK (rating IN ('forgotten', 'partial', 'correct', 'mastered')),
+  reviewed_at TIMESTAMPTZ NOT NULL,
+  next_due_at TIMESTAMPTZ NOT NULL,
+  interval_days INTEGER NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS error_journal (
+  id TEXT PRIMARY KEY,
+  exercise_id TEXT NOT NULL,
+  correction_id TEXT NOT NULL,
+  category TEXT NOT NULL,
+  summary TEXT NOT NULL,
+  competency_ids TEXT[] NOT NULL DEFAULT '{}',
+  next_action TEXT NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS exam_sessions (
+  id TEXT PRIMARY KEY,
+  title TEXT NOT NULL,
+  exercise_ids TEXT[] NOT NULL DEFAULT '{}',
+  duration_minutes INTEGER NOT NULL,
+  status TEXT NOT NULL CHECK (status IN ('draft', 'in-progress', 'submitted')),
+  started_at TIMESTAMPTZ,
+  submitted_at TIMESTAMPTZ,
+  score INTEGER
+);
+
+CREATE TABLE IF NOT EXISTS business_cases (
+  id TEXT PRIMARY KEY,
+  title TEXT NOT NULL,
+  domain TEXT NOT NULL,
+  level INTEGER NOT NULL,
+  status TEXT NOT NULL CHECK (status IN ('locked', 'available', 'completed')),
+  payload_json JSONB NOT NULL DEFAULT '{}'::jsonb
+);
+
+CREATE TABLE IF NOT EXISTS business_case_attempts (
+  id TEXT PRIMARY KEY,
+  business_case_id TEXT NOT NULL REFERENCES business_cases(id) ON DELETE CASCADE,
+  user_memo TEXT NOT NULL,
+  score INTEGER NOT NULL CHECK (score BETWEEN 0 AND 20),
+  correction TEXT NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);

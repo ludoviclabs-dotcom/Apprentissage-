@@ -1,5 +1,16 @@
 import postgres from "postgres";
-import { competencies, documents, exercises, learningPath, lessons, sourcePacks } from "@finance/domain";
+import {
+  businessCases,
+  competencies,
+  documents,
+  examSessions,
+  exercises,
+  flashcards,
+  learningModules,
+  learningPath,
+  lessons,
+  sourcePacks
+} from "@finance/domain";
 
 const databaseUrl = process.env.DATABASE_URL;
 
@@ -87,9 +98,10 @@ try {
 
   for (const exercise of exercises) {
     await sql`
-      INSERT INTO exercises (id, domain, topic, level, estimated_minutes, statement, expected_answer, rubric_json, competency_ids, source_chunk_ids)
-      VALUES (${exercise.id}, ${exercise.domainId}, ${exercise.title}, ${exercise.level}, ${exercise.estimatedMinutes}, ${exercise.statement}, ${exercise.expectedAnswer}, ${JSON.stringify(exercise.rubric)}::jsonb, ${exercise.competencyIds}, ${exercise.sourceChunkIds})
+      INSERT INTO exercises (id, domain, type, topic, level, estimated_minutes, statement, expected_answer, rubric_json, competency_ids, source_chunk_ids)
+      VALUES (${exercise.id}, ${exercise.domainId}, ${exercise.type}, ${exercise.title}, ${exercise.level}, ${exercise.estimatedMinutes}, ${exercise.statement}, ${exercise.expectedAnswer}, ${JSON.stringify(exercise.rubric)}::jsonb, ${exercise.competencyIds}, ${exercise.sourceChunkIds})
       ON CONFLICT (id) DO UPDATE SET
+        type = EXCLUDED.type,
         topic = EXCLUDED.topic,
         level = EXCLUDED.level,
         estimated_minutes = EXCLUDED.estimated_minutes,
@@ -98,6 +110,66 @@ try {
         rubric_json = EXCLUDED.rubric_json,
         competency_ids = EXCLUDED.competency_ids,
         source_chunk_ids = EXCLUDED.source_chunk_ids
+    `;
+  }
+
+  for (const module of learningModules) {
+    await sql`
+      INSERT INTO modules (id, title, domain, tier, description, objective, payload_json)
+      VALUES (${module.id}, ${module.title}, ${module.domainId}, ${module.tier}, ${module.description}, ${module.objective}, ${JSON.stringify(module)}::jsonb)
+      ON CONFLICT (id) DO UPDATE SET
+        title = EXCLUDED.title,
+        domain = EXCLUDED.domain,
+        tier = EXCLUDED.tier,
+        description = EXCLUDED.description,
+        objective = EXCLUDED.objective,
+        payload_json = EXCLUDED.payload_json
+    `;
+  }
+
+  for (const card of flashcards) {
+    await sql`
+      INSERT INTO flashcards (id, module_id, concept_id, domain, type, front, back, explanation, competency_ids, status, due_at, interval_days, source_references_json)
+      VALUES (${card.id}, ${card.moduleId}, ${card.conceptId}, ${card.domainId}, ${card.type}, ${card.front}, ${card.back}, ${card.explanation}, ${card.competencyIds}, ${card.status}, ${card.dueAt}, ${card.intervalDays}, ${JSON.stringify(card.sourceReferences)}::jsonb)
+      ON CONFLICT (id) DO UPDATE SET
+        module_id = EXCLUDED.module_id,
+        concept_id = EXCLUDED.concept_id,
+        domain = EXCLUDED.domain,
+        type = EXCLUDED.type,
+        front = EXCLUDED.front,
+        back = EXCLUDED.back,
+        explanation = EXCLUDED.explanation,
+        competency_ids = EXCLUDED.competency_ids,
+        status = EXCLUDED.status,
+        due_at = EXCLUDED.due_at,
+        interval_days = EXCLUDED.interval_days,
+        source_references_json = EXCLUDED.source_references_json
+    `;
+  }
+
+  for (const exam of examSessions) {
+    await sql`
+      INSERT INTO exam_sessions (id, title, exercise_ids, duration_minutes, status, started_at, submitted_at, score)
+      VALUES (${exam.id}, ${exam.title}, ${exam.exerciseIds}, ${exam.durationMinutes}, ${exam.status}, ${exam.startedAt ?? null}, ${exam.submittedAt ?? null}, ${exam.score ?? null})
+      ON CONFLICT (id) DO UPDATE SET
+        title = EXCLUDED.title,
+        exercise_ids = EXCLUDED.exercise_ids,
+        duration_minutes = EXCLUDED.duration_minutes,
+        status = EXCLUDED.status,
+        score = EXCLUDED.score
+    `;
+  }
+
+  for (const businessCase of businessCases) {
+    await sql`
+      INSERT INTO business_cases (id, title, domain, level, status, payload_json)
+      VALUES (${businessCase.id}, ${businessCase.title}, ${businessCase.domainId}, ${businessCase.level}, ${businessCase.status}, ${JSON.stringify(businessCase)}::jsonb)
+      ON CONFLICT (id) DO UPDATE SET
+        title = EXCLUDED.title,
+        domain = EXCLUDED.domain,
+        level = EXCLUDED.level,
+        status = EXCLUDED.status,
+        payload_json = EXCLUDED.payload_json
     `;
   }
 

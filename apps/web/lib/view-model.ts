@@ -6,11 +6,19 @@ import {
 } from "@finance/domain";
 import {
   getCompetencies,
+  getBusinessCases,
+  getConcepts,
   getCorrectionHistory,
   getDocuments,
+  getErrorJournal,
+  getExamSessions,
   getExercises,
+  getFlashcards,
   getLearningPath,
+  getLearningModules,
   getLessons,
+  getProgressSnapshot,
+  getRevisionSession,
   getSourcePacks
 } from "@finance/db";
 
@@ -94,6 +102,95 @@ export async function getSourceModel() {
   return {
     sourcePacks,
     documents,
+    domains
+  };
+}
+
+export async function getPathModel() {
+  const [learningPath, modules, competencies, lessons, exercises] = await Promise.all([
+    getLearningPath(),
+    getLearningModules(),
+    getCompetencies(),
+    getLessons(),
+    getExercises()
+  ]);
+
+  return {
+    learningPath,
+    modules,
+    competencies,
+    lessons,
+    exercises,
+    domains
+  };
+}
+
+export async function getKnowledgeModel() {
+  const [modules, concepts, flashcards, lessons] = await Promise.all([
+    getLearningModules(),
+    getConcepts(),
+    getFlashcards(),
+    getLessons()
+  ]);
+
+  return {
+    modules,
+    concepts,
+    flashcards,
+    lessons,
+    domains
+  };
+}
+
+export async function getRevisionModel() {
+  const [session, flashcards, errorJournal] = await Promise.all([
+    getRevisionSession(),
+    getFlashcards(),
+    getErrorJournal()
+  ]);
+
+  return {
+    session,
+    flashcards,
+    errorJournal
+  };
+}
+
+export async function getExamModel() {
+  const [examSessions, exercises, competencies] = await Promise.all([
+    getExamSessions(),
+    getExercises(),
+    getCompetencies()
+  ]);
+
+  return {
+    examSessions,
+    exercises,
+    competencies,
+    domains
+  };
+}
+
+export async function getProgressModel() {
+  const snapshot = await getProgressSnapshot();
+
+  return {
+    ...snapshot,
+    domains
+  };
+}
+
+export async function getBusinessCaseModel() {
+  const [businessCases, modules, competencies] = await Promise.all([
+    getBusinessCases(),
+    getLearningModules(),
+    getCompetencies()
+  ]);
+
+  return {
+    businessCases,
+    modules,
+    competencies,
     domains
   };
 }
