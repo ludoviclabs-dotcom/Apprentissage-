@@ -4,6 +4,7 @@ import { createHash } from "node:crypto";
 import { extname, join, relative } from "node:path";
 import type { DomainId } from "@finance/domain";
 import { z } from "zod";
+import { extractDocx, extractPdf } from "./extractors";
 
 export const supportedExtensions = [".pdf", ".docx", ".pptx", ".xlsx", ".md"] as const;
 
@@ -28,7 +29,9 @@ export interface ExtractedDocument {
   extension: SupportedExtension;
   rawText: string;
   markdownText: string;
+  pages: number;
   status: "extracted" | "needs-docling";
+  reason?: string;
 }
 
 export interface TextChunk {
@@ -62,16 +65,17 @@ export function isSupportedExtension(extension: string): extension is SupportedE
 export function inferDomainFromPath(path: string): DomainId | "unknown" {
   const normalized = path.toLowerCase();
 
-  if (normalized.includes("compta-generale") || normalized.includes("pcg")) {
-    return "compta-generale";
-  }
-
-  if (normalized.includes("analytique")) {
+  // Méthodes de coûts / pilotage de la performance → analytique (avant le filet "compta").
+  if (
+    /(analytique|m[eé]thode abc|\babc\b|co[uû]t cible|target costing|yield|management des capacit|pilotage et performance|tableaux? de bord|seuil de rentabilit|co[uû]t variable|[eé]carts? sur)/.test(
+      normalized
+    )
+  ) {
     return "compta-analytique";
   }
 
-  if (normalized.includes("controle") || normalized.includes("contrôle")) {
-    return "controle-gestion";
+  if (normalized.includes("compta-generale") || normalized.includes("pcg")) {
+    return "compta-generale";
   }
 
   if (normalized.includes("ifrs") || normalized.includes("ias")) {
@@ -84,6 +88,23 @@ export function inferDomainFromPath(path: string): DomainId | "unknown" {
 
   if (normalized.includes("fiscal")) {
     return "fiscalite";
+  }
+
+  if (
+    normalized.includes("controle") ||
+    normalized.includes("contrôle") ||
+    normalized.includes("controledegestion")
+  ) {
+    return "controle-gestion";
+  }
+
+  // Comptabilité générale & approfondie (large filet après les cas spécifiques).
+  if (
+    /(comptabilit|\bcompta\b|comptes sociaux|comptes consolid|immobilisation|amortissement|provision|emprunts obligataires|\btitres\b|op[eé]rations courantes|constitution des|variations du capital|contrats? [aà] long terme|cl[oô]ture|\btva\b)/.test(
+      normalized
+    )
+  ) {
+    return "compta-generale";
   }
 
   if (normalized.includes("finance")) {
@@ -140,24 +161,42 @@ export async function createSourcePackManifest(rootPath: string): Promise<Source
 export async function extractDocument(rootPath: string, file: IngestFile): Promise<ExtractedDocument> {
   const absolutePath = join(rootPath, file.path);
 
-  if (file.extension !== ".md") {
+  if (file.extension === ".md") {
+    const markdownText = await readFile(absolutePath, "utf8");
+
     return {
       path: file.path,
       extension: file.extension,
-      rawText: "",
-      markdownText: "",
-      status: "needs-docling"
+      rawText: markdownText.replaceAll(/[#*_`>-]/g, " "),
+      markdownText,
+      pages: 1,
+      status: "extracted"
     };
   }
 
-  const markdownText = await readFile(absolutePath, "utf8");
+  if (file.extension === ".pdf" || file.extension === ".docx") {
+    const extracted = file.extension === ".pdf" ? await extractPdf(absolutePath) : await extractDocx(absolutePath);
 
+    return {
+      path: file.path,
+      extension: file.extension,
+      rawText: extracted.rawText,
+      markdownText: extracted.markdownText,
+      pages: extracted.pages,
+      status: extracted.status,
+      reason: extracted.reason
+    };
+  }
+
+  // .pptx / .xlsx ne sont pas couverts par l'extracteur Node léger de la V1.
   return {
     path: file.path,
     extension: file.extension,
-    rawText: markdownText.replaceAll(/[#*_`>-]/g, " "),
-    markdownText,
-    status: "extracted"
+    rawText: "",
+    markdownText: "",
+    pages: 0,
+    status: "needs-docling",
+    reason: "format non couvert par l'extracteur Node V1 (.pptx / .xlsx)"
   };
 }
 

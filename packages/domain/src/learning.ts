@@ -15,6 +15,16 @@ import type {
   RevisionSession,
   SourcePack
 } from "./types";
+import {
+  comptaConcepts,
+  comptaExercises,
+  comptaFlashcards,
+  comptaLearningDays,
+  comptaLessons,
+  comptaModules,
+  comptaSourcePack
+} from "./compta-v1";
+import { comptaBusinessCase, comptaExamSessions } from "./compta-extra";
 
 export const sourcePacks: SourcePack[] = [
   {
@@ -64,7 +74,8 @@ export const sourcePacks: SourcePack[] = [
     status: "ready",
     documentsCount: 18,
     chunksCount: 202
-  }
+  },
+  comptaSourcePack
 ];
 
 export const documents: DocumentRecord[] = [
@@ -182,7 +193,8 @@ export const lessons: Lesson[] = [
         effectiveDate: "2027-01-01"
       }
     ]
-  }
+  },
+  ...comptaLessons
 ];
 
 export const learningModules: LearningModule[] = [
@@ -272,7 +284,8 @@ export const learningModules: LearningModule[] = [
     status: "not-started",
     progress: 0,
     nextAction: "Debloquer apres validation des fondations comptables."
-  }
+  },
+  ...comptaModules
 ];
 
 export const concepts: Concept[] = [
@@ -355,7 +368,8 @@ export const concepts: Concept[] = [
     status: "fragile",
     strength: 38,
     sourceReferences: [provisionCourseSource, ias37Source]
-  }
+  },
+  ...comptaConcepts
 ];
 
 export const exercises: Exercise[] = [
@@ -652,7 +666,8 @@ export const exercises: Exercise[] = [
     ],
     competencyIds: ["cg-provisions", "cg-cutoff", "ifrs-ias37"],
     sourceChunkIds: ["chunk-provision-42", "chunk-ias37-3"]
-  }
+  },
+  ...comptaExercises
 ];
 
 export const corrections: Correction[] = [
@@ -1105,7 +1120,8 @@ export const flashcards: Flashcard[] = [
     dueAt: "2026-06-18T08:00:00.000Z",
     intervalDays: 3,
     sourceReferences: [ias37Source]
-  }
+  },
+  ...comptaFlashcards
 ];
 
 export const revisionSession: RevisionSession = {
@@ -1142,6 +1158,7 @@ export const errorJournalEntries: ErrorJournalEntry[] = [
 ];
 
 export const examSessions: ExamSession[] = [
+  ...comptaExamSessions,
   {
     id: "exam-provisions-quick",
     title: "Examen court - provisions, cut-off et annexe",
@@ -1232,77 +1249,17 @@ export const businessCases: BusinessCase[] = [
         effectiveDate: "2025-09-01"
       }
     ]
-  }
+  },
+  comptaBusinessCase
 ];
 
 export const learningPath: LearningPath = {
   id: "path-30-days-foundation",
-  name: "Remise à niveau finance métiers - 30 jours",
+  name: "Remise à niveau Comptabilité & pilotage - 30 jours",
   durationDays: 30,
-  currentDay: 4,
-  goal: "Construire un socle logique avant les automatismes de correction et de simulation.",
-  days: [
-    {
-      day: 1,
-      title: "Diagnostic compta générale",
-      domainId: "compta-generale",
-      competencyIds: ["cg-cutoff"],
-      lessonId: "lesson-provisions",
-      exerciseId: "ex-provision-litige",
-      minutes: 45,
-      status: "done"
-    },
-    {
-      day: 2,
-      title: "Centres d'analyse et unités d'oeuvre",
-      domainId: "compta-analytique",
-      competencyIds: ["ca-centres"],
-      lessonId: "lesson-provisions",
-      exerciseId: "ex-provision-litige",
-      minutes: 55,
-      status: "done"
-    },
-    {
-      day: 3,
-      title: "Ecarts prix-volume-mix",
-      domainId: "controle-gestion",
-      competencyIds: ["cdg-ecarts"],
-      lessonId: "lesson-provisions",
-      exerciseId: "ex-provision-litige",
-      minutes: 50,
-      status: "done"
-    },
-    {
-      day: 4,
-      title: "Provisions PCG puis IAS 37",
-      domainId: "ifrs-ias",
-      competencyIds: ["ifrs-ias37", "cg-provisions"],
-      lessonId: "lesson-ias37",
-      exerciseId: "ex-ias37-comparison",
-      minutes: 60,
-      status: "today"
-    },
-    {
-      day: 5,
-      title: "Constat d'audit ISO",
-      domainId: "iso",
-      competencyIds: ["iso-audit"],
-      lessonId: "lesson-provisions",
-      exerciseId: "ex-provision-litige",
-      minutes: 40,
-      status: "next"
-    },
-    {
-      day: 6,
-      title: "Retraitements fiscaux courants",
-      domainId: "fiscalite",
-      competencyIds: ["fisc-retraitements"],
-      lessonId: "lesson-provisions",
-      exerciseId: "ex-provision-litige",
-      minutes: 45,
-      status: "locked"
-    }
-  ]
+  currentDay: 3,
+  goal: "Construire le socle comptable (opérations, clôture, financement) puis le pilotage de la performance, à partir du corpus Master CCA.",
+  days: comptaLearningDays
 };
 
 export const dashboardPriorities: DashboardPriority[] = [

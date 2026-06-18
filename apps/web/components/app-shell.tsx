@@ -14,7 +14,8 @@ import {
   LineChart,
   NotebookTabs,
   Repeat,
-  Route
+  Route,
+  Search
 } from "lucide-react";
 
 const navigation = [
@@ -22,6 +23,7 @@ const navigation = [
   { href: "/parcours", label: "Parcours", icon: Route },
   { href: "/cours", label: "Cours", icon: BookOpen },
   { href: "/connaissances", label: "Connaissances", icon: Library },
+  { href: "/recherche", label: "Recherche", icon: Search },
   { href: "/exercices", label: "Exercices", icon: ClipboardCheck },
   { href: "/annales-concours", label: "Annales & Concours", icon: NotebookTabs },
   { href: "/business-cases", label: "Business Cases", icon: BriefcaseBusiness },

@@ -1241,9 +1241,93 @@ export async function getCorrectionHistory(): Promise<{
   }
 }
 
-export async function searchKnowledge(query: string, limit = 5): Promise<KnowledgeHit[]> {
-  if (!canUseDatabase() || query.trim().length < 3) {
+function normalizeSearch(value: string): string {
+  return value.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
+}
+
+// Seed-mode search over the derived, committed corpus (lessons, concepts, flashcards).
+// Every hit keeps its source citation. Vector search over raw chunks stays the DB-mode upgrade.
+function searchSeedKnowledge(query: string, limit: number): KnowledgeHit[] {
+  const tokens = normalizeSearch(query)
+    .split(/\s+/)
+    .filter((token) => token.length >= 3);
+
+  if (tokens.length === 0) {
     return [];
+  }
+
+  const toSource = (ref: SourceReference): KnowledgeHit["source"] => ({
+    pack: ref.pack,
+    document: ref.document,
+    sourceType: ref.sourceType,
+    pageStart: ref.pageStart,
+    pageEnd: ref.pageEnd,
+    effectiveDate: ref.effectiveDate
+  });
+
+  const candidates: { content: string; haystack: string; source: KnowledgeHit["source"] }[] = [];
+
+  for (const lesson of lessons) {
+    const ref = lesson.sourceReferences[0];
+    if (!ref) continue;
+    candidates.push({
+      content: `${lesson.title} — ${lesson.rule}`,
+      haystack: normalizeSearch(`${lesson.title} ${lesson.concept} ${lesson.rule} ${lesson.reasoning} ${lesson.example} ${lesson.frequentError}`),
+      source: toSource(ref)
+    });
+  }
+
+  for (const concept of seedConcepts) {
+    const ref = concept.sourceReferences[0];
+    if (!ref) continue;
+    candidates.push({
+      content: `${concept.title} : ${concept.shortDefinition}`,
+      haystack: normalizeSearch(`${concept.title} ${concept.shortDefinition} ${concept.frequentTrap} ${concept.miniExample} ${concept.formula ?? ""}`),
+      source: toSource(ref)
+    });
+  }
+
+  for (const card of seedFlashcards) {
+    const ref = card.sourceReferences[0];
+    if (!ref) continue;
+    candidates.push({
+      content: `${card.front} → ${card.back}`,
+      haystack: normalizeSearch(`${card.front} ${card.back} ${card.explanation}`),
+      source: toSource(ref)
+    });
+  }
+
+  const scored = candidates
+    .map((candidate) => {
+      let score = 0;
+      for (const token of tokens) {
+        const occurrences = candidate.haystack.split(token).length - 1;
+        if (occurrences > 0) {
+          score += 1 + Math.min(occurrences, 3) * 0.2;
+        }
+      }
+      return { candidate, score };
+    })
+    .filter((entry) => entry.score > 0)
+    .sort((a, b) => b.score - a.score)
+    .slice(0, limit);
+
+  const max = scored[0]?.score ?? 1;
+
+  return scored.map(({ candidate, score }) => ({
+    content: candidate.content,
+    confidence: Math.min(0.95, 0.5 + (score / max) * 0.45),
+    source: candidate.source
+  }));
+}
+
+export async function searchKnowledge(query: string, limit = 5): Promise<KnowledgeHit[]> {
+  if (query.trim().length < 3) {
+    return [];
+  }
+
+  if (!canUseDatabase()) {
+    return searchSeedKnowledge(query, limit);
   }
 
   try {
