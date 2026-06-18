@@ -1352,3 +1352,60 @@ button {
     grid-template-columns: 1fr;
   }
 }
+
+/* Corpus search (Phase 4) */
+.search-form {
+  display: flex;
+  gap: 12px;
+  margin-top: 4px;
+}
+
+.search-form input {
+  flex: 1;
+  padding: 12px 14px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius);
+  font: inherit;
+  background: var(--surface);
+  color: var(--text);
+}
+
+.search-form button {
+  padding: 12px 20px;
+  border: none;
+  border-radius: var(--radius);
+  background: var(--accent);
+  color: #ffffff;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.search-results {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.search-hit p {
+  margin: 0 0 12px;
+}
+
+.search-hit-meta {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.source-chip {
+  font-size: 12px;
+  color: var(--muted);
+  background: var(--surface-muted);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 4px 10px;
+}
+
+.muted {
+  color: var(--muted);
+}

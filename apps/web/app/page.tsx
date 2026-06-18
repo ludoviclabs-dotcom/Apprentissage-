@@ -11,6 +11,8 @@ import { getDomain } from "@finance/domain";
 export default async function DashboardPage() {
   const model = await getDashboardModel();
   const runtime = getRuntimeFlags();
+  const totalDocuments = model.sourcePacks.reduce((sum, pack) => sum + pack.documentsCount, 0);
+  const totalChunks = model.sourcePacks.reduce((sum, pack) => sum + pack.chunksCount, 0);
 
   if (!model.currentDay || !model.currentLesson || !model.currentExercise || !model.latestCorrection) {
     return null;
@@ -41,14 +43,33 @@ export default async function DashboardPage() {
         </article>
         <article>
           <span>Sources</span>
-          <strong>{model.documents.length} documents</strong>
-          <p>{model.sourcePacks.length} packs locaux ou importes manuellement alimentent les citations.</p>
+          <strong>{totalDocuments} documents</strong>
+          <p>{model.sourcePacks.length} packs · {totalChunks} extraits indexes alimentent les citations.</p>
         </article>
         <article>
           <span>Correction</span>
           <strong>{model.latestCorrection.rubricScores.length} criteres</strong>
           <p>Le score separe bareme, erreurs, remediation et preuves citees.</p>
         </article>
+      </section>
+
+      <section className="panel corpus-search">
+        <div className="panel-heading">
+          <div>
+            <span className="section-label">Recherche corpus</span>
+            <h2>Interroger le corpus documentaire</h2>
+          </div>
+        </div>
+        <form action="/recherche" method="get" className="search-form">
+          <input
+            type="search"
+            name="q"
+            placeholder="Rechercher une notion, une règle, une écriture..."
+            aria-label="Rechercher dans le corpus"
+          />
+          <button type="submit">Rechercher</button>
+        </form>
+        <p className="muted">Recherche locale sur {totalChunks} extraits dérivés et cités.</p>
       </section>
 
       <section className="domain-overview" aria-label="Niveau par domaine">
