@@ -1,4 +1,4 @@
-import { integer, jsonb, pgTable, text, timestamp, varchar } from "drizzle-orm/pg-core";
+import { integer, jsonb, pgTable, primaryKey, text, timestamp, uuid, varchar } from "drizzle-orm/pg-core";
 
 export const sourcePacksTable = pgTable("source_packs", {
   id: text("id").primaryKey(),
@@ -118,6 +118,7 @@ export const exercisesTable = pgTable("exercises", {
 
 export const attemptsTable = pgTable("attempts", {
   id: text("id").primaryKey(),
+  userId: uuid("user_id"),
   exerciseId: text("exercise_id").notNull(),
   userAnswer: text("user_answer").notNull(),
   score: integer("score").notNull(),
@@ -127,6 +128,7 @@ export const attemptsTable = pgTable("attempts", {
 
 export const correctionsTable = pgTable("corrections", {
   id: text("id").primaryKey(),
+  userId: uuid("user_id"),
   attemptId: text("attempt_id").notNull(),
   score: integer("score").notNull(),
   summary: text("summary").notNull(),
@@ -137,6 +139,7 @@ export const correctionsTable = pgTable("corrections", {
 
 export const revisionItemsTable = pgTable("revision_items", {
   id: text("id").primaryKey(),
+  userId: uuid("user_id"),
   competencyId: text("competency_id").notNull(),
   dueAt: timestamp("due_at", { mode: "string" }).notNull(),
   strength: integer("strength").notNull(),
@@ -171,6 +174,7 @@ export const flashcardsTable = pgTable("flashcards", {
 
 export const revisionReviewsTable = pgTable("revision_reviews", {
   id: text("id").primaryKey(),
+  userId: uuid("user_id"),
   flashcardId: text("flashcard_id").notNull(),
   rating: text("rating").notNull(),
   reviewedAt: timestamp("reviewed_at", { mode: "string" }).notNull(),
@@ -180,6 +184,7 @@ export const revisionReviewsTable = pgTable("revision_reviews", {
 
 export const errorJournalTable = pgTable("error_journal", {
   id: text("id").primaryKey(),
+  userId: uuid("user_id"),
   exerciseId: text("exercise_id").notNull(),
   correctionId: text("correction_id").notNull(),
   category: text("category").notNull(),
@@ -211,9 +216,86 @@ export const businessCasesTable = pgTable("business_cases", {
 
 export const businessCaseAttemptsTable = pgTable("business_case_attempts", {
   id: text("id").primaryKey(),
+  userId: uuid("user_id"),
   businessCaseId: text("business_case_id").notNull(),
   userMemo: text("user_memo").notNull(),
   score: integer("score").notNull(),
   correction: text("correction").notNull(),
   createdAt: timestamp("created_at", { mode: "string" }).notNull().defaultNow()
 });
+
+// --- Identity -------------------------------------------------------------
+//
+// `app_users` and `user_sessions` are the only tables without row level
+// security: the login flow must read them before any user context exists.
+// Nothing outside this application connects to the database, and no route
+// handler exposes them. See docs/adr/001-local-auth-rls.md.
+
+export const appUsersTable = pgTable("app_users", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  email: text("email").notNull(),
+  emailNormalized: text("email_normalized").notNull(),
+  passwordHash: text("password_hash").notNull(),
+  createdAt: timestamp("created_at", { mode: "string" }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { mode: "string" }).notNull().defaultNow()
+});
+
+export const userSessionsTable = pgTable("user_sessions", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  userId: uuid("user_id").notNull(),
+  tokenHash: text("token_hash").notNull(),
+  createdAt: timestamp("created_at", { mode: "string" }).notNull().defaultNow(),
+  lastSeenAt: timestamp("last_seen_at", { mode: "string" }).notNull().defaultNow(),
+  expiresAt: timestamp("expires_at", { mode: "string" }).notNull()
+});
+
+export const profilesTable = pgTable("profiles", {
+  userId: uuid("user_id").primaryKey(),
+  displayName: text("display_name").notNull().default(""),
+  locale: text("locale").notNull().default("fr"),
+  createdAt: timestamp("created_at", { mode: "string" }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { mode: "string" }).notNull().defaultNow()
+});
+
+// --- Per-user progress ----------------------------------------------------
+//
+// These replace mutations of the shared catalogue: `recordAttempt` used to
+// UPDATE competencies.strength and `reviewFlashcard` used to UPDATE
+// flashcards.status/due_at, so one account's work moved every other account's
+// progress. The catalogue columns remain the seeded starting point.
+
+export const examRunsTable = pgTable("exam_runs", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  userId: uuid("user_id").notNull(),
+  examSessionId: text("exam_session_id").notNull(),
+  status: text("status").notNull(),
+  startedAt: timestamp("started_at", { mode: "string" }).notNull().defaultNow(),
+  submittedAt: timestamp("submitted_at", { mode: "string" }),
+  score: integer("score"),
+  answersJson: jsonb("answers_json").notNull().default([])
+});
+
+export const competencyProgressTable = pgTable(
+  "competency_progress",
+  {
+    userId: uuid("user_id").notNull(),
+    competencyId: text("competency_id").notNull(),
+    strength: integer("strength").notNull(),
+    status: text("status").notNull(),
+    updatedAt: timestamp("updated_at", { mode: "string" }).notNull().defaultNow()
+  },
+  (table) => [primaryKey({ columns: [table.userId, table.competencyId] })]
+);
+
+export const flashcardStatesTable = pgTable(
+  "flashcard_states",
+  {
+    userId: uuid("user_id").notNull(),
+    flashcardId: text("flashcard_id").notNull(),
+    status: text("status").notNull(),
+    dueAt: timestamp("due_at", { mode: "string" }).notNull(),
+    intervalDays: integer("interval_days").notNull().default(0),
+    updatedAt: timestamp("updated_at", { mode: "string" }).notNull().defaultNow()
+  },
+  (table) => [primaryKey({ columns: [table.userId, table.flashcardId] })]
+);
