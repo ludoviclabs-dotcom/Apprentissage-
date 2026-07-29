@@ -1,10 +1,13 @@
 import { describe, expect, it } from "vitest";
 import {
   buildRevisionSession,
+  businessCases,
   createErrorJournalEntries,
   flashcards,
   getRevisionIntervalDays,
-  reviewFlashcardSchedule
+  normalizeForMatching,
+  reviewFlashcardSchedule,
+  scoreBusinessCase
 } from "../src";
 
 describe("active learning helpers", () => {
@@ -64,5 +67,45 @@ describe("active learning helpers", () => {
       "source-quality",
       "missing-element"
     ]);
+  });
+});
+
+describe("scoreBusinessCase", () => {
+  it("normalizes accents on both sides of the comparison", () => {
+    expect(normalizeForMatching("Produits à recevoir")).toBe("produits a recevoir");
+  });
+
+  it("credits an accented expected point written without accents", () => {
+    const caseItem = {
+      id: "bc-accents",
+      domainId: "compta-generale",
+      title: "Cas accents",
+      description: "",
+      dossier: "",
+      status: "available",
+      documents: [],
+      questions: [
+        {
+          id: "q1",
+          prompt: "",
+          expectedPoints: ["produits à recevoir", "rattachement à la période"]
+        }
+      ],
+      expectedDeliverable: "",
+      sourceReferences: []
+    } as unknown as (typeof businessCases)[number];
+
+    const attempt = scoreBusinessCase(caseItem, "J'ai retenu produits a recevoir et rattachement a la periode.");
+
+    expect(attempt.score).toBe(20);
+  });
+
+  it("lets every seeded business case reach a full score", () => {
+    for (const caseItem of businessCases) {
+      const expectedTerms = caseItem.questions.flatMap((question) => question.expectedPoints);
+      const perfectMemo = expectedTerms.join(" ; ");
+
+      expect(scoreBusinessCase(caseItem, perfectMemo).score, `${caseItem.id} is unscorable`).toBe(20);
+    }
   });
 });

@@ -137,13 +137,20 @@ export function startExamSession(template: ExamSession, startedAt = new Date()):
   };
 }
 
-export function scoreBusinessCase(caseItem: BusinessCase, userMemo: string): BusinessCaseAttempt {
-  const normalized = userMemo
+/** Accent- and case-insensitive comparison key. */
+export function normalizeForMatching(input: string): string {
+  return input
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "")
     .toLowerCase();
+}
+
+export function scoreBusinessCase(caseItem: BusinessCase, userMemo: string): BusinessCaseAttempt {
+  const normalized = normalizeForMatching(userMemo);
   const expectedTerms = caseItem.questions.flatMap((question) => question.expectedPoints);
-  const matched = expectedTerms.filter((term) => normalized.includes(term.toLowerCase()));
+  // Both sides must be normalized: accented expected points could never match an
+  // accent-stripped memo back when only the memo was normalized.
+  const matched = expectedTerms.filter((term) => normalized.includes(normalizeForMatching(term)));
   const score = Math.min(20, Math.round((matched.length / Math.max(1, expectedTerms.length)) * 20));
 
   return {

@@ -8,11 +8,15 @@ import {
   BookOpen,
   BriefcaseBusiness,
   ClipboardCheck,
+  FileCheck,
+  FlaskConical,
+  FolderOpen,
   GraduationCap,
   Home,
   Library,
   LineChart,
   NotebookTabs,
+  PackageOpen,
   Repeat,
   Route,
   Search
@@ -22,13 +26,18 @@ const navigation = [
   { href: "/", label: "Accueil", icon: Home },
   { href: "/parcours", label: "Parcours", icon: Route },
   { href: "/cours", label: "Cours", icon: BookOpen },
+  { href: "/apprendre", label: "Apprendre", icon: GraduationCap },
   { href: "/connaissances", label: "Connaissances", icon: Library },
   { href: "/recherche", label: "Recherche", icon: Search },
   { href: "/exercices", label: "Exercices", icon: ClipboardCheck },
   { href: "/annales-concours", label: "Annales & Concours", icon: NotebookTabs },
   { href: "/business-cases", label: "Business Cases", icon: BriefcaseBusiness },
+  { href: "/simulations", label: "Simulations", icon: FlaskConical },
   { href: "/revisions", label: "Revisions", icon: Repeat },
-  { href: "/progression", label: "Progression", icon: LineChart }
+  { href: "/corrections", label: "Corrections", icon: FileCheck },
+  { href: "/progression", label: "Progression", icon: LineChart },
+  { href: "/documents", label: "Documents", icon: FolderOpen },
+  { href: "/source-packs", label: "Source packs", icon: PackageOpen }
 ];
 
 export function AppShell({ children, runtime }: { children: ReactNode; runtime: RuntimeFlags }) {

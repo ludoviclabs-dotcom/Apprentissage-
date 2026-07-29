@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { postJson } from "@/lib/api-client";
 
 interface SourceHit {
   content: string;
@@ -17,7 +18,6 @@ interface SourceHit {
 
 interface SourceSearchResult {
   hits?: SourceHit[];
-  error?: string;
   sourcePolicy?: string;
 }
 
@@ -25,22 +25,23 @@ export function SourceSearchForm() {
   const [query, setQuery] = useState("provision litige");
   const [isPending, setIsPending] = useState(false);
   const [result, setResult] = useState<SourceSearchResult | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   async function searchSources() {
     setIsPending(true);
     setResult(null);
+    setError(null);
 
-    try {
-      const response = await fetch("/api/ai/librarian", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ query, limit: 5 })
-      });
-      const payload = (await response.json()) as SourceSearchResult;
-      setResult(payload);
-    } finally {
-      setIsPending(false);
+    const outcome = await postJson<SourceSearchResult>("/api/ai/librarian", { query, limit: 5 });
+
+    setIsPending(false);
+
+    if (!outcome.ok) {
+      setError(outcome.error);
+      return;
     }
+
+    setResult(outcome.data);
   }
 
   return (
@@ -48,7 +49,10 @@ export function SourceSearchForm() {
       <div>
         <span className="section-label">Bibliothecaire</span>
         <h2>Retrouver les sources avant de raisonner</h2>
-        <p>Recherche deterministe dans les chunks importes. Si la DB n'est pas active, le resultat reste vide.</p>
+        <p>
+          Recherche deterministe dans le corpus. Sans base active, la recherche porte sur le corpus
+          seedé du repo ; avec la base active, elle porte sur les chunks importés.
+        </p>
       </div>
       <label>
         Recherche
@@ -75,9 +79,9 @@ export function SourceSearchForm() {
           )}
         </div>
       ) : null}
-      {result?.error ? (
+      {error ? (
         <div className="result-box error">
-          <strong>{result.error}</strong>
+          <strong>{error}</strong>
         </div>
       ) : null}
     </section>

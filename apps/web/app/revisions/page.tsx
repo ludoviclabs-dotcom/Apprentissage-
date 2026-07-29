@@ -1,9 +1,11 @@
 import { RevisionReviewForm } from "@/components/forms/revision-review-form";
 import { SourceReference } from "@/components/source-reference";
+import { getFeatures } from "@/lib/features";
 import { getRevisionModel } from "@/lib/view-model";
 
 export default async function RevisionsPage() {
   const model = await getRevisionModel();
+  const features = getFeatures();
 
   return (
     <div className="page-stack">
@@ -58,7 +60,11 @@ export default async function RevisionsPage() {
               <p>{card.back}</p>
             </div>
             <p>{card.explanation}</p>
-            <RevisionReviewForm flashcardId={card.id} />
+            <RevisionReviewForm
+              flashcardId={card.id}
+              writes={features.writes}
+              persistence={features.persistence}
+            />
             <SourceReference sources={card.sourceReferences} />
           </article>
         ))}

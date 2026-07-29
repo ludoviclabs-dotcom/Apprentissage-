@@ -9,6 +9,14 @@ export const metadata: Metadata = {
   description: "Plateforme privée local-first pour apprendre, s'exercer et comprendre la logique finance."
 };
 
+/**
+ * Every screen reflects runtime configuration: public-demo lockdown, database
+ * mode, AI provider. Prerendering would bake the values present at build time —
+ * which is how the public-demo banner and every disabled write control silently
+ * failed to appear on a production build made with the flag unset.
+ */
+export const dynamic = "force-dynamic";
+
 export default function RootLayout({ children }: { children: ReactNode }) {
   const runtime = getRuntimeFlags();
 

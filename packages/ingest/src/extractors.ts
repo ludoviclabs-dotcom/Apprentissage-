@@ -17,7 +17,7 @@ const MIN_ALNUM_RATIO = 0.45;
 export function normalizeText(input: string): string {
   return input
     .replace(/\r\n/g, "\n")
-    .replace(/ /g, " ")
+    .replace(/\u00A0/g, " ")
     .replace(/[ \t]+\n/g, "\n")
     .replace(/[ \t]{2,}/g, " ")
     .replace(/\n{3,}/g, "\n\n")

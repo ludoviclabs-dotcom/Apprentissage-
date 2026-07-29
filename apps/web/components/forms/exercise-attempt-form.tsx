@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import type { Correction, Exercise } from "@finance/domain";
+import { postJson } from "@/lib/api-client";
 import { CorrectionSummary } from "../correction-summary";
 
 export function ExerciseAttemptForm({ exercise }: { exercise: Exercise }) {
@@ -16,19 +17,22 @@ export function ExerciseAttemptForm({ exercise }: { exercise: Exercise }) {
     setCorrection(null);
 
     try {
-      const response = await fetch("/api/exercises/attempts", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ exerciseId: exercise.id, userAnswer: answer })
+      const outcome = await postJson<{ correction?: Correction }>("/api/exercises/attempts", {
+        exerciseId: exercise.id,
+        userAnswer: answer
       });
-      const payload = (await response.json()) as { correction?: Correction; error?: string };
 
-      if (!response.ok || !payload.correction) {
-        setError(payload.error ?? "Correction impossible.");
+      if (!outcome.ok) {
+        setError(outcome.error);
         return;
       }
 
-      setCorrection(payload.correction);
+      if (!outcome.data.correction) {
+        setError("Correction impossible.");
+        return;
+      }
+
+      setCorrection(outcome.data.correction);
     } finally {
       setIsPending(false);
     }

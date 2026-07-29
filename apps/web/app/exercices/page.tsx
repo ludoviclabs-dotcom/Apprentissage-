@@ -24,7 +24,12 @@ export default async function ExercisesPage() {
           <h2>Session recommandée</h2>
           <p>5 QCM, 1 cas pratique, 1 correction guidée, 1 fiche de remédiation.</p>
         </div>
-        <button type="button" className="primary-action">Préparer la session</button>
+        <div className="planned-action">
+          <button type="button" className="primary-action" disabled title="Génération de session non implémentée">
+            Préparer la session
+          </button>
+          <span className="badge-soon">Bientôt disponible</span>
+        </div>
       </section>
 
       <div className="two-column">

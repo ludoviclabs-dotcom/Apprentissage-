@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { domains } from "@finance/domain";
+import { postJson } from "@/lib/api-client";
 
 interface DiagnosticResult {
   recommendedStart?: {
@@ -16,17 +17,22 @@ export function DiagnosticForm() {
     Object.fromEntries(domains.map((domain) => [domain.id, 50]))
   );
   const [result, setResult] = useState<DiagnosticResult | null>(null);
+  const [error, setError] = useState<string | null>(null);
   const [isPending, setIsPending] = useState(false);
 
   async function submitDiagnostic() {
     setIsPending(true);
+    setError(null);
+
     try {
-      const response = await fetch("/api/learning/diagnostic", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ levels })
-      });
-      setResult((await response.json()) as DiagnosticResult);
+      const outcome = await postJson<DiagnosticResult>("/api/learning/diagnostic", { levels });
+
+      if (!outcome.ok) {
+        setError(outcome.error);
+        return;
+      }
+
+      setResult(outcome.data);
     } finally {
       setIsPending(false);
     }
@@ -70,6 +76,7 @@ export function DiagnosticForm() {
           </span>
         </div>
       ) : null}
+      {error ? <div className="result-box error">{error}</div> : null}
     </section>
   );
 }

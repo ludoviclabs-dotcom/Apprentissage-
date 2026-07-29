@@ -2,18 +2,29 @@
 
 import { useMemo, useState } from "react";
 import type { ExamSession, Exercise } from "@finance/domain";
+import { postJson } from "@/lib/api-client";
+import { FeatureNotice } from "@/components/feature-notice";
+import type { FeatureState } from "@/lib/features";
+
+/** Mirrors `userAnswer: z.string().min(12)` in app/api/exams/submit. */
+const MIN_ANSWER_LENGTH = 12;
 
 export function ExamSessionForm({
   exam,
-  exercises
+  exercises,
+  writes,
+  persistence
 }: {
   exam: ExamSession;
   exercises: Exercise[];
+  writes: FeatureState;
+  persistence: FeatureState;
 }) {
   const [started, setStarted] = useState(false);
   const [score, setScore] = useState<number | null>(null);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const locked = !writes.enabled;
   const scopedExercises = useMemo(
     () => exercises.filter((exercise) => exam.exerciseIds.includes(exercise.id)),
     [exam.exerciseIds, exercises]
@@ -21,22 +32,20 @@ export function ExamSessionForm({
   const [answers, setAnswers] = useState<Record<string, string>>(
     Object.fromEntries(scopedExercises.map((exercise) => [exercise.id, ""]))
   );
+  const incompleteAnswers = scopedExercises.filter(
+    (exercise) => (answers[exercise.id] ?? "").trim().length < MIN_ANSWER_LENGTH
+  );
 
   async function start() {
     setPending(true);
     setError(null);
 
-    const response = await fetch("/api/exams/start", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ examId: exam.id })
-    });
-    const payload = (await response.json()) as { error?: string };
+    const outcome = await postJson<unknown>("/api/exams/start", { examId: exam.id });
 
     setPending(false);
 
-    if (!response.ok) {
-      setError(payload.error ?? "Demarrage impossible");
+    if (!outcome.ok) {
+      setError(outcome.error);
       return;
     }
 
@@ -47,29 +56,36 @@ export function ExamSessionForm({
     setPending(true);
     setError(null);
 
-    const response = await fetch("/api/exams/submit", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        answers: Object.entries(answers).map(([exerciseId, userAnswer]) => ({ exerciseId, userAnswer }))
-      })
+    const outcome = await postJson<{ score?: number }>("/api/exams/submit", {
+      answers: Object.entries(answers).map(([exerciseId, userAnswer]) => ({ exerciseId, userAnswer }))
     });
-    const payload = (await response.json()) as { score?: number; error?: string };
 
     setPending(false);
 
-    if (!response.ok || typeof payload.score !== "number") {
-      setError(payload.error ?? "Soumission impossible");
+    if (!outcome.ok) {
+      setError(outcome.error);
       return;
     }
 
-    setScore(payload.score);
+    if (typeof outcome.data.score !== "number") {
+      setError("Soumission impossible");
+      return;
+    }
+
+    setScore(outcome.data.score);
   }
 
   return (
     <div className="exam-runner">
+      <FeatureNotice feature={writes} />
       {!started ? (
-        <button type="button" className="primary-action" disabled={pending} onClick={() => void start()}>
+        <button
+          type="button"
+          className="primary-action"
+          disabled={pending || locked}
+          title={locked ? writes.reason : undefined}
+          onClick={() => void start()}
+        >
           Demarrer l'examen
         </button>
       ) : (
@@ -79,7 +95,7 @@ export function ExamSessionForm({
               {exercise.title}
               <span className="muted">{exercise.statement}</span>
               <textarea
-                minLength={12}
+                minLength={MIN_ANSWER_LENGTH}
                 rows={4}
                 value={answers[exercise.id] ?? ""}
                 onChange={(event) =>
@@ -88,12 +104,28 @@ export function ExamSessionForm({
               />
             </label>
           ))}
-          <button type="button" className="primary-action" disabled={pending} onClick={() => void submit()}>
+          {incompleteAnswers.length > 0 ? (
+            <p className="muted">
+              {incompleteAnswers.length} réponse(s) sous {MIN_ANSWER_LENGTH} caractères. Toutes les
+              réponses sont requises pour soumettre.
+            </p>
+          ) : null}
+          <button
+            type="button"
+            className="primary-action"
+            disabled={pending || locked || incompleteAnswers.length > 0}
+            onClick={() => void submit()}
+          >
             Soumettre
           </button>
         </div>
       )}
-      {score !== null ? <div className="result-box">Score moyen : {score}/20</div> : null}
+      {score !== null ? (
+        <div className="result-box">
+          Score moyen : {score}/20
+          {persistence.enabled ? null : <span className="muted">{persistence.reason}</span>}
+        </div>
+      ) : null}
       {error ? <div className="result-box error">{error}</div> : null}
     </div>
   );

@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { domains } from "@finance/domain";
+import { postFormData } from "@/lib/api-client";
 
 interface UploadResult {
   file?: {
@@ -43,12 +44,9 @@ export function DocumentUploadForm({ disabled = false }: { disabled?: boolean })
       formData.append("file", file);
       formData.append("domainId", domainId);
 
-      const response = await fetch("/api/documents/upload", {
-        method: "POST",
-        body: formData
-      });
-      const payload = (await response.json()) as UploadResult;
-      setResult(payload);
+      const outcome = await postFormData<UploadResult>("/api/documents/upload", formData);
+
+      setResult(outcome.ok ? outcome.data : { error: outcome.error });
     } finally {
       setIsPending(false);
     }
@@ -65,7 +63,7 @@ export function DocumentUploadForm({ disabled = false }: { disabled?: boolean })
       <div className="form-grid">
         <label>
           Domaine
-          <select value={domainId} onChange={(event) => setDomainId(event.target.value)}>
+          <select value={domainId} disabled={disabled} onChange={(event) => setDomainId(event.target.value)}>
             {domains.map((domain) => (
               <option key={domain.id} value={domain.id}>
                 {domain.name}

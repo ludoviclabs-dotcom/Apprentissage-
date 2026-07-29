@@ -3,44 +3,59 @@
 import { useState } from "react";
 import type { SourceReference } from "@finance/domain";
 import { SourceReference as SourceReferenceList } from "../source-reference";
+import { postJson } from "@/lib/api-client";
 
 interface TutorResponse {
   answer?: string;
   reasoningSteps?: string[];
   sources?: SourceReference[];
-  error?: string;
+  provider?: string;
+  providerStatus?: "ok" | "disabled" | "failed";
 }
+
+const PROVIDER_MESSAGES: Record<NonNullable<TutorResponse["providerStatus"]>, string | null> = {
+  ok: null,
+  disabled: "Aucun modèle configuré (AI_PROVIDER=none) : réponse assemblée depuis le corpus seedé.",
+  failed: "Le modèle configuré n'a pas répondu : réponse de repli assemblée depuis le corpus seedé."
+};
 
 export function TutorAskForm() {
   const [question, setQuestion] = useState("Explique-moi la logique d'une provision.");
   const [response, setResponse] = useState<TutorResponse | null>(null);
+  const [error, setError] = useState<string | null>(null);
   const [isPending, setIsPending] = useState(false);
 
   async function askTutor() {
     setIsPending(true);
-    try {
-      const result = await fetch("/api/ai/tutor", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ question, mode: "reprise" })
-      });
-      setResponse((await result.json()) as TutorResponse);
-    } finally {
-      setIsPending(false);
+    setError(null);
+
+    const outcome = await postJson<TutorResponse>("/api/ai/tutor", { question, mode: "reprise" });
+
+    setIsPending(false);
+
+    if (!outcome.ok) {
+      setResponse(null);
+      setError(outcome.error);
+      return;
     }
+
+    setResponse(outcome.data);
   }
+
+  const providerMessage = response?.providerStatus ? PROVIDER_MESSAGES[response.providerStatus] : null;
 
   return (
     <section className="panel action-form">
       <div>
         <span className="section-label">Tuteur sourcé</span>
         <h2>Poser une question</h2>
-        <p>Version MVP déterministe : le tuteur répond uniquement avec des sources attachées.</p>
+        <p>Le tuteur répond uniquement avec des sources attachées.</p>
       </div>
       <input value={question} onChange={(event) => setQuestion(event.target.value)} />
       <button type="button" className="primary-action" onClick={askTutor} disabled={isPending || question.length < 4}>
         {isPending ? "Recherche..." : "Demander au tuteur"}
       </button>
+      {providerMessage ? <p className="feature-notice info">{providerMessage}</p> : null}
       {response?.answer ? (
         <div className="result-box">
           <strong>{response.answer}</strong>
@@ -48,9 +63,9 @@ export function TutorAskForm() {
         </div>
       ) : null}
       {response?.sources ? <SourceReferenceList sources={response.sources} /> : null}
-      {response?.error ? (
+      {error ? (
         <div className="result-box error">
-          <strong>{response.error}</strong>
+          <strong>{error}</strong>
         </div>
       ) : null}
     </section>

@@ -3,15 +3,21 @@
   "version": "0.1.0",
   "private": true,
   "packageManager": "pnpm@10.11.0",
+  "engines": {
+    "node": ">=22"
+  },
   "scripts": {
-    "dev": "corepack pnpm --filter @finance/web dev",
-    "build": "corepack pnpm --filter @finance/web build",
-    "lint": "corepack pnpm --filter @finance/web lint",
+    "dev": "pnpm --filter @finance/web dev",
+    "build": "pnpm --filter @finance/web build",
+    "lint": "eslint . --max-warnings=0",
+    "typecheck": "pnpm -r --if-present typecheck",
     "test": "vitest run",
-    "typecheck": "corepack pnpm -r --if-present typecheck",
-    "db:migrate": "corepack pnpm --filter @finance/db migrate",
-    "db:seed": "corepack pnpm --filter @finance/db seed",
-    "ingest": "corepack pnpm --filter @finance/ingest ingest"
+    "test:watch": "vitest",
+    "test:e2e": "playwright test",
+    "check": "pnpm lint && pnpm typecheck && pnpm test && pnpm build",
+    "db:migrate": "pnpm --filter @finance/db migrate",
+    "db:seed": "pnpm --filter @finance/db seed",
+    "ingest": "pnpm --filter @finance/ingest ingest"
   },
   "dependencies": {
     "lucide-react": "^0.468.0",
@@ -21,6 +27,7 @@
   },
   "devDependencies": {
     "@eslint/js": "^9.30.0",
+    "@playwright/test": "^1.62.0",
     "@types/node": "^24.0.0",
     "eslint": "^9.30.0",
     "tsx": "^4.20.0",

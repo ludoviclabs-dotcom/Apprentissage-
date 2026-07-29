@@ -1,25 +1,25 @@
+import { getEnv } from "@/lib/env";
+import { getFeatures, isDatabaseActive, isPublicDemo, type FeatureSet } from "@/lib/features";
+
 export interface RuntimeFlags {
   authEnabled: boolean;
   databaseConfigured: boolean;
   databaseActive: boolean;
   publicDemo: boolean;
   vercelEnv?: string;
+  features: FeatureSet;
 }
 
 export function getRuntimeFlags(): RuntimeFlags {
-  const authEnabled = process.env.LEARNING_HUB_AUTH_ENABLED === "true";
-  const databaseConfigured = Boolean(process.env.DATABASE_URL);
-  const databaseActive = process.env.FINANCE_HUB_USE_DATABASE === "true" && databaseConfigured;
-  const vercelEnv = process.env.VERCEL_ENV;
-  const publicDemo =
-    process.env.FINANCE_HUB_PUBLIC_DEMO === "true" || (vercelEnv === "production" && !authEnabled);
+  const env = getEnv();
 
   return {
-    authEnabled,
-    databaseConfigured,
-    databaseActive,
-    publicDemo,
-    vercelEnv
+    authEnabled: env.LEARNING_HUB_AUTH_ENABLED,
+    databaseConfigured: Boolean(env.DATABASE_URL),
+    databaseActive: isDatabaseActive(env),
+    publicDemo: isPublicDemo(env),
+    vercelEnv: env.VERCEL_ENV,
+    features: getFeatures()
   };
 }
 

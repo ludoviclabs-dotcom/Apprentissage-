@@ -1,10 +1,12 @@
 import { BusinessCaseAttemptForm } from "@/components/forms/business-case-attempt-form";
 import { DomainBadge } from "@/components/domain-badge";
 import { SourceReference } from "@/components/source-reference";
+import { getFeatures } from "@/lib/features";
 import { getBusinessCaseModel } from "@/lib/view-model";
 
 export default async function BusinessCasesPage() {
   const model = await getBusinessCaseModel();
+  const features = getFeatures();
 
   return (
     <div className="page-stack">
@@ -65,7 +67,11 @@ export default async function BusinessCasesPage() {
             <strong>Rendu attendu</strong>
             <p>{businessCase.expectedDeliverable}</p>
           </div>
-          <BusinessCaseAttemptForm businessCaseId={businessCase.id} />
+          <BusinessCaseAttemptForm
+            businessCaseId={businessCase.id}
+            writes={features.writes}
+            persistence={features.persistence}
+          />
           <SourceReference sources={businessCase.sourceReferences} />
         </article>
       ))}
