@@ -13,11 +13,31 @@ function emailFor(workerIndex: number, label: string): string {
   return `${label}-${workerIndex}@example.test`;
 }
 
+/**
+ * Registers through the UI and does not return until the session cookie is set
+ * and the client has left /signup.
+ *
+ * Both waits matter: navigating away while the POST is still in flight cancels
+ * it, so the browser never receives Set-Cookie and the next page renders as
+ * anonymous. Asserting the status here also turns a failed signup into a clear
+ * error instead of a confusing timeout further down the test.
+ */
 async function signUp(page: Page, email: string, password = STRONG_PASSWORD) {
   await page.goto("/signup");
   await page.getByLabel("Adresse e-mail").fill(email);
   await page.getByLabel("Mot de passe").fill(password);
+
+  const pendingSignup = page.waitForResponse(
+    (response) =>
+      response.url().includes("/api/auth/signup") && response.request().method() === "POST"
+  );
+
   await page.getByRole("button", { name: "Créer le compte" }).click();
+
+  const response = await pendingSignup;
+  expect(response.status(), `signup for ${email}`).toBe(201);
+
+  await page.waitForURL((url) => !url.pathname.startsWith("/signup"));
 }
 
 test("a short password keeps the submit button disabled", async ({ page }) => {
@@ -64,7 +84,14 @@ test("a protected route redirects to login once signed out", async ({ page }, te
   await signUp(page, emailFor(testInfo.workerIndex, "signout"));
 
   await page.goto("/account");
+
+  const pendingLogout = page.waitForResponse(
+    (response) =>
+      response.url().includes("/api/auth/logout") && response.request().method() === "POST"
+  );
+
   await page.getByRole("button", { name: "Se déconnecter" }).click();
+  expect((await pendingLogout).status()).toBe(204);
   await expect(page).toHaveURL(/\/login/);
 
   await page.goto("/progression");
