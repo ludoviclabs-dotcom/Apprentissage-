@@ -2,7 +2,8 @@
 // written to be idempotent. Appending here is the only way a migration ships.
 export const migrationFiles = [
   "migrations/0001_init.sql",
-  "migrations/0002_auth_ownership_rls.sql"
+  "migrations/0002_auth_ownership_rls.sql",
+  "migrations/0003_mastery_unlocks.sql"
 ] as const;
 
 /** Tables protected by row level security, keyed on `user_id`. */
@@ -16,7 +17,11 @@ export const userOwnedTables = [
   "exam_runs",
   "business_case_attempts",
   "competency_progress",
-  "flashcard_states"
+  "flashcard_states",
+  "enrollments",
+  "mastery_events",
+  "mastery_snapshots",
+  "unlock_events"
 ] as const;
 
 export type UserOwnedTable = (typeof userOwnedTables)[number];
@@ -51,7 +56,13 @@ export const tables = [
   "profiles",
   "exam_runs",
   "competency_progress",
-  "flashcard_states"
+  "flashcard_states",
+  "curriculum_versions",
+  "module_levels",
+  "enrollments",
+  "mastery_events",
+  "mastery_snapshots",
+  "unlock_events"
 ] as const;
 
 export type TableName = (typeof tables)[number];

@@ -1,4 +1,15 @@
-import { integer, jsonb, pgTable, primaryKey, text, timestamp, uuid, varchar } from "drizzle-orm/pg-core";
+import {
+  date,
+  integer,
+  jsonb,
+  numeric,
+  pgTable,
+  primaryKey,
+  text,
+  timestamp,
+  uuid,
+  varchar
+} from "drizzle-orm/pg-core";
 
 export const sourcePacksTable = pgTable("source_packs", {
   id: text("id").primaryKey(),
@@ -299,3 +310,84 @@ export const flashcardStatesTable = pgTable(
   },
   (table) => [primaryKey({ columns: [table.userId, table.flashcardId] })]
 );
+
+// --- Curriculum catalogue -------------------------------------------------
+//
+// Global and versioned, like `exercises`: no `user_id`, no row level security,
+// written by `seed.ts`. A learner is enrolled against a version, so publishing
+// new thresholds never re-grades somebody already mid-track.
+
+export const curriculumVersionsTable = pgTable("curriculum_versions", {
+  id: text("id").primaryKey(),
+  label: text("label").notNull(),
+  effectiveFrom: date("effective_from", { mode: "string" }).notNull(),
+  rulesJson: jsonb("rules_json").notNull(),
+  createdAt: timestamp("created_at", { mode: "string" }).defaultNow()
+});
+
+export const moduleLevelsTable = pgTable("module_levels", {
+  id: text("id").primaryKey(),
+  curriculumVersionId: text("curriculum_version_id").notNull(),
+  trackId: text("track_id").notNull(),
+  moduleId: text("module_id").notNull(),
+  domain: text("domain").notNull(),
+  level: integer("level").notNull(),
+  title: text("title").notNull(),
+  objective: text("objective").notNull(),
+  competencyIds: text("competency_ids").array().notNull().default([]),
+  criticalCompetencyIds: text("critical_competency_ids").array().notNull().default([]),
+  estimatedMinutes: integer("estimated_minutes").notNull().default(0)
+});
+
+// --- Mastery and unlocking ------------------------------------------------
+//
+// Scores are NUMERIC(5,2) rather than INTEGER because a weighted level score is
+// rounded to two decimals, and the postgres-js driver hands them back as strings
+// — `mastery-repository.ts` is the boundary that converts.
+
+export const enrollmentsTable = pgTable("enrollments", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  userId: uuid("user_id").notNull(),
+  curriculumVersionId: text("curriculum_version_id").notNull(),
+  trackId: text("track_id").notNull(),
+  enrolledAt: timestamp("enrolled_at", { mode: "string" }).notNull().defaultNow()
+});
+
+export const masteryEventsTable = pgTable("mastery_events", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  userId: uuid("user_id").notNull(),
+  levelId: text("level_id").notNull(),
+  kind: text("kind").notNull(),
+  scorePercent: numeric("score_percent", { precision: 5, scale: 2 }).notNull(),
+  occurredAt: timestamp("occurred_at", { mode: "string" }).notNull().defaultNow(),
+  sourceRef: text("source_ref")
+});
+
+// A cache of a pure function, hence keyed on (user_id, level_id) and always
+// replaceable by an upsert.
+export const masterySnapshotsTable = pgTable(
+  "mastery_snapshots",
+  {
+    userId: uuid("user_id").notNull(),
+    levelId: text("level_id").notNull(),
+    rulesVersion: text("rules_version").notNull(),
+    status: text("status").notNull(),
+    score: numeric("score", { precision: 5, scale: 2 }).notNull(),
+    detailJson: jsonb("detail_json").notNull().default({}),
+    blockersJson: jsonb("blockers_json").notNull().default([]),
+    computedAt: timestamp("computed_at", { mode: "string" }).notNull().defaultNow()
+  },
+  (table) => [primaryKey({ columns: [table.userId, table.levelId] })]
+);
+
+// Append-only. The UNIQUE (user_id, level_id) in migration 0003 is what makes
+// acquisition idempotent and monotonic: a later dip in scores cannot re-lock a
+// level that was once cleared.
+export const unlockEventsTable = pgTable("unlock_events", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  userId: uuid("user_id").notNull(),
+  levelId: text("level_id").notNull(),
+  rulesVersion: text("rules_version").notNull(),
+  score: numeric("score", { precision: 5, scale: 2 }).notNull(),
+  occurredAt: timestamp("occurred_at", { mode: "string" }).notNull().defaultNow()
+});
