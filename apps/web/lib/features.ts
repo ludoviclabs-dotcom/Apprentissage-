@@ -57,7 +57,9 @@ export function resolveFeatures(env: Env): FeatureSet {
   return {
     auth: env.LEARNING_HUB_AUTH_ENABLED
       ? ON
-      : off("Authentification désactivée : LEARNING_HUB_AUTH_ENABLED=false."),
+      : off(
+          "Comptes désactivés : LEARNING_HUB_AUTH_ENABLED=false. Les données restent partagées et non attribuées."
+        ),
     database: databaseActive ? ON : off(NO_DATABASE_REASON),
     writes: publicDemo ? off(PUBLIC_DEMO_REASON) : ON,
     uploads: publicDemo ? off(PUBLIC_DEMO_REASON) : ON,

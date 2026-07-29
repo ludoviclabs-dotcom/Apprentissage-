@@ -1438,6 +1438,23 @@ button:disabled,
   flex-wrap: wrap;
 }
 
+.auth-panel {
+  max-width: 460px;
+}
+
+.topbar-account {
+  margin-left: 12px;
+  font-size: 13px;
+  color: var(--muted);
+  text-decoration: none;
+  border-bottom: 1px solid var(--border);
+}
+
+.topbar-account:hover,
+.topbar-account:focus-visible {
+  color: inherit;
+}
+
 .badge-soon {
   font-size: 12px;
   color: var(--muted);

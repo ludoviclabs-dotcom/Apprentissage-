@@ -40,7 +40,15 @@ const navigation = [
   { href: "/source-packs", label: "Source packs", icon: PackageOpen }
 ];
 
-export function AppShell({ children, runtime }: { children: ReactNode; runtime: RuntimeFlags }) {
+export function AppShell({
+  children,
+  runtime,
+  user
+}: {
+  children: ReactNode;
+  runtime: RuntimeFlags;
+  user: { id: string; email: string } | null;
+}) {
   const pathname = usePathname();
   const statusLabel = runtime.publicDemo
     ? "Démo publique lecture seule"
@@ -90,6 +98,11 @@ export function AppShell({ children, runtime }: { children: ReactNode; runtime: 
           <div className="topbar-status">
             <span className="status-dot" aria-hidden="true" />
             {statusLabel}
+            {runtime.features.auth.enabled ? (
+              <Link href="/account" className="topbar-account">
+                {user ? user.email : "Se connecter"}
+              </Link>
+            ) : null}
           </div>
         </header>
         {runtime.publicDemo ? (
