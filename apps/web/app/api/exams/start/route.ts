@@ -1,4 +1,5 @@
 import { getPublicDemoWriteResponse, getRuntimeFlags } from "@/lib/runtime-flags";
+import { resolveWriteUser } from "@/lib/auth/current-user";
 import { startExam } from "@finance/db";
 import { z } from "zod";
 
@@ -17,7 +18,13 @@ export async function POST(request: Request) {
     return Response.json({ error: "Invalid exam start request", details: body.error.flatten() }, { status: 400 });
   }
 
-  const session = await startExam(body.data.examId);
+  const writer = await resolveWriteUser();
+
+  if (writer.response) {
+    return writer.response;
+  }
+
+  const session = await startExam(writer.userId ?? "", body.data.examId);
 
   return Response.json({ session });
 }

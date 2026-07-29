@@ -22,14 +22,14 @@ import {
   getSourcePacks
 } from "@finance/db";
 
-export async function getDashboardModel() {
+export async function getDashboardModel(userId?: string | null) {
   const [competencies, exercises, lessons, learningPath, correctionHistory, sourcePacks, documents] =
     await Promise.all([
-      getCompetencies(),
+      getCompetencies(userId),
       getExercises(),
       getLessons(),
       getLearningPath(),
-      getCorrectionHistory(),
+      getCorrectionHistory(userId),
       getSourcePacks(),
       getDocuments()
     ]);
@@ -61,12 +61,12 @@ export async function getDashboardModel() {
   };
 }
 
-export async function getLearningModel() {
+export async function getLearningModel(userId?: string | null) {
   const [learningPath, lessons, exercises, competencies] = await Promise.all([
     getLearningPath(),
     getLessons(),
     getExercises(),
-    getCompetencies()
+    getCompetencies(userId)
   ]);
   const currentDay = learningPath.days.find((day) => day.status === "today") ?? learningPath.days[0];
 
@@ -80,11 +80,11 @@ export async function getLearningModel() {
   };
 }
 
-export async function getExerciseModel() {
+export async function getExerciseModel(userId?: string | null) {
   const [exercises, correctionHistory, competencies] = await Promise.all([
     getExercises(),
-    getCorrectionHistory(),
-    getCompetencies()
+    getCorrectionHistory(userId),
+    getCompetencies(userId)
   ]);
 
   return {
@@ -106,11 +106,11 @@ export async function getSourceModel() {
   };
 }
 
-export async function getPathModel() {
+export async function getPathModel(userId?: string | null) {
   const [learningPath, modules, competencies, lessons, exercises] = await Promise.all([
     getLearningPath(),
     getLearningModules(),
-    getCompetencies(),
+    getCompetencies(userId),
     getLessons(),
     getExercises()
   ]);
@@ -125,11 +125,11 @@ export async function getPathModel() {
   };
 }
 
-export async function getKnowledgeModel() {
+export async function getKnowledgeModel(userId?: string | null) {
   const [modules, concepts, flashcards, lessons] = await Promise.all([
     getLearningModules(),
     getConcepts(),
-    getFlashcards(),
+    getFlashcards(userId),
     getLessons()
   ]);
 
@@ -142,11 +142,11 @@ export async function getKnowledgeModel() {
   };
 }
 
-export async function getRevisionModel() {
+export async function getRevisionModel(userId?: string | null) {
   const [session, flashcards, errorJournal] = await Promise.all([
-    getRevisionSession(),
-    getFlashcards(),
-    getErrorJournal()
+    getRevisionSession(userId),
+    getFlashcards(userId),
+    getErrorJournal(userId)
   ]);
 
   return {
@@ -156,11 +156,11 @@ export async function getRevisionModel() {
   };
 }
 
-export async function getExamModel() {
+export async function getExamModel(userId?: string | null) {
   const [examSessions, exercises, competencies] = await Promise.all([
     getExamSessions(),
     getExercises(),
-    getCompetencies()
+    getCompetencies(userId)
   ]);
 
   return {
@@ -171,8 +171,8 @@ export async function getExamModel() {
   };
 }
 
-export async function getProgressModel() {
-  const snapshot = await getProgressSnapshot();
+export async function getProgressModel(userId?: string | null) {
+  const snapshot = await getProgressSnapshot(userId);
 
   return {
     ...snapshot,
@@ -180,11 +180,11 @@ export async function getProgressModel() {
   };
 }
 
-export async function getBusinessCaseModel() {
+export async function getBusinessCaseModel(userId?: string | null) {
   const [businessCases, modules, competencies] = await Promise.all([
     getBusinessCases(),
     getLearningModules(),
-    getCompetencies()
+    getCompetencies(userId)
   ]);
 
   return {

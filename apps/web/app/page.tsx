@@ -7,9 +7,11 @@ import { ProgressMeter } from "@/components/progress-meter";
 import { getRuntimeFlags } from "@/lib/runtime-flags";
 import { getDashboardModel } from "@/lib/view-model";
 import { getDomain } from "@finance/domain";
+import { getCurrentUser } from "@/lib/auth/current-user";
 
 export default async function DashboardPage() {
-  const model = await getDashboardModel();
+  const user = await getCurrentUser();
+  const model = await getDashboardModel(user?.id);
   const runtime = getRuntimeFlags();
   const totalDocuments = model.sourcePacks.reduce((sum, pack) => sum + pack.documentsCount, 0);
   const totalChunks = model.sourcePacks.reduce((sum, pack) => sum + pack.chunksCount, 0);
