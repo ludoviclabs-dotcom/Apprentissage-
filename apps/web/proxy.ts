@@ -1,10 +1,11 @@
 import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
+import { getEnv } from "@/lib/env";
 
 const protectedPathPattern = /^\/(?!_next\/|favicon.ico|robots.txt|sitemap.xml|api\/health).*/;
 
 function isAuthEnabled() {
-  return process.env.LEARNING_HUB_AUTH_ENABLED === "true";
+  return getEnv().LEARNING_HUB_AUTH_ENABLED;
 }
 
 function unauthorized() {
@@ -17,8 +18,8 @@ function unauthorized() {
 }
 
 function isAuthorized(request: NextRequest) {
-  const user = process.env.LEARNING_HUB_AUTH_USER;
-  const password = process.env.LEARNING_HUB_AUTH_PASSWORD;
+  // `getEnv()` guarantees both are present whenever auth is enabled.
+  const { LEARNING_HUB_AUTH_USER: user, LEARNING_HUB_AUTH_PASSWORD: password } = getEnv();
 
   if (!user || !password) {
     return false;

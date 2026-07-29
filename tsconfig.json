@@ -2,9 +2,9 @@
   "extends": "./tsconfig.base.json",
   "files": [],
   "references": [
-    { "path": "./packages/domain" },
-    { "path": "./packages/db" },
-    { "path": "./packages/ai" },
-    { "path": "./packages/ingest" }
+    { "path": "./packages/domain/tsconfig.json" },
+    { "path": "./packages/db/tsconfig.json" },
+    { "path": "./packages/ai/tsconfig.json" },
+    { "path": "./packages/ingest/tsconfig.json" }
   ]
 }
