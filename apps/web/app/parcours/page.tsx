@@ -1,6 +1,11 @@
 import Link from "next/link";
 import { DomainBadge } from "@/components/domain-badge";
+import { FeatureNotice } from "@/components/feature-notice";
+import { LevelTrack } from "@/components/level-track";
 import { ProgressMeter } from "@/components/progress-meter";
+import { getCurrentUser } from "@/lib/auth/current-user";
+import { getFeatures } from "@/lib/features";
+import { getLevelTrackModel } from "@/lib/mastery-model";
 import { getPathModel } from "@/lib/view-model";
 import { getDomain } from "@finance/domain";
 
@@ -11,7 +16,9 @@ const tierLabels = {
 } as const;
 
 export default async function ParcoursPage() {
-  const model = await getPathModel();
+  const user = await getCurrentUser();
+  const [model, track] = await Promise.all([getPathModel(user?.id), getLevelTrackModel(user?.id)]);
+  const features = getFeatures();
 
   return (
     <div className="page-stack">
@@ -44,6 +51,24 @@ export default async function ParcoursPage() {
           </article>
         ))}
       </section>
+
+      <LevelTrack
+        levels={track.levels}
+        snapshots={track.snapshots}
+        passingScore={track.passingScore}
+        rulesLabel={track.rulesLabel}
+      />
+
+      {track.persisted ? null : (
+        <FeatureNotice
+          feature={{
+            enabled: false,
+            reason: features.persistence.enabled
+              ? "Connecte-toi pour voir ta progression réelle : ces niveaux affichent l'état d'un parcours vierge."
+              : `${features.persistence.reason} Les niveaux affichent l'état d'un parcours vierge.`
+          }}
+        />
+      )}
 
       <section className="module-grid">
         {model.modules.map((module) => {
