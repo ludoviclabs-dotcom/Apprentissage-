@@ -75,8 +75,17 @@ jobs:
       - name: Install
         run: corepack pnpm install --frozen-lockfile
 
+      # `set -o pipefail` is load-bearing: without it the exit status of the
+      # pipeline is tee's, so a failing suite reported success. This job was green
+      # for two PRs while the isolation assertions were failing.
       - name: Isolation tests
-        run: corepack pnpm exec vitest run packages/db/test/rls.integration.test.ts packages/db/test/user-context.integration.test.ts packages/db/test/mastery-isolation.integration.test.ts 2>&1 | tee rls.log
+        shell: bash
+        run: |
+          set -o pipefail
+          corepack pnpm exec vitest run \
+            packages/db/test/rls.integration.test.ts \
+            packages/db/test/user-context.integration.test.ts \
+            packages/db/test/mastery-isolation.integration.test.ts 2>&1 | tee rls.log
 
       - name: Fail if isolation was not actually verified
         run: |
