@@ -1,7 +1,8 @@
-import { asc, eq } from "drizzle-orm";
+import { asc, eq, sql } from "drizzle-orm";
 import {
   ACTIVITY_KINDS,
   activeCurriculum,
+  assertValidCurriculum,
   assertValidRules,
   domains,
   evaluateTrack,
@@ -59,6 +60,14 @@ export class MalformedPersistedDataError extends Error {
   constructor(message: string) {
     super(message);
     this.name = "MalformedPersistedDataError";
+  }
+}
+
+/** The requested level is absent from the learner's pinned curriculum version. */
+export class MasteryLevelNotAvailableError extends Error {
+  constructor(levelId: string) {
+    super(`Level "${levelId}" is not available in this learner's curriculum version.`);
+    this.name = "MasteryLevelNotAvailableError";
   }
 }
 
@@ -222,13 +231,20 @@ async function loadCurriculumVersion(versionId: string): Promise<CurriculumVersi
     estimatedMinutes: row.estimatedMinutes
   }));
 
-  return {
+  const curriculum: CurriculumVersion = {
     id: versionRow.id,
     label: versionRow.label,
     effectiveFrom: versionRow.effectiveFrom.slice(0, 10),
     rules: parseRules(versionRow.id, versionRow.rulesJson),
     levels
   };
+
+  // The seed validates before writing; validate again at the read boundary so a
+  // manually corrupted catalogue cannot yield a version that looks loadable but
+  // contains impossible unlock conditions.
+  assertValidCurriculum(curriculum);
+
+  return curriculum;
 }
 
 /**
@@ -288,11 +304,43 @@ export async function getEnrollment(userId: string, trackId: string): Promise<st
   });
 }
 
+/**
+ * Resolves the curriculum a learner must use for one track.
+ *
+ * The first visit pins the active version; every later read returns that exact
+ * version. This is the only version-selection boundary for persisted progress.
+ */
+export async function getTrackCurriculum(userId: string, trackId: string): Promise<CurriculumVersion | null> {
+  if (!canUseDatabase()) {
+    return null;
+  }
+
+  assertUserId(userId, "getTrackCurriculum");
+
+  const pinnedVersionId = await getEnrollment(userId, trackId);
+
+  if (pinnedVersionId) {
+    const pinned = await loadCurriculumVersion(pinnedVersionId);
+
+    return pinned && getTrackLevels(pinned, trackId).length > 0 ? pinned : null;
+  }
+
+  const active = await getActiveCurriculumVersion();
+
+  if (!active || getTrackLevels(active, trackId).length === 0) {
+    return null;
+  }
+
+  await ensureEnrollment(userId, trackId, active.id);
+  return active;
+}
+
 // --- Mastery events --------------------------------------------------------
 
-export async function recordMasteryEvent(userId: string, event: MasteryEventInput): Promise<void> {
+/** Records an event only when its level belongs to the learner's pinned curriculum. */
+export async function recordMasteryEvent(userId: string, event: MasteryEventInput): Promise<string> {
   if (!canUseDatabase()) {
-    return;
+    return "";
   }
 
   assertUserId(userId, "recordMasteryEvent");
@@ -300,6 +348,25 @@ export async function recordMasteryEvent(userId: string, event: MasteryEventInpu
   // Parsed before it reaches SQL so an out-of-range score fails with a field
   // path rather than as a CHECK violation from the driver.
   const input = masteryEventInputSchema.parse(event);
+  const levelRows = await createDb()
+    .select({
+      trackId: moduleLevelsTable.trackId,
+      curriculumVersionId: moduleLevelsTable.curriculumVersionId
+    })
+    .from(moduleLevelsTable)
+    .where(eq(moduleLevelsTable.id, input.levelId))
+    .limit(1);
+  const level = levelRows[0];
+
+  if (!level) {
+    throw new MasteryLevelNotAvailableError(input.levelId);
+  }
+
+  const curriculum = await getTrackCurriculum(userId, level.trackId);
+
+  if (!curriculum || curriculum.id !== level.curriculumVersionId) {
+    throw new MasteryLevelNotAvailableError(input.levelId);
+  }
 
   await withUserContext(userId, async (tx) => {
     await tx.insert(masteryEventsTable).values({
@@ -311,6 +378,8 @@ export async function recordMasteryEvent(userId: string, event: MasteryEventInpu
       ...(input.occurredAt ? { occurredAt: input.occurredAt } : {})
     });
   });
+
+  return level.trackId;
 }
 
 /**
@@ -340,7 +409,9 @@ export async function getMasteryEvents(userId: string, trackId: string): Promise
       .from(masteryEventsTable)
       .innerJoin(moduleLevelsTable, eq(moduleLevelsTable.id, masteryEventsTable.levelId))
       .where(eq(moduleLevelsTable.trackId, trackId))
-      .orderBy(asc(masteryEventsTable.occurredAt));
+      // Timestamps can tie. The immutable event id makes the input order to the
+      // pure latest-wins reducer stable across recalculations.
+      .orderBy(asc(masteryEventsTable.occurredAt), asc(masteryEventsTable.id));
 
     return rows.map((row) => {
       const kind = masteryEventKindSchema.safeParse(row.kind);
@@ -450,7 +521,16 @@ export async function saveSnapshots(userId: string, snapshots: LevelSnapshot[]):
             detailJson: values.detailJson,
             blockersJson: values.blockersJson,
             computedAt: values.computedAt
-          }
+          },
+          // A snapshot is a cache of a pure calculation. An identical replay
+          // must not write solely to move `computedAt` forward.
+          where: sql`
+            ${masterySnapshotsTable.rulesVersion} IS DISTINCT FROM ${values.rulesVersion}
+            OR ${masterySnapshotsTable.status} IS DISTINCT FROM ${values.status}
+            OR ${masterySnapshotsTable.score} IS DISTINCT FROM ${values.score}
+            OR ${masterySnapshotsTable.detailJson} IS DISTINCT FROM ${values.detailJson}
+            OR ${masterySnapshotsTable.blockersJson} IS DISTINCT FROM ${values.blockersJson}
+          `
         });
     }
   });
@@ -521,10 +601,7 @@ export async function refreshTrackProgress(userId: string, trackId: string): Pro
 
   assertUserId(userId, "refreshTrackProgress");
 
-  const pinnedVersionId = await getEnrollment(userId, trackId);
-  const version = pinnedVersionId
-    ? await loadCurriculumVersion(pinnedVersionId)
-    : await getActiveCurriculumVersion();
+  const version = await getTrackCurriculum(userId, trackId);
 
   if (!version) {
     return [];
@@ -534,13 +611,6 @@ export async function refreshTrackProgress(userId: string, trackId: string): Pro
 
   if (levels.length === 0) {
     return [];
-  }
-
-  if (!pinnedVersionId) {
-    // Pin on first contact rather than at registration: a learner who never
-    // opens a track is not enrolled in it, and pinning here is what stops a
-    // later rule change from re-grading the work that follows.
-    await ensureEnrollment(userId, trackId, version.id);
   }
 
   const events = await getMasteryEvents(userId, trackId);

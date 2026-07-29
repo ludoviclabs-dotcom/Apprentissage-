@@ -1,5 +1,5 @@
-import { ACTIVITY_KINDS, activeCurriculum } from "@finance/domain";
-import { recordMasteryEvent, refreshTrackProgress } from "@finance/db";
+import { ACTIVITY_KINDS } from "@finance/domain";
+import { MasteryLevelNotAvailableError, recordMasteryEvent, refreshTrackProgress } from "@finance/db";
 import { z } from "zod";
 import { resolveWriteUser } from "@/lib/auth/current-user";
 import { getFeatures } from "@/lib/features";
@@ -14,13 +14,8 @@ import { getFeatures } from "@/lib/features";
 
 const KINDS = [...ACTIVITY_KINDS, "finalDiagnostic"] as const;
 
-/** Level ids are validated against the curriculum, not merely against a string. */
-const KNOWN_LEVEL_IDS = new Set(activeCurriculum.levels.map((level) => level.id));
-
 const masteryEventSchema = z.object({
-  levelId: z.string().min(1).refine((value) => KNOWN_LEVEL_IDS.has(value), {
-    message: "Unknown level id"
-  }),
+  levelId: z.string().min(1),
   kind: z.enum(KINDS),
   scorePercent: z.number().min(0).max(100),
   sourceRef: z.string().min(1).max(200).optional()
@@ -61,18 +56,16 @@ export async function POST(request: Request) {
     );
   }
 
-  const level = activeCurriculum.levels.find((item) => item.id === body.data.levelId);
-
-  if (!level) {
-    return Response.json({ error: "Niveau inconnu" }, { status: 404 });
-  }
-
   try {
-    await recordMasteryEvent(writer.userId, body.data);
-    const snapshots = await refreshTrackProgress(writer.userId, level.trackId);
+    const trackId = await recordMasteryEvent(writer.userId, body.data);
+    const snapshots = await refreshTrackProgress(writer.userId, trackId);
 
-    return Response.json({ trackId: level.trackId, snapshots }, { status: 201 });
+    return Response.json({ trackId, snapshots }, { status: 201 });
   } catch (error) {
+    if (error instanceof MasteryLevelNotAvailableError) {
+      return Response.json({ error: "Niveau indisponible", details: error.message }, { status: 400 });
+    }
+
     return Response.json(
       {
         error: "Enregistrement impossible",

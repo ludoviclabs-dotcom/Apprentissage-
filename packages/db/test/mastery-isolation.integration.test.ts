@@ -29,11 +29,14 @@ if (!DATABASE_URL) {
 
 const LEVEL_1 = "level-compta-generale-1";
 const TRACK = "track-compta-generale";
+const LEGACY_VERSION = "curriculum-legacy-fixture";
+const LEGACY_LEVEL = "level-compta-generale-legacy-fixture";
 
 describeWithDb("progression isolation", () => {
   let sql: Sql;
   let alice: string;
   let bob: string;
+  let carol: string;
   let db: typeof import("../src/mastery-repository");
 
   beforeAll(async () => {
@@ -71,6 +74,18 @@ describeWithDb("progression isolation", () => {
         on conflict (id) do update set track_id = excluded.track_id`;
     }
 
+    const legacyRules = { ...activeCurriculum.rules, version: LEGACY_VERSION, passingScore: 80 };
+    await sql`
+      insert into curriculum_versions (id, label, effective_from, rules_json)
+      values (${LEGACY_VERSION}, 'Legacy fixture', '2026-01-01', ${JSON.stringify(legacyRules)}::jsonb)
+      on conflict (id) do update set rules_json = excluded.rules_json`;
+    await sql`
+      insert into module_levels (id, curriculum_version_id, track_id, module_id, domain, level, title,
+                                 objective, competency_ids, critical_competency_ids, estimated_minutes)
+      values (${LEGACY_LEVEL}, ${LEGACY_VERSION}, ${TRACK}, 'module-legacy', 'compta-generale', 1,
+              'Legacy fixture', 'Legacy fixture', array['cg-cutoff'], array['cg-cutoff'], 60)
+      on conflict (id) do update set curriculum_version_id = excluded.curriculum_version_id`;
+
     const [aliceRow] = await sql`
       insert into app_users (email, email_normalized, password_hash)
       values ('alice-mastery@example.test', 'alice-mastery@example.test', 'scrypt$fixture')
@@ -84,6 +99,17 @@ describeWithDb("progression isolation", () => {
 
     alice = aliceRow.id;
     bob = bobRow.id;
+
+    const [carolRow] = await sql`
+      insert into app_users (email, email_normalized, password_hash)
+      values ('carol-mastery@example.test', 'carol-mastery@example.test', 'scrypt$fixture')
+      on conflict (email_normalized) do update set updated_at = now()
+      returning id`;
+    carol = carolRow.id;
+    await sql`
+      insert into enrollments (user_id, curriculum_version_id, track_id)
+      values (${carol}, ${LEGACY_VERSION}, ${TRACK})
+      on conflict (user_id, track_id) do update set curriculum_version_id = excluded.curriculum_version_id`;
   }, 180_000);
 
   afterAll(async () => {
@@ -91,7 +117,7 @@ describeWithDb("progression isolation", () => {
       return;
     }
 
-    await sql`delete from app_users where email_normalized in ('alice-mastery@example.test', 'bob-mastery@example.test')`;
+    await sql`delete from app_users where email_normalized in ('alice-mastery@example.test', 'bob-mastery@example.test', 'carol-mastery@example.test')`;
     await sql.end();
   });
 
@@ -121,6 +147,30 @@ describeWithDb("progression isolation", () => {
 
     expect(aliceAcquired).toEqual([LEVEL_1]);
     expect(bobAcquired).toEqual([]);
+  });
+
+  it("does not rewrite a snapshot when an unchanged track is refreshed", async () => {
+    const [before] = await sql`
+      select computed_at from mastery_snapshots where user_id = ${alice} and level_id = ${LEVEL_1}`;
+
+    await db.refreshTrackProgress(alice, TRACK);
+
+    const [after] = await sql`
+      select computed_at from mastery_snapshots where user_id = ${alice} and level_id = ${LEVEL_1}`;
+
+    expect(after.computed_at).toEqual(before.computed_at);
+  });
+
+  it("uses the learner's pinned version and rejects a level from another version", async () => {
+    const curriculum = await db.getTrackCurriculum(carol, TRACK);
+
+    expect(curriculum?.id).toBe(LEGACY_VERSION);
+    await expect(
+      db.recordMasteryEvent(carol, { levelId: LEVEL_1, kind: "direct", scorePercent: 90 })
+    ).rejects.toMatchObject({ name: "MasteryLevelNotAvailableError" });
+    await expect(
+      db.recordMasteryEvent(carol, { levelId: LEGACY_LEVEL, kind: "direct", scorePercent: 90 })
+    ).resolves.toBe(TRACK);
   });
 
   it("keeps snapshots private", async () => {

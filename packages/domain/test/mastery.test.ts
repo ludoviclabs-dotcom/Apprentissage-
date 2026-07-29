@@ -46,6 +46,14 @@ describe("assertValidRules", () => {
     expect(() => assertValidRules(RULES)).not.toThrow();
   });
 
+  it("remains valid after JSON serialization for a curriculum version", () => {
+    const restored = JSON.parse(JSON.stringify(RULES)) as MasteryRules;
+
+    expect(restored).toEqual(RULES);
+    expect(() => assertValidRules(restored)).not.toThrow();
+    expect(computeLevelScore({ direct: 80, retention: 60, caseStudy: 40, explanation: 20 }, restored)).toBe(58);
+  });
+
   it("rejects weights that do not sum to one instead of normalising them", () => {
     // Silent normalisation would let a typo rescale everybody's score.
     expect(() =>
