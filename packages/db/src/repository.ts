@@ -1,5 +1,6 @@
 import { basename } from "node:path";
-import { asc, desc, eq, ilike, inArray } from "drizzle-orm";
+import { randomUUID } from "node:crypto";
+import { and, asc, desc, eq, ilike, inArray } from "drizzle-orm";
 import {
   attempts as seedAttempts,
   buildRevisionSession,
@@ -44,19 +45,23 @@ import {
   type SourcePack
 } from "@finance/domain";
 import { chunkMarkdown, extractDocument, type SourcePackManifest } from "@finance/ingest";
-import { createDb, canUseDatabase } from "./client";
+import { createDb, canUseDatabase, type FinanceDb } from "./client";
+import { assertUserId, withUserContext } from "./user-context";
 import {
   attemptsTable,
   businessCaseAttemptsTable,
   businessCasesTable,
   chunksTable,
   competenciesTable,
+  competencyProgressTable,
   documentPagesTable,
   correctionsTable,
   documentsTable,
   errorJournalTable,
+  examRunsTable,
   examSessionsTable,
   exercisesTable,
+  flashcardStatesTable,
   flashcardsTable,
   learningDaysTable,
   learningPathsTable,
@@ -381,7 +386,13 @@ export async function getExercises(): Promise<Exercise[]> {
   }
 }
 
-export async function getCompetencies(): Promise<Competency[]> {
+/**
+ * Competencies are a shared catalogue whose `strength` is the seeded starting
+ * point. A signed-in user's own `competency_progress` overlays it, so the
+ * progression screen shows their level rather than a value every account was
+ * previously overwriting in place.
+ */
+export async function getCompetencies(userId?: string | null): Promise<Competency[]> {
   if (!canUseDatabase()) {
     return competencies;
   }
@@ -389,7 +400,35 @@ export async function getCompetencies(): Promise<Competency[]> {
   try {
     const db = createDb();
     const rows = await db.select().from(competenciesTable);
-    return rows.map(toCompetency);
+    const catalogue = rows.length > 0 ? rows.map(toCompetency) : competencies;
+
+    if (!userId) {
+      return catalogue;
+    }
+
+    const progress = await withUserContext(userId, (tx) =>
+      tx
+        .select({
+          competencyId: competencyProgressTable.competencyId,
+          strength: competencyProgressTable.strength,
+          status: competencyProgressTable.status
+        })
+        .from(competencyProgressTable)
+    );
+
+    if (progress.length === 0) {
+      return catalogue;
+    }
+
+    const byId = new Map(progress.map((row) => [row.competencyId, row]));
+
+    return catalogue.map((competency) => {
+      const own = byId.get(competency.id);
+
+      return own
+        ? { ...competency, strength: own.strength, status: own.status as CompetencyStatus }
+        : competency;
+    });
   } catch {
     return competencies;
   }
@@ -608,7 +647,13 @@ export async function getConcepts(): Promise<Concept[]> {
   return seedConcepts;
 }
 
-export async function getFlashcards(): Promise<Flashcard[]> {
+/**
+ * Flashcards are a shared catalogue; the schedule is per user. When a user is
+ * signed in their `flashcard_states` row overlays the catalogue defaults, so a
+ * rating actually changes what they see next — previously the rating updated the
+ * shared row and the UI showed everyone the same schedule.
+ */
+export async function getFlashcards(userId?: string | null): Promise<Flashcard[]> {
   if (!canUseDatabase()) {
     return seedFlashcards;
   }
@@ -616,47 +661,121 @@ export async function getFlashcards(): Promise<Flashcard[]> {
   try {
     const db = createDb();
     const rows = await db.select().from(flashcardsTable).orderBy(asc(flashcardsTable.dueAt));
-    return rows.length > 0 ? rows.map(toFlashcard) : seedFlashcards;
+    const catalogue = rows.length > 0 ? rows.map(toFlashcard) : seedFlashcards;
+
+    if (!userId) {
+      return catalogue;
+    }
+
+    const states = await withUserContext(userId, (tx) =>
+      tx
+        .select({
+          flashcardId: flashcardStatesTable.flashcardId,
+          status: flashcardStatesTable.status,
+          dueAt: flashcardStatesTable.dueAt,
+          intervalDays: flashcardStatesTable.intervalDays
+        })
+        .from(flashcardStatesTable)
+    );
+
+    if (states.length === 0) {
+      return catalogue;
+    }
+
+    const byId = new Map(states.map((state) => [state.flashcardId, state]));
+
+    return catalogue
+      .map((card) => {
+        const state = byId.get(card.id);
+
+        return state
+          ? {
+              ...card,
+              status: state.status as Flashcard["status"],
+              dueAt: state.dueAt,
+              intervalDays: state.intervalDays
+            }
+          : card;
+      })
+      .sort((left, right) => left.dueAt.localeCompare(right.dueAt));
   } catch {
     return seedFlashcards;
   }
 }
 
-export async function getRevisionSession(now = new Date()) {
-  return buildRevisionSession(await getFlashcards(), now);
+export async function getRevisionSession(userId?: string | null, now = new Date()) {
+  return buildRevisionSession(await getFlashcards(userId), now);
 }
 
-export async function reviewFlashcard(flashcardId: string, rating: ReviewRating) {
+export async function reviewFlashcard(userId: string, flashcardId: string, rating: ReviewRating) {
   const review = reviewFlashcardSchedule(flashcardId, rating);
 
   if (!canUseDatabase()) {
     return review;
   }
 
-  const db = createDb();
-  await db
-    .update(flashcardsTable)
-    .set({
-      status: review.nextStatus,
-      dueAt: review.nextDueAt,
+  assertUserId(userId, "reviewFlashcard");
+
+  await withUserContext(userId, async (tx) => {
+    // Spaced-repetition state is per user. It used to UPDATE the shared
+    // `flashcards` row, so one account's rating rescheduled the card for
+    // everybody.
+    await tx
+      .insert(flashcardStatesTable)
+      .values({
+        userId,
+        flashcardId,
+        status: review.nextStatus,
+        dueAt: review.nextDueAt,
+        intervalDays: review.intervalDays,
+        updatedAt: new Date().toISOString()
+      })
+      .onConflictDoUpdate({
+        target: [flashcardStatesTable.userId, flashcardStatesTable.flashcardId],
+        set: {
+          status: review.nextStatus,
+          dueAt: review.nextDueAt,
+          intervalDays: review.intervalDays,
+          updatedAt: new Date().toISOString()
+        }
+      });
+
+    await tx.insert(revisionReviewsTable).values({
+      id: `review-${randomUUID()}`,
+      userId,
+      flashcardId,
+      rating,
+      reviewedAt: review.reviewedAt,
+      nextDueAt: review.nextDueAt,
       intervalDays: review.intervalDays
-    })
-    .where(eq(flashcardsTable.id, flashcardId));
-  await db.insert(revisionReviewsTable).values({
-    id: `review-${flashcardId}-${Date.now()}`,
-    flashcardId,
-    rating,
-    reviewedAt: review.reviewedAt,
-    nextDueAt: review.nextDueAt,
-    intervalDays: review.intervalDays
+    });
   });
 
   return review;
 }
 
-export async function getErrorJournal(): Promise<ErrorJournalEntry[]> {
+/**
+ * The error journal is personal data.
+ *
+ * Seed fallback applies only when nobody is signed in — that is the public demo.
+ * For a signed-in user an empty result means "you have made no mistakes yet" and
+ * must stay empty: falling back would present the seeded corpus as their own
+ * history, which is exactly what an ownership model has to prevent.
+ */
+export async function getErrorJournal(userId?: string | null): Promise<ErrorJournalEntry[]> {
   if (!canUseDatabase()) {
     return seedErrorJournalEntries;
+  }
+
+  if (userId) {
+    return withUserContext(userId, async (tx) => {
+      const rows = await tx
+        .select()
+        .from(errorJournalTable)
+        .orderBy(desc(errorJournalTable.createdAt));
+
+      return rows.map(toErrorJournalEntry);
+    });
   }
 
   try {
@@ -682,7 +801,7 @@ export async function getExamSessions(): Promise<ExamSession[]> {
   }
 }
 
-export async function startExam(examId: string) {
+export async function startExam(userId: string, examId: string) {
   const template = (await getExamSessions()).find((exam) => exam.id === examId) ?? seedExamSessions[0];
   const session = startExamSession(template);
 
@@ -690,16 +809,23 @@ export async function startExam(examId: string) {
     return session;
   }
 
-  const db = createDb();
-  await db.insert(examSessionsTable).values({
-    id: session.id,
-    title: session.title,
-    exerciseIds: session.exerciseIds,
-    durationMinutes: session.durationMinutes,
-    status: session.status,
-    startedAt: session.startedAt,
-    submittedAt: session.submittedAt,
-    score: session.score
+  assertUserId(userId, "startExam");
+
+  await withUserContext(userId, async (tx) => {
+    // A run is now a row in `exam_runs`, not a clone of the template in
+    // `exam_sessions`. That table is the seeded catalogue, and inserting runs
+    // into it is what made /annales-concours accumulate duplicates.
+    await tx
+      .insert(examRunsTable)
+      .values({
+        userId,
+        examSessionId: template.id,
+        status: "in-progress",
+        startedAt: session.startedAt ?? new Date().toISOString()
+      })
+      // A partial unique index allows a single live run per exam per user, so a
+      // double click resumes instead of creating a second one.
+      .onConflictDoNothing();
   });
 
   return session;
@@ -747,6 +873,7 @@ export async function getBusinessCases(): Promise<BusinessCase[]> {
 }
 
 export async function submitBusinessCaseAttempt(
+  userId: string,
   businessCaseId: string,
   userMemo: string
 ): Promise<BusinessCaseAttempt | null> {
@@ -759,27 +886,31 @@ export async function submitBusinessCaseAttempt(
   const attempt = scoreBusinessCase(businessCase, userMemo);
 
   if (canUseDatabase()) {
-    const db = createDb();
-    await db.insert(businessCaseAttemptsTable).values({
-      id: attempt.id,
-      businessCaseId: attempt.businessCaseId,
-      userMemo: attempt.userMemo,
-      score: attempt.score,
-      correction: attempt.correction,
-      createdAt: attempt.createdAt
+    assertUserId(userId, "submitBusinessCaseAttempt");
+
+    await withUserContext(userId, async (tx) => {
+      await tx.insert(businessCaseAttemptsTable).values({
+        id: `bc-attempt-${randomUUID()}`,
+        userId,
+        businessCaseId: attempt.businessCaseId,
+        userMemo: attempt.userMemo,
+        score: attempt.score,
+        correction: attempt.correction,
+        createdAt: attempt.createdAt
+      });
     });
   }
 
   return attempt;
 }
 
-export async function getProgressSnapshot() {
+export async function getProgressSnapshot(userId?: string | null) {
   const [competencies, modules, concepts, errorJournal, revisionSession] = await Promise.all([
-    getCompetencies(),
+    getCompetencies(userId),
     getLearningModules(),
     getConcepts(),
-    getErrorJournal(),
-    getRevisionSession()
+    getErrorJournal(userId),
+    getRevisionSession(userId)
   ]);
 
   return {
@@ -1116,105 +1247,177 @@ export function gradeExercise(exercise: Exercise, userAnswer: string): Correctio
   };
 }
 
-export async function recordAttempt(exerciseId: string, userAnswer: string, correction: Correction) {
+/**
+ * Reads a user's strength for a competency, falling back to the seeded catalogue
+ * value the first time they touch it. The catalogue is the starting point; it is
+ * never written, so one account's progress cannot move another's.
+ */
+async function currentStrengthFor(
+  tx: FinanceDb,
+  userId: string,
+  competencyId: string,
+  catalogueStrength: number
+): Promise<number> {
+  const rows = await tx
+    .select({ strength: competencyProgressTable.strength })
+    .from(competencyProgressTable)
+    .where(
+      and(
+        eq(competencyProgressTable.userId, userId),
+        eq(competencyProgressTable.competencyId, competencyId)
+      )
+    )
+    .limit(1);
+
+  return rows[0]?.strength ?? catalogueStrength;
+}
+
+async function upsertCompetencyProgress(
+  tx: FinanceDb,
+  userId: string,
+  competencyId: string,
+  strength: number
+) {
+  await tx
+    .insert(competencyProgressTable)
+    .values({
+      userId,
+      competencyId,
+      strength,
+      status: statusFromStrength(strength),
+      updatedAt: new Date().toISOString()
+    })
+    .onConflictDoUpdate({
+      target: [competencyProgressTable.userId, competencyProgressTable.competencyId],
+      set: {
+        strength,
+        status: statusFromStrength(strength),
+        updatedAt: new Date().toISOString()
+      }
+    });
+}
+
+export async function recordAttempt(
+  userId: string,
+  exerciseId: string,
+  userAnswer: string,
+  correction: Correction
+) {
   if (!canUseDatabase()) {
     return;
   }
 
-  const db = createDb();
-  const attemptId = `attempt-${Date.now()}`;
-  await db.insert(attemptsTable).values({
-    id: attemptId,
-    exerciseId,
-    userAnswer,
-    score: correction.score,
-    correctionJson: correction,
-    createdAt: new Date().toISOString()
-  });
-  await db.insert(correctionsTable).values({
-    id: correction.id,
-    attemptId,
-    score: correction.score,
-    summary: correction.summary,
-    correctJson: correction.correct,
-    errorsJson: correction.errors,
-    remediation: correction.remediation
-  });
-
-  for (const entry of createErrorJournalEntries(correction)) {
-    await db.insert(errorJournalTable).values({
-      id: entry.id,
-      exerciseId: entry.exerciseId,
-      correctionId: entry.correctionId,
-      category: entry.category,
-      summary: entry.summary,
-      competencyIds: entry.competencyIds,
-      nextAction: entry.nextAction,
-      createdAt: entry.createdAt
-    });
-  }
+  assertUserId(userId, "recordAttempt");
 
   const exercise = await getExerciseById(exerciseId);
 
-  if (!exercise || exercise.competencyIds.length === 0) {
-    return;
-  }
+  // Everything lands in one transaction: this is also the scope `SET LOCAL
+  // app.current_user_id` lives in, so RLS applies to every statement below.
+  await withUserContext(userId, async (tx) => {
+    // Random ids, not `attempt-${Date.now()}`: with more than one account the
+    // timestamp form collided whenever two people submitted in the same
+    // millisecond, and the primary key would reject the second write.
+    const attemptId = `attempt-${randomUUID()}`;
 
-  const competencyRows = await db
-    .select()
-    .from(competenciesTable)
-    .where(inArray(competenciesTable.id, exercise.competencyIds));
-
-  for (const competency of competencyRows) {
-    const delta = correction.score >= 14 ? 8 : correction.score >= 10 ? 3 : -6;
-    const nextStrength = clampStrength(competency.strength + delta);
-    await db
-      .update(competenciesTable)
-      .set({
-        strength: nextStrength,
-        status: statusFromStrength(nextStrength)
-      })
-      .where(eq(competenciesTable.id, competency.id));
-
-    const dueDate = new Date();
-    dueDate.setDate(dueDate.getDate() + (correction.score >= 14 ? 7 : correction.score >= 10 ? 3 : 1));
-
-    await db.insert(revisionItemsTable).values({
-      id: `revision-${competency.id}-${Date.now()}`,
-      competencyId: competency.id,
-      dueAt: dueDate.toISOString(),
-      strength: nextStrength,
-      lastReviewedAt: new Date().toISOString()
+    await tx.insert(attemptsTable).values({
+      id: attemptId,
+      userId,
+      exerciseId,
+      userAnswer,
+      score: correction.score,
+      correctionJson: correction,
+      createdAt: new Date().toISOString()
     });
-  }
+
+    await tx.insert(correctionsTable).values({
+      id: correction.id,
+      userId,
+      attemptId,
+      score: correction.score,
+      summary: correction.summary,
+      correctJson: correction.correct,
+      errorsJson: correction.errors,
+      remediation: correction.remediation
+    });
+
+    for (const entry of createErrorJournalEntries(correction)) {
+      await tx.insert(errorJournalTable).values({
+        id: entry.id,
+        userId,
+        exerciseId: entry.exerciseId,
+        correctionId: entry.correctionId,
+        category: entry.category,
+        summary: entry.summary,
+        competencyIds: entry.competencyIds,
+        nextAction: entry.nextAction,
+        createdAt: entry.createdAt
+      });
+    }
+
+    if (!exercise || exercise.competencyIds.length === 0) {
+      return;
+    }
+
+    const competencyRows = await tx
+      .select()
+      .from(competenciesTable)
+      .where(inArray(competenciesTable.id, exercise.competencyIds));
+
+    const delta = correction.score >= 14 ? 8 : correction.score >= 10 ? 3 : -6;
+    const intervalDays = correction.score >= 14 ? 7 : correction.score >= 10 ? 3 : 1;
+
+    for (const competency of competencyRows) {
+      const previous = await currentStrengthFor(tx, userId, competency.id, competency.strength);
+      const nextStrength = clampStrength(previous + delta);
+
+      await upsertCompetencyProgress(tx, userId, competency.id, nextStrength);
+
+      const dueDate = new Date();
+      dueDate.setDate(dueDate.getDate() + intervalDays);
+
+      await tx.insert(revisionItemsTable).values({
+        id: `revision-${randomUUID()}`,
+        userId,
+        competencyId: competency.id,
+        dueAt: dueDate.toISOString(),
+        strength: nextStrength,
+        lastReviewedAt: new Date().toISOString()
+      });
+    }
+  });
 }
 
-export async function recordDiagnostic(levels: Record<string, number>) {
+export async function recordDiagnostic(userId: string, levels: Record<string, number>) {
   if (!canUseDatabase()) {
     return;
   }
 
-  const db = createDb();
+  assertUserId(userId, "recordDiagnostic");
 
-  for (const competency of competencies) {
-    const domainLevel = levels[competency.domainId];
+  await withUserContext(userId, async (tx) => {
+    for (const competency of competencies) {
+      const domainLevel = levels[competency.domainId];
 
-    if (typeof domainLevel !== "number") {
-      continue;
+      if (typeof domainLevel !== "number") {
+        continue;
+      }
+
+      // Averages against the user's own current strength. The previous version
+      // averaged against the seeded array value every time, so re-running a
+      // diagnostic dragged real progress back toward the seed baseline.
+      const previous = await currentStrengthFor(tx, userId, competency.id, competency.strength);
+
+      await upsertCompetencyProgress(tx, userId, competency.id, clampStrength((previous + domainLevel) / 2));
     }
-
-    const nextStrength = clampStrength((competency.strength + domainLevel) / 2);
-    await db
-      .update(competenciesTable)
-      .set({
-        strength: nextStrength,
-        status: statusFromStrength(nextStrength)
-      })
-      .where(eq(competenciesTable.id, competency.id));
-  }
+  });
 }
 
-export async function getCorrectionHistory(): Promise<{
+/**
+ * Attempt history is personal data. As with {@link getErrorJournal}, the seed
+ * fallback is reserved for the anonymous demo: a signed-in user with no attempts
+ * sees an empty history, never somebody else's.
+ */
+export async function getCorrectionHistory(userId?: string | null): Promise<{
   attempts: Attempt[];
   corrections: Correction[];
 }> {
@@ -1223,6 +1426,19 @@ export async function getCorrectionHistory(): Promise<{
       attempts: seedAttempts,
       corrections: seedCorrections
     };
+  }
+
+  if (userId) {
+    return withUserContext(userId, async (tx) => {
+      const rows = await tx.select().from(attemptsTable).orderBy(desc(attemptsTable.createdAt));
+
+      return {
+        attempts: rows.map(toAttempt),
+        corrections: rows
+          .map(toCorrection)
+          .filter((correction): correction is Correction => correction !== null)
+      };
+    });
   }
 
   try {

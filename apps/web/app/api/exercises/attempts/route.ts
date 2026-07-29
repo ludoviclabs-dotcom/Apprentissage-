@@ -1,4 +1,5 @@
 import { getExerciseById, gradeExercise, recordAttempt } from "@finance/db";
+import { resolveWriteUser } from "@/lib/auth/current-user";
 import { z } from "zod";
 
 const attemptSchema = z.object({
@@ -20,9 +21,14 @@ export async function POST(request: Request) {
   }
 
   const correction = gradeExercise(exercise, body.data.userAnswer);
+  const writer = await resolveWriteUser();
+
+  if (writer.response) {
+    return writer.response;
+  }
 
   try {
-    await recordAttempt(exercise.id, body.data.userAnswer, correction);
+    await recordAttempt(writer.userId ?? "", exercise.id, body.data.userAnswer, correction);
   } catch (error) {
     return Response.json(
       {

@@ -2,9 +2,11 @@ import { RevisionReviewForm } from "@/components/forms/revision-review-form";
 import { SourceReference } from "@/components/source-reference";
 import { getFeatures } from "@/lib/features";
 import { getRevisionModel } from "@/lib/view-model";
+import { getCurrentUser } from "@/lib/auth/current-user";
 
 export default async function RevisionsPage() {
-  const model = await getRevisionModel();
+  const user = await getCurrentUser();
+  const model = await getRevisionModel(user?.id);
   const features = getFeatures();
 
   return (

@@ -14,6 +14,28 @@ export type JsonResult<T> =
 const NETWORK_ERROR = "Requête impossible : vérifie que le serveur local répond.";
 const MALFORMED_ERROR = "Réponse illisible du serveur.";
 
+/** Statuses that are defined to carry no body at all. */
+const BODILESS_STATUSES = new Set([204, 205, 304]);
+
+/**
+ * Reads a JSON body, tolerating responses that legitimately have none.
+ *
+ * Calling `.json()` unconditionally made every 204 look like a malformed
+ * response, which is why signing out reported "réponse illisible" and never
+ * navigated even though the server had succeeded.
+ */
+async function readPayload(response: Response): Promise<{ payload: unknown; malformed: boolean }> {
+  if (BODILESS_STATUSES.has(response.status) || response.headers.get("content-length") === "0") {
+    return { payload: null, malformed: false };
+  }
+
+  try {
+    return { payload: await response.json(), malformed: false };
+  } catch {
+    return { payload: null, malformed: true };
+  }
+}
+
 function readErrorMessage(payload: unknown, status: number): string {
   if (payload && typeof payload === "object" && "error" in payload) {
     const message = (payload as { error?: unknown }).error;
@@ -39,21 +61,7 @@ export async function postJson<T>(url: string, body: unknown): Promise<JsonResul
     return { ok: false, error: NETWORK_ERROR };
   }
 
-  let payload: unknown = null;
-
-  try {
-    payload = await response.json();
-  } catch {
-    if (response.ok) {
-      return { ok: false, error: MALFORMED_ERROR };
-    }
-  }
-
-  if (!response.ok) {
-    return { ok: false, error: readErrorMessage(payload, response.status) };
-  }
-
-  return { ok: true, data: payload as T };
+  return toResult<T>(response);
 }
 
 export async function postFormData<T>(url: string, formData: FormData): Promise<JsonResult<T>> {
@@ -65,18 +73,18 @@ export async function postFormData<T>(url: string, formData: FormData): Promise<
     return { ok: false, error: NETWORK_ERROR };
   }
 
-  let payload: unknown = null;
+  return toResult<T>(response);
+}
 
-  try {
-    payload = await response.json();
-  } catch {
-    if (response.ok) {
-      return { ok: false, error: MALFORMED_ERROR };
-    }
-  }
+async function toResult<T>(response: Response): Promise<JsonResult<T>> {
+  const { payload, malformed } = await readPayload(response);
 
   if (!response.ok) {
     return { ok: false, error: readErrorMessage(payload, response.status) };
+  }
+
+  if (malformed) {
+    return { ok: false, error: MALFORMED_ERROR };
   }
 
   return { ok: true, data: payload as T };

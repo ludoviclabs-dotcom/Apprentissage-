@@ -57,7 +57,12 @@ const envSchema = z
     FINANCE_HUB_USE_DATABASE: booleanFlag(),
     FINANCE_HUB_PUBLIC_DEMO: booleanFlag(),
 
+    // Turns on account-based authentication. Since PR-01 this means real user
+    // accounts in PostgreSQL, not the single shared HTTP basic credential.
     LEARNING_HUB_AUTH_ENABLED: booleanFlag(),
+    // Retired in PR-01. Kept in the schema only so a stale `.env` fails loudly
+    // instead of quietly losing its protection: someone who still sets these
+    // would otherwise believe the app is gated when it is not.
     LEARNING_HUB_AUTH_USER: z.string().min(1).optional(),
     LEARNING_HUB_AUTH_PASSWORD: z.string().min(1).optional(),
 
@@ -78,20 +83,24 @@ const envSchema = z
       });
     }
 
-    if (value.LEARNING_HUB_AUTH_ENABLED) {
-      if (!value.LEARNING_HUB_AUTH_USER) {
-        ctx.addIssue({
-          code: "custom",
-          path: ["LEARNING_HUB_AUTH_USER"],
-          message: "LEARNING_HUB_AUTH_ENABLED=true requires LEARNING_HUB_AUTH_USER"
-        });
-      }
+    // Accounts and sessions are rows in PostgreSQL, so auth cannot work in
+    // seeded mode. Failing here beats an app that shows a login form and then
+    // cannot store the account.
+    if (value.LEARNING_HUB_AUTH_ENABLED && !value.FINANCE_HUB_USE_DATABASE) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["FINANCE_HUB_USE_DATABASE"],
+        message:
+          "LEARNING_HUB_AUTH_ENABLED=true requires FINANCE_HUB_USE_DATABASE=true — accounts and sessions are stored in PostgreSQL"
+      });
+    }
 
-      if (!value.LEARNING_HUB_AUTH_PASSWORD) {
+    for (const retired of ["LEARNING_HUB_AUTH_USER", "LEARNING_HUB_AUTH_PASSWORD"] as const) {
+      if (value[retired]) {
         ctx.addIssue({
           code: "custom",
-          path: ["LEARNING_HUB_AUTH_PASSWORD"],
-          message: "LEARNING_HUB_AUTH_ENABLED=true requires LEARNING_HUB_AUTH_PASSWORD"
+          path: [retired],
+          message: `${retired} was retired in PR-01: HTTP basic auth is replaced by user accounts. Remove it from your .env`
         });
       }
     }

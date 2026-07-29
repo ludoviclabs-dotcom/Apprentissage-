@@ -38,6 +38,40 @@ boot with every problem listed at once:
 | `AI_PROVIDER=openai` without `OPENAI_API_KEY` | used to silently disable the tutor |
 | `AI_PROVIDER` set to anything but `none`/`openai`/`ollama` | not implemented in `packages/ai` |
 | A boolean flag set to `1`, `TRUE`, `yes`… | only `true`/`false` are read; anything else silently meant `false` |
+| `LEARNING_HUB_AUTH_ENABLED=true` without database mode | accounts and sessions are rows in PostgreSQL |
+| `LEARNING_HUB_AUTH_USER` / `_PASSWORD` set at all | retired in PR-01; keeping them would look like protection that no longer exists |
+
+## Accounts
+
+```text
+FINANCE_HUB_USE_DATABASE=true
+DATABASE_URL=postgresql://finance:finance_dev_password@localhost:5432/finance_hub
+LEARNING_HUB_AUTH_ENABLED=true
+```
+
+Then `pnpm db:migrate`, `pnpm db:seed`, and register at `/signup`. Passwords are
+hashed with scrypt from `node:crypto`; sessions are opaque tokens whose digest is
+stored in `user_sessions`. No external service is contacted.
+
+Personal data — attempts, corrections, revisions, the error journal, exam runs,
+business-case attempts, competency progress and flashcard schedules — is owned by
+`user_id` and protected by PostgreSQL row level security. The application sets
+`app.current_user_id` per transaction; policies compare against it, and an unset
+value matches nothing, so the default is deny.
+
+With a database but **no** accounts, write routes answer `409`: a row would have
+no owner and the policy would reject it. That is deliberate — see
+`docs/adr/001-local-auth-rls.md`.
+
+### Proving isolation locally
+
+```bash
+RLS_TEST_DATABASE_URL=postgresql://finance:finance_dev_password@localhost:5432/finance_hub \
+  corepack pnpm exec vitest run packages/db/test/rls.integration.test.ts
+```
+
+Without that variable the suite **skips** and prints a warning saying isolation was
+not verified. CI sets it and fails the build if the warning appears.
 
 ## Checks
 

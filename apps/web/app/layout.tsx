@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
 import { AppShell } from "@/components/app-shell";
+import { getCurrentUser } from "@/lib/auth/current-user";
 import { getRuntimeFlags } from "@/lib/runtime-flags";
 import "./globals.css";
 
@@ -17,13 +18,16 @@ export const metadata: Metadata = {
  */
 export const dynamic = "force-dynamic";
 
-export default function RootLayout({ children }: { children: ReactNode }) {
+export default async function RootLayout({ children }: { children: ReactNode }) {
   const runtime = getRuntimeFlags();
+  const user = await getCurrentUser();
 
   return (
     <html lang="fr">
       <body>
-        <AppShell runtime={runtime}>{children}</AppShell>
+        <AppShell runtime={runtime} user={user}>
+          {children}
+        </AppShell>
       </body>
     </html>
   );

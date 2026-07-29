@@ -17,8 +17,8 @@ describe("isPublicDemo", () => {
     const env = parseEnv({
       VERCEL_ENV: "production",
       LEARNING_HUB_AUTH_ENABLED: "true",
-      LEARNING_HUB_AUTH_USER: "ludo",
-      LEARNING_HUB_AUTH_PASSWORD: "secret"
+      FINANCE_HUB_USE_DATABASE: "true",
+      DATABASE_URL: DB_URL
     });
 
     expect(isPublicDemo(env)).toBe(false);

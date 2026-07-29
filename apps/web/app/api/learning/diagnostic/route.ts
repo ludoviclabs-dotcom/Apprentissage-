@@ -1,5 +1,6 @@
 import { domains, learningPath, type DomainId } from "@finance/domain";
 import { recordDiagnostic } from "@finance/db";
+import { resolveWriteUser } from "@/lib/auth/current-user";
 import { z } from "zod";
 
 const diagnosticSchema = z.object({
@@ -38,8 +39,14 @@ export async function POST(request: Request) {
     })
     .sort((left, right) => left.level - right.level);
 
+  const writer = await resolveWriteUser();
+
+  if (writer.response) {
+    return writer.response;
+  }
+
   try {
-    await recordDiagnostic(body.data.levels);
+    await recordDiagnostic(writer.userId ?? "", body.data.levels);
   } catch (error) {
     return Response.json(
       {

@@ -3,9 +3,11 @@ import { ProgressMeter } from "@/components/progress-meter";
 import { SourceReference } from "@/components/source-reference";
 import { getKnowledgeModel } from "@/lib/view-model";
 import { getDomain } from "@finance/domain";
+import { getCurrentUser } from "@/lib/auth/current-user";
 
 export default async function ConnaissancesPage() {
-  const model = await getKnowledgeModel();
+  const user = await getCurrentUser();
+  const model = await getKnowledgeModel(user?.id);
 
   return (
     <div className="page-stack">

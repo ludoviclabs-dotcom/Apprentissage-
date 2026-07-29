@@ -1,4 +1,5 @@
 import { getPublicDemoWriteResponse, getRuntimeFlags } from "@/lib/runtime-flags";
+import { resolveWriteUser } from "@/lib/auth/current-user";
 import { reviewFlashcard } from "@finance/db";
 import { z } from "zod";
 
@@ -18,7 +19,13 @@ export async function POST(request: Request) {
     return Response.json({ error: "Invalid revision review", details: body.error.flatten() }, { status: 400 });
   }
 
-  const review = await reviewFlashcard(body.data.flashcardId, body.data.rating);
+  const writer = await resolveWriteUser();
+
+  if (writer.response) {
+    return writer.response;
+  }
+
+  const review = await reviewFlashcard(writer.userId ?? "", body.data.flashcardId, body.data.rating);
 
   return Response.json({ review });
 }

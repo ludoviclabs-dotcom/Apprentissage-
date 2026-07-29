@@ -3,9 +3,11 @@ import { DomainBadge } from "@/components/domain-badge";
 import { ProgressMeter } from "@/components/progress-meter";
 import { getProgressModel } from "@/lib/view-model";
 import { getDomainAverage, getWeakestCompetencies } from "@finance/domain";
+import { getCurrentUser } from "@/lib/auth/current-user";
 
 export default async function ProgressionPage() {
-  const model = await getProgressModel();
+  const user = await getCurrentUser();
+  const model = await getProgressModel(user?.id);
   const weakest = getWeakestCompetencies(model.competencies, 6);
 
   return (

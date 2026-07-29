@@ -1,4 +1,5 @@
 import { getPublicDemoWriteResponse, getRuntimeFlags } from "@/lib/runtime-flags";
+import { resolveWriteUser } from "@/lib/auth/current-user";
 import { submitBusinessCaseAttempt } from "@finance/db";
 import { z } from "zod";
 
@@ -17,7 +18,13 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
     return Response.json({ error: "Invalid business case submission", details: body.error.flatten() }, { status: 400 });
   }
 
-  const attempt = await submitBusinessCaseAttempt(id, body.data.userMemo);
+  const writer = await resolveWriteUser();
+
+  if (writer.response) {
+    return writer.response;
+  }
+
+  const attempt = await submitBusinessCaseAttempt(writer.userId ?? "", id, body.data.userMemo);
 
   if (!attempt) {
     return Response.json({ error: "Business case not found" }, { status: 404 });

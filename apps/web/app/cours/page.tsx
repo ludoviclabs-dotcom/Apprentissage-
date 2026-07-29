@@ -1,9 +1,11 @@
 import Link from "next/link";
 import { SourceReference } from "@/components/source-reference";
 import { getKnowledgeModel } from "@/lib/view-model";
+import { getCurrentUser } from "@/lib/auth/current-user";
 
 export default async function CoursPage() {
-  const model = await getKnowledgeModel();
+  const user = await getCurrentUser();
+  const model = await getKnowledgeModel(user?.id);
 
   return (
     <div className="page-stack">

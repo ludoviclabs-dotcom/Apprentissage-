@@ -1,9 +1,11 @@
 import { CorrectionSummary } from "@/components/correction-summary";
 import { getCorrectionHistory } from "@finance/db";
 import Link from "next/link";
+import { getCurrentUser } from "@/lib/auth/current-user";
 
 export default async function CorrectionsPage() {
-  const { corrections, attempts } = await getCorrectionHistory();
+  const user = await getCurrentUser();
+  const { corrections, attempts } = await getCorrectionHistory(user?.id);
   const averageScore =
     attempts.length > 0
       ? Math.round(attempts.reduce((sum, attempt) => sum + attempt.score, 0) / attempts.length)

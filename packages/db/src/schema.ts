@@ -1,4 +1,25 @@
-export const migrationFiles = ["migrations/0001_init.sql"] as const;
+// `migrate.ts` replays this list in order on every run, so each file must be
+// written to be idempotent. Appending here is the only way a migration ships.
+export const migrationFiles = [
+  "migrations/0001_init.sql",
+  "migrations/0002_auth_ownership_rls.sql"
+] as const;
+
+/** Tables protected by row level security, keyed on `user_id`. */
+export const userOwnedTables = [
+  "profiles",
+  "attempts",
+  "corrections",
+  "revision_items",
+  "revision_reviews",
+  "error_journal",
+  "exam_runs",
+  "business_case_attempts",
+  "competency_progress",
+  "flashcard_states"
+] as const;
+
+export type UserOwnedTable = (typeof userOwnedTables)[number];
 
 export const tables = [
   "source_packs",
@@ -24,7 +45,13 @@ export const tables = [
   "error_journal",
   "exam_sessions",
   "business_cases",
-  "business_case_attempts"
+  "business_case_attempts",
+  "app_users",
+  "user_sessions",
+  "profiles",
+  "exam_runs",
+  "competency_progress",
+  "flashcard_states"
 ] as const;
 
 export type TableName = (typeof tables)[number];

@@ -1,56 +1,74 @@
 import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
 import { getEnv } from "@/lib/env";
+import { SESSION_COOKIE_NAME } from "@/lib/auth/session";
 
-const protectedPathPattern = /^\/(?!_next\/|favicon.ico|robots.txt|sitemap.xml|api\/health).*/;
+/**
+ * Session gate.
+ *
+ * PR-01 replaced the single shared HTTP basic credential with real accounts, so
+ * this now checks for a session cookie and redirects to /login instead of
+ * answering 401 with a browser prompt.
+ *
+ * Deliberately does NOT validate the session against the database: the proxy runs
+ * on every request including static assets, and a database round trip here would
+ * tax them all. It only checks that a cookie is present, which is enough to route
+ * anonymous visitors to the login page. Authorisation is enforced where it counts
+ * — server components call `getCurrentUser()`, route handlers call
+ * `requireCurrentUser()`, and PostgreSQL row level security is the backstop, so a
+ * forged cookie yields no data.
+ */
 
-function isAuthEnabled() {
-  return getEnv().LEARNING_HUB_AUTH_ENABLED;
+/** Pages that must stay reachable without a session, or login is impossible. */
+const PUBLIC_PATHS = new Set(["/login", "/signup"]);
+
+const PUBLIC_PREFIXES = [
+  "/_next/",
+  "/api/auth/",
+  "/api/health",
+  "/favicon.ico",
+  "/robots.txt",
+  "/sitemap.xml"
+];
+
+/**
+ * Routes holding personal data. Everything else stays public so the seeded demo
+ * keeps working: the risk called out in PR-00 was protecting every route at once
+ * and taking the public demo down with it.
+ */
+const PROTECTED_PREFIXES = ["/account", "/progression", "/corrections", "/revisions"];
+
+function isPublic(pathname: string): boolean {
+  return PUBLIC_PATHS.has(pathname) || PUBLIC_PREFIXES.some((prefix) => pathname.startsWith(prefix));
 }
 
-function unauthorized() {
-  return new NextResponse("Authentication required", {
-    status: 401,
-    headers: {
-      "WWW-Authenticate": 'Basic realm="Finance Learning Hub"'
-    }
-  });
-}
-
-function isAuthorized(request: NextRequest) {
-  // `getEnv()` guarantees both are present whenever auth is enabled.
-  const { LEARNING_HUB_AUTH_USER: user, LEARNING_HUB_AUTH_PASSWORD: password } = getEnv();
-
-  if (!user || !password) {
-    return false;
-  }
-
-  const header = request.headers.get("authorization");
-
-  if (!header?.startsWith("Basic ")) {
-    return false;
-  }
-
-  const decoded = atob(header.slice("Basic ".length));
-  const separatorIndex = decoded.indexOf(":");
-
-  if (separatorIndex === -1) {
-    return false;
-  }
-
-  return decoded.slice(0, separatorIndex) === user && decoded.slice(separatorIndex + 1) === password;
+function isProtected(pathname: string): boolean {
+  return PROTECTED_PREFIXES.some(
+    (prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`)
+  );
 }
 
 export function proxy(request: NextRequest) {
-  if (!isAuthEnabled() || !protectedPathPattern.test(request.nextUrl.pathname)) {
+  const { LEARNING_HUB_AUTH_ENABLED: authEnabled } = getEnv();
+  const { pathname } = request.nextUrl;
+
+  if (!authEnabled || isPublic(pathname)) {
     return NextResponse.next();
   }
 
-  if (!isAuthorized(request)) {
-    return unauthorized();
+  const hasSession = Boolean(request.cookies.get(SESSION_COOKIE_NAME)?.value);
+
+  if (hasSession || !isProtected(pathname)) {
+    return NextResponse.next();
   }
 
-  return NextResponse.next();
+  const loginUrl = new URL("/login", request.nextUrl);
+  // Bring the visitor back where they were headed once signed in. Only the
+  // path is carried over, never an absolute URL, so this cannot be turned into
+  // an open redirect.
+  loginUrl.searchParams.set("next", `${pathname}${request.nextUrl.search}`);
+
+  return NextResponse.redirect(loginUrl);
 }
 
 export const config = {

@@ -31,15 +31,37 @@ describe("parseEnv", () => {
     expect(env.FINANCE_HUB_USE_DATABASE).toBe(true);
   });
 
-  it("rejects auth without credentials and reports every missing key at once", () => {
+  it("rejects account auth without database mode, since accounts live in postgres", () => {
     try {
       parseEnv({ LEARNING_HUB_AUTH_ENABLED: "true" });
+      expect.unreachable("should have thrown");
+    } catch (error) {
+      expect(error).toBeInstanceOf(EnvValidationError);
+      expect((error as EnvValidationError).issues.join("\n")).toContain("FINANCE_HUB_USE_DATABASE");
+    }
+  });
+
+  it("accepts account auth alongside database mode", () => {
+    const env = parseEnv({
+      LEARNING_HUB_AUTH_ENABLED: "true",
+      FINANCE_HUB_USE_DATABASE: "true",
+      DATABASE_URL: "postgresql://finance:pw@localhost:5432/finance_hub"
+    });
+
+    expect(env.LEARNING_HUB_AUTH_ENABLED).toBe(true);
+  });
+
+  it("rejects the retired basic-auth credentials instead of ignoring them", () => {
+    // Silently ignoring them would leave someone believing the app is gated.
+    try {
+      parseEnv({ LEARNING_HUB_AUTH_USER: "ludo", LEARNING_HUB_AUTH_PASSWORD: "secret" });
       expect.unreachable("should have thrown");
     } catch (error) {
       expect(error).toBeInstanceOf(EnvValidationError);
       const issues = (error as EnvValidationError).issues.join("\n");
       expect(issues).toContain("LEARNING_HUB_AUTH_USER");
       expect(issues).toContain("LEARNING_HUB_AUTH_PASSWORD");
+      expect(issues).toContain("retired in PR-01");
     }
   });
 

@@ -1,10 +1,12 @@
 import { CorrectionSummary } from "@/components/correction-summary";
 import { getCorrectionHistory, getExercises } from "@finance/db";
 import { notFound } from "next/navigation";
+import { getCurrentUser } from "@/lib/auth/current-user";
 
 export default async function CorrectionDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const [{ corrections, attempts }, exercises] = await Promise.all([getCorrectionHistory(), getExercises()]);
+  const user = await getCurrentUser();
+  const [{ corrections, attempts }, exercises] = await Promise.all([getCorrectionHistory(user?.id), getExercises()]);
   const correction = corrections.find((item) => item.id === id);
 
   if (!correction) {
