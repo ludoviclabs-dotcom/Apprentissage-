@@ -15,6 +15,15 @@ import { createDb, type FinanceDb } from "./client";
  * which matches nothing, so the default outcome is "deny" rather than "see
  * everything".
  */
+export class UserContextBindingError extends Error {
+  constructor(expected: string | null, actual: string | null) {
+    super(
+      `Row level security context is bound to ${actual ?? "nobody"} but ${expected ?? "nobody"} was requested.`
+    );
+    this.name = "UserContextBindingError";
+  }
+}
+
 export async function withUserContext<T>(
   userId: string | null,
   run: (db: FinanceDb) => Promise<T>,
@@ -25,8 +34,34 @@ export async function withUserContext<T>(
     // unlike SET it accepts a bind parameter instead of string interpolation.
     await tx.execute(sql`select set_config('app.current_user_id', ${userId ?? ""}, true)`);
 
+    // Read the binding back on the same connection before trusting it.
+    //
+    // The pool is shared, so `SET LOCAL` and the statements that depend on it must
+    // demonstrably run on the same connection. If they ever did not, every policy
+    // would silently evaluate against the wrong identity — a cross-user data leak
+    // that returns plausible rows rather than an error. One extra round trip per
+    // transaction is a cheap price for turning that into a loud failure.
+    const bound = await tx.execute<{ app_current_user_id: string | null }>(
+      sql`select app_current_user_id() as app_current_user_id`
+    );
+    const actual = readBoundUserId(bound);
+
+    if (actual !== (userId ?? null)) {
+      throw new UserContextBindingError(userId ?? null, actual);
+    }
+
     return run(tx as unknown as FinanceDb);
   });
+}
+
+/** The postgres-js driver returns rows as an array-like; normalise the shape. */
+function readBoundUserId(result: unknown): string | null {
+  const rows = Array.isArray(result)
+    ? result
+    : ((result as { rows?: unknown[] } | null)?.rows ?? []);
+  const first = rows[0] as { app_current_user_id?: string | null } | undefined;
+
+  return first?.app_current_user_id ?? null;
 }
 
 /**

@@ -76,12 +76,12 @@ jobs:
         run: corepack pnpm install --frozen-lockfile
 
       - name: Isolation tests
-        run: corepack pnpm exec vitest run packages/db/test/rls.integration.test.ts 2>&1 | tee rls.log
+        run: corepack pnpm exec vitest run packages/db/test/rls.integration.test.ts packages/db/test/user-context.integration.test.ts 2>&1 | tee rls.log
 
       - name: Fail if isolation was not actually verified
         run: |
-          if grep -q "isolation is NOT verified" rls.log; then
-            echo "::error::RLS tests skipped — isolation was not verified."
+          if grep -q "is NOT verified" rls.log; then
+            echo "::error::Isolation tests skipped — isolation was not verified."
             exit 1
           fi
 
