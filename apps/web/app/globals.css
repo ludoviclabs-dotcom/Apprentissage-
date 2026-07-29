@@ -1409,3 +1409,41 @@ button {
 .muted {
   color: var(--muted);
 }
+
+/* Any disabled control must read as disabled, wherever it lives. */
+button:disabled,
+.primary-action:disabled,
+.secondary-action:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+/* Explains, before the click, why a control is off or why nothing is stored. */
+.feature-notice {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--muted);
+  background: var(--surface-muted);
+  border: 1px solid var(--border);
+  border-left-width: 3px;
+  border-radius: 8px;
+  padding: 8px 12px;
+}
+
+.planned-action {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.badge-soon {
+  font-size: 12px;
+  color: var(--muted);
+  background: var(--surface-muted);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 4px 10px;
+  white-space: nowrap;
+}

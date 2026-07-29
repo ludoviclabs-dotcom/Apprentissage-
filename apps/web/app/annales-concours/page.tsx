@@ -1,8 +1,10 @@
 import { ExamSessionForm } from "@/components/forms/exam-session-form";
+import { getFeatures } from "@/lib/features";
 import { getExamModel } from "@/lib/view-model";
 
 export default async function AnnalesConcoursPage() {
   const model = await getExamModel();
+  const features = getFeatures();
 
   return (
     <div className="page-stack">
@@ -11,8 +13,9 @@ export default async function AnnalesConcoursPage() {
           <span className="section-label">Annales & Concours</span>
           <h1>Annales blanches et examens courts</h1>
           <p>
-            Des sessions chronométrées construites à partir du corpus : QCM, calcul, écriture, justification et
-            mini-cas, pour vérifier le choix de méthode et pas seulement la mémoire immédiate.
+            Des sessions construites à partir du corpus : QCM, calcul, écriture, justification et mini-cas, pour
+            vérifier le choix de méthode et pas seulement la mémoire immédiate. La durée affichée est indicative :
+            le chronomètre n'est pas encore implémenté.
           </p>
         </div>
         <div className="hero-score">
@@ -32,7 +35,12 @@ export default async function AnnalesConcoursPage() {
             </div>
             <span className="state-token processing">{exam.status}</span>
           </div>
-          <ExamSessionForm exam={exam} exercises={model.exercises} />
+          <ExamSessionForm
+            exam={exam}
+            exercises={model.exercises}
+            writes={features.writes}
+            persistence={features.persistence}
+          />
         </section>
       ))}
 

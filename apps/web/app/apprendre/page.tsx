@@ -11,7 +11,17 @@ export default async function LearnPage() {
   const currentLesson = lessons.find((lesson) => lesson.id === currentDay?.lessonId) ?? lessons[0];
 
   if (!currentDay || !currentLesson) {
-    return null;
+    return (
+      <div className="page-stack">
+        <section className="page-header">
+          <div>
+            <span className="section-label">Apprendre</span>
+            <h1>Aucune leçon disponible</h1>
+            <p>Le parcours ne contient ni jour courant ni leçon. Lance `pnpm db:seed` ou repasse en mode seedé.</p>
+          </div>
+        </section>
+      </div>
+    );
   }
 
   return (

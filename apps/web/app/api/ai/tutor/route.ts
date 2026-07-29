@@ -1,7 +1,11 @@
 import { createAiProviderFromEnv, createSourceAudit, createTutorMessages, createTutorResponse } from "@finance/ai";
 import { lessons } from "@finance/domain";
 import { searchKnowledge } from "@finance/db";
+import { getEnv } from "@/lib/env";
 import { z } from "zod";
+
+/** `disabled`: no provider configured. `failed`: provider configured but errored. */
+export type TutorProviderStatus = "ok" | "disabled" | "failed";
 
 const tutorRequestSchema = z.object({
   question: z.string().min(4),
@@ -31,14 +35,16 @@ export async function POST(request: Request) {
     mode: body.data.mode,
     retrieval
   });
+  const env = getEnv();
   const provider = createAiProviderFromEnv({
-    AI_PROVIDER: process.env.AI_PROVIDER,
-    OPENAI_API_KEY: process.env.OPENAI_API_KEY,
-    OPENAI_MODEL: process.env.OPENAI_MODEL,
-    OLLAMA_BASE_URL: process.env.OLLAMA_BASE_URL,
-    OLLAMA_MODEL: process.env.OLLAMA_MODEL
+    AI_PROVIDER: env.AI_PROVIDER,
+    OPENAI_API_KEY: env.OPENAI_API_KEY,
+    OPENAI_MODEL: env.OPENAI_MODEL,
+    OLLAMA_BASE_URL: env.OLLAMA_BASE_URL,
+    OLLAMA_MODEL: env.OLLAMA_MODEL
   });
   let providerAnswer: string | null = null;
+  let providerStatus: TutorProviderStatus = provider.name === "none" ? "disabled" : "ok";
 
   if (provider.name !== "none") {
     try {
@@ -50,7 +56,10 @@ export async function POST(request: Request) {
         })
       );
     } catch {
+      // The seeded answer below is still cited and usable, but the caller must be
+      // told the provider failed instead of silently believing it answered.
       providerAnswer = null;
+      providerStatus = "failed";
     }
   }
 
@@ -58,6 +67,7 @@ export async function POST(request: Request) {
     ...response,
     answer: providerAnswer ?? response.answer,
     provider: provider.name,
+    providerStatus,
     audit: createSourceAudit(retrieval)
   });
 }

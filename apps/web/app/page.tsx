@@ -15,7 +15,21 @@ export default async function DashboardPage() {
   const totalChunks = model.sourcePacks.reduce((sum, pack) => sum + pack.chunksCount, 0);
 
   if (!model.currentDay || !model.currentLesson || !model.currentExercise || !model.latestCorrection) {
-    return null;
+    return (
+      <div className="page-stack">
+        <section className="page-header">
+          <div>
+            <span className="section-label">Tableau de bord</span>
+            <h1>Aucune donnée d'apprentissage à afficher</h1>
+            <p>
+              {runtime.databaseActive
+                ? "La base est active mais ne contient pas encore de parcours, d'exercice ou de correction. Lance `pnpm db:seed` pour charger le socle."
+                : "Le socle seedé n'a pas pu être chargé. Vérifie l'installation des dépendances puis relance `pnpm dev`."}
+            </p>
+          </div>
+        </section>
+      </div>
+    );
   }
 
   return (
