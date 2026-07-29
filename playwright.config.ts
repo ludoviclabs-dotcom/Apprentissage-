@@ -15,8 +15,12 @@ const authBaseURL = `http://127.0.0.1:${AUTH_PORT}`;
  */
 const authDatabaseUrl = process.env.PLAYWRIGHT_AUTH_DATABASE_URL;
 
-/** Specs that need accounts enabled; every other project must skip the file. */
-const AUTH_ENABLED_SPEC = /auth-enabled\.spec\.ts/;
+/**
+ * Specs that need accounts and a database. The `*-enabled.spec.ts` suffix is the
+ * convention: any project without a database must ignore them, and the
+ * `authenticated` project runs nothing else.
+ */
+const AUTH_ENABLED_SPEC = /-enabled\.spec\.ts$/;
 
 const projects = [
   {
