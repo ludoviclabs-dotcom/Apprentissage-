@@ -92,7 +92,7 @@ test("a protected route redirects to login once signed out", async ({ page }, te
 
   await page.getByRole("button", { name: "Se déconnecter" }).click();
   expect((await pendingLogout).status()).toBe(204);
-  await expect(page).toHaveURL(/\/login/);
+  await page.waitForURL(/\/login/);
 
   await page.goto("/progression");
   await expect(page).toHaveURL(/\/login\?next=%2Fprogression/);

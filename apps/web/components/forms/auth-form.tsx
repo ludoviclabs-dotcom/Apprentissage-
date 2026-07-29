@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { postJson } from "@/lib/api-client";
 import { FeatureNotice } from "@/components/feature-notice";
@@ -18,7 +17,6 @@ export function AuthForm({
   auth: FeatureState;
   nextPath: string;
 }) {
-  const router = useRouter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -44,10 +42,10 @@ export function AuthForm({
       return;
     }
 
-    // Server components must re-read the session cookie, so refresh before
-    // navigating — otherwise the destination renders as anonymous.
-    router.refresh();
-    router.push(nextPath);
+    // A full document load rather than router.push, for the same reason as
+    // signing out: the client router cache holds pages rendered while anonymous,
+    // and every server component now has to re-read the session cookie.
+    window.location.assign(nextPath);
   }
 
   return (
