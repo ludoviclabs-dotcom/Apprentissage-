@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { postJson } from "@/lib/api-client";
 
 interface ImportResult {
   manifest?: {
@@ -27,13 +28,9 @@ export function SourcePackImportForm({ disabled = false }: { disabled?: boolean 
     setResult(null);
 
     try {
-      const response = await fetch("/api/source-packs", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ path })
-      });
-      const payload = (await response.json()) as ImportResult;
-      setResult(payload);
+      const outcome = await postJson<ImportResult>("/api/source-packs", { path });
+
+      setResult(outcome.ok ? outcome.data : { error: outcome.error });
     } finally {
       setIsPending(false);
     }

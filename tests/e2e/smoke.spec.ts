@@ -98,3 +98,23 @@ test("the tutor states that no model is configured", async ({ page }) => {
 
   await expect(page.getByText(/AI_PROVIDER=none/)).toBeVisible();
 });
+
+test("public demo disables protected CTAs before submission and rejects writes", async ({ page, request }, testInfo) => {
+  test.skip(testInfo.project.name !== "public-demo", "requires the dedicated public-demo server");
+
+  await page.goto("/revisions");
+  await expect(page.getByRole("button", { name: "Réussie" }).first()).toBeDisabled();
+  await expect(page.getByText(/Indisponible en démo publique/).first()).toBeVisible();
+
+  await page.goto("/documents");
+  await expect(page.getByRole("button", { name: "Uploader" })).toBeDisabled();
+
+  await page.goto("/source-packs");
+  await expect(page.getByRole("button", { name: "Analyser le pack" })).toBeDisabled();
+
+  const response = await request.post("/api/revisions/review", {
+    data: { flashcardId: "fc-amort-lineaire", rating: "correct" }
+  });
+
+  expect(response.status()).toBe(403);
+});

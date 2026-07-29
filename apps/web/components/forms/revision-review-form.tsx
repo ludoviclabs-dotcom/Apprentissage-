@@ -6,10 +6,10 @@ import { postJson } from "@/lib/api-client";
 import type { FeatureState } from "@/lib/features";
 
 const ratings: Array<{ value: ReviewRating; label: string }> = [
-  { value: "forgotten", label: "Oubliee" },
+  { value: "forgotten", label: "Oubliée" },
   { value: "partial", label: "Partielle" },
-  { value: "correct", label: "Reussie" },
-  { value: "mastered", label: "Maitrisee" }
+  { value: "correct", label: "Réussie" },
+  { value: "mastered", label: "Maîtrisée" }
 ];
 
 export function RevisionReviewForm({
