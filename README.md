@@ -66,6 +66,12 @@ corepack pnpm db:seed
 
 Setting the flag without the URL is rejected at boot rather than falling back to seeded data silently.
 
+## Accounts
+
+Set `LEARNING_HUB_AUTH_ENABLED=true` (requires database mode) and register at `/signup`. Authentication is local: scrypt password hashing from `node:crypto`, opaque session tokens stored as digests, no external service.
+
+Personal data is owned by `user_id` and isolated by PostgreSQL row level security — enabled *and* forced, so even the connecting role cannot read across accounts. Isolation is proven by 13 integration tests that run against a real PostgreSQL in CI; the build fails if they skip. See `docs/adr/001-local-auth-rls.md`.
+
 When database mode is enabled, source-pack imports persist packs, documents and Markdown chunks; attempts persist corrections and update competency strength. In seeded mode, submissions are scored but not stored, and the UI says so.
 
 ## Source Packs
@@ -88,6 +94,7 @@ docker compose run --rm ingestion-worker python worker.py /app/source-packs/cour
 
 - `docs/architecture.md` — runtime boundaries and data strategy
 - `docs/adr/000-baseline.md` — PR-00 baseline decisions
+- `docs/adr/001-local-auth-rls.md` — PR-01 local auth, ownership and row level security
 - `docs/local-runbook.md` — local modes, environment validation, checks
 - `docs/roadmap-pr-plan.md` — PR-00 → PR-07 execution plan
 - `docs/source-policy.md`, `docs/secrets.md`, `docs/evals.md`, `docs/learning-design.md`, `docs/deployments.md`
