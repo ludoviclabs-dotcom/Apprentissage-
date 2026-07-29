@@ -98,6 +98,33 @@ test("a protected route redirects to login once signed out", async ({ page }, te
   await expect(page).toHaveURL(/\/login\?next=%2Fprogression/);
 });
 
+test("a forged session cookie cannot read personal API data", async ({ browser }, testInfo) => {
+  const baseURL = testInfo.project.use.baseURL;
+  expect(typeof baseURL, "authenticated project base URL").toBe("string");
+  const origin = new URL(baseURL as string).origin;
+  const context = await browser.newContext();
+
+  try {
+    await context.addCookies([
+      {
+        name: "flh_session",
+        value: "forged-session-token",
+        url: origin
+      }
+    ]);
+
+    const [progress, revisions] = await Promise.all([
+      context.request.get(new URL("/api/progress", origin).toString()),
+      context.request.get(new URL("/api/revisions/due", origin).toString())
+    ]);
+
+    expect(progress.status()).toBe(401);
+    expect(revisions.status()).toBe(401);
+  } finally {
+    await context.close();
+  }
+});
+
 test("two accounts never see each other's identity", async ({ browser }, testInfo) => {
   // Separate contexts mean separate cookie jars: two genuinely different users.
   const [contextA, contextB] = await Promise.all([browser.newContext(), browser.newContext()]);

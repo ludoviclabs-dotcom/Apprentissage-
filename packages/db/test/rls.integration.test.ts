@@ -116,6 +116,32 @@ describeWithDb("row level security", () => {
     }
   });
 
+  it("installs SELECT, INSERT, UPDATE and DELETE ownership policies on every owned table", async () => {
+    const rows = await sql<{ tablename: string; policyname: string; cmd: string; qual: string | null; with_check: string | null }[]>`
+      select tablename, policyname, cmd, qual, with_check
+      from pg_policies
+      where schemaname = current_schema()
+        and tablename = any(${sql.array([...userOwnedTables])})`;
+
+    for (const table of userOwnedTables) {
+      const policies = rows.filter((row) => row.tablename === table);
+
+      expect(policies.map((row) => row.cmd).sort(), `${table} policies`).toEqual([
+        "DELETE",
+        "INSERT",
+        "SELECT",
+        "UPDATE"
+      ]);
+      expect(policies.every((row) => row.policyname.startsWith(`${table}_`))).toBe(true);
+      expect(policies.every((row) => row.qual?.includes("app_current_user_id") ?? row.with_check?.includes("app_current_user_id"))).toBe(true);
+      expect(
+        policies
+          .filter((row) => row.cmd === "INSERT" || row.cmd === "UPDATE")
+          .every((row) => row.with_check?.includes("app_current_user_id"))
+      ).toBe(true);
+    }
+  });
+
   it("shows each user only their own attempts", async () => {
     const aliceRows = await asUser(alice, (tx) => tx`select id, user_id from attempts`);
     const bobRows = await asUser(bob, (tx) => tx`select id, user_id from attempts`);

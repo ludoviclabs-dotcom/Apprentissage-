@@ -94,6 +94,37 @@ export async function resolveWriteUser(): Promise<
 }
 
 /**
+ * Resolves the caller for a read that includes personal state.
+ *
+ * Catalogue reads remain public when accounts are disabled. Once accounts are
+ * enabled, however, an API route must resolve the database-backed opaque
+ * session before it loads user-scoped progress. This deliberately mirrors
+ * {@link resolveWriteUser}: a mere cookie is never treated as an identity.
+ */
+export async function resolveReadUser(): Promise<
+  { userId: string | null; response?: never } | { userId?: never; response: Response }
+> {
+  const features = getFeatures();
+
+  if (!features.auth.enabled) {
+    return { userId: null };
+  }
+
+  const user = await getCurrentUser();
+
+  if (!user) {
+    return {
+      response: Response.json(
+        { error: "Session requise", details: "Connecte-toi pour consulter ta progression." },
+        { status: 401 }
+      )
+    };
+  }
+
+  return { userId: user.id };
+}
+
+/**
  * For route handlers that must not proceed anonymously. Returns the user or a
  * ready-to-return 401 — never both, never neither.
  */
