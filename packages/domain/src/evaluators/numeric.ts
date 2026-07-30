@@ -36,6 +36,18 @@ export interface NumericSubmission {
 
 const DEFAULT_TOLERANCE_PCT = 0.0001;
 
+/**
+ * Floating-point arithmetic must not turn an answer exactly at the authored
+ * boundary into a failure (`100.01 - 100` is not exactly `0.01` in IEEE-754).
+ * This scales an epsilon to the magnitudes being compared without widening a
+ * learner-facing tolerance in any material way.
+ */
+function isAtMost(actual: number, limit: number, sourceMagnitude = 1): boolean {
+  const epsilon =
+    Number.EPSILON * Math.max(1, Math.abs(actual), Math.abs(limit), Math.abs(sourceMagnitude)) * 8;
+  return actual <= limit || Math.abs(actual - limit) <= epsilon;
+}
+
 export function isWithinTolerance(actual: number, spec: NumericSpec): boolean {
   if (!Number.isFinite(actual)) {
     return false;
@@ -43,7 +55,10 @@ export function isWithinTolerance(actual: number, spec: NumericSpec): boolean {
 
   const diff = Math.abs(actual - spec.expected);
 
-  if (typeof spec.toleranceAbs === "number" && diff <= spec.toleranceAbs) {
+  if (
+    typeof spec.toleranceAbs === "number" &&
+    isAtMost(diff, spec.toleranceAbs, Math.max(Math.abs(actual), Math.abs(spec.expected)))
+  ) {
     return true;
   }
 
@@ -58,7 +73,7 @@ export function isWithinTolerance(actual: number, spec: NumericSpec): boolean {
   // accident.
   const base = Math.max(Math.abs(spec.expected), 1);
 
-  return diff / base <= pct;
+  return isAtMost(diff / base, pct);
 }
 
 /**
@@ -94,16 +109,16 @@ export const numericEvaluator: Evaluator<NumericSpec, NumericSubmission> = {
       throw new InvalidEvaluationSpecError("numeric: `expected` must be a finite number.");
     }
 
-    if (typeof spec.tolerancePct === "number" && spec.tolerancePct < 0) {
-      throw new InvalidEvaluationSpecError("numeric: `tolerancePct` cannot be negative.");
+    if (typeof spec.tolerancePct === "number" && (!Number.isFinite(spec.tolerancePct) || spec.tolerancePct < 0)) {
+      throw new InvalidEvaluationSpecError("numeric: `tolerancePct` must be a finite non-negative number.");
     }
 
-    if (typeof spec.toleranceAbs === "number" && spec.toleranceAbs < 0) {
-      throw new InvalidEvaluationSpecError("numeric: `toleranceAbs` cannot be negative.");
+    if (typeof spec.toleranceAbs === "number" && (!Number.isFinite(spec.toleranceAbs) || spec.toleranceAbs < 0)) {
+      throw new InvalidEvaluationSpecError("numeric: `toleranceAbs` must be a finite non-negative number.");
     }
 
-    if (typeof spec.points === "number" && spec.points <= 0) {
-      throw new InvalidEvaluationSpecError("numeric: `points` must be greater than zero.");
+    if (typeof spec.points === "number" && (!Number.isFinite(spec.points) || spec.points <= 0)) {
+      throw new InvalidEvaluationSpecError("numeric: `points` must be a finite number greater than zero.");
     }
   },
 

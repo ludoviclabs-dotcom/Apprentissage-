@@ -8,7 +8,8 @@ export const migrationFiles = [
   // After the role grant on purpose: 0004 ends with ALTER DEFAULT PRIVILEGES, so
   // tables created from here on are reachable by `finance_app` without the
   // migration having to re-grant them.
-  "migrations/0005_exercise_versions.sql"
+  "migrations/0005_exercise_versions.sql",
+  "migrations/0006_attempt_evaluation_provenance.sql"
 ] as const;
 
 /** Tables protected by row level security, keyed on `user_id`. */

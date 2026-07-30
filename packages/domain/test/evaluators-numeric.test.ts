@@ -49,6 +49,21 @@ describe("isWithinTolerance", () => {
     expect(isWithinTolerance(100.51, spec)).toBe(false);
   });
 
+  it("accepts an answer exactly on a decimal boundary despite IEEE-754 noise", () => {
+    const spec: NumericSpec = { expected: 100, toleranceAbs: 0.01 };
+
+    expect(isWithinTolerance(100.01, spec)).toBe(true);
+    expect(isWithinTolerance(99.99, spec)).toBe(true);
+    expect(isWithinTolerance(100.0101, spec)).toBe(false);
+  });
+
+  it("keeps the same inclusive rule at a relative boundary", () => {
+    const spec: NumericSpec = { expected: 100, tolerancePct: 0.1 };
+
+    expect(isWithinTolerance(110, spec)).toBe(true);
+    expect(isWithinTolerance(110.01, spec)).toBe(false);
+  });
+
   it("accepts when either declared tolerance is satisfied", () => {
     const spec: NumericSpec = { expected: 1000, tolerancePct: 0.001, toleranceAbs: 50 };
 
@@ -91,6 +106,18 @@ describe("numericEvaluator.assertValidSpec", () => {
       InvalidEvaluationSpecError
     );
     expect(() => numericEvaluator.assertValidSpec({ expected: 1, points: 0 })).toThrow(InvalidEvaluationSpecError);
+  });
+
+  it("rejects non-finite tolerances and points", () => {
+    expect(() => numericEvaluator.assertValidSpec({ expected: 1, tolerancePct: Number.NaN })).toThrow(
+      InvalidEvaluationSpecError
+    );
+    expect(() => numericEvaluator.assertValidSpec({ expected: 1, toleranceAbs: Number.POSITIVE_INFINITY })).toThrow(
+      InvalidEvaluationSpecError
+    );
+    expect(() => numericEvaluator.assertValidSpec({ expected: 1, points: Number.NaN })).toThrow(
+      InvalidEvaluationSpecError
+    );
   });
 });
 

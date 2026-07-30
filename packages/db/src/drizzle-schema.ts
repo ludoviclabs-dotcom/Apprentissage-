@@ -133,7 +133,9 @@ export const attemptsTable = pgTable("attempts", {
   userId: uuid("user_id"),
   exerciseId: text("exercise_id").notNull(),
   userAnswer: text("user_answer").notNull(),
-  score: integer("score").notNull(),
+  // Typed evaluators can award fractional marks; the database must preserve the
+  // same score the correction panel and its JSON payload show.
+  score: numeric("score", { precision: 5, scale: 2 }).notNull(),
   correctionJson: jsonb("correction_json").notNull().default({}),
   createdAt: timestamp("created_at", { mode: "string" }).notNull().defaultNow(),
   // Which engine produced the mark. Nullable because attempts predating the
@@ -146,7 +148,7 @@ export const correctionsTable = pgTable("corrections", {
   id: text("id").primaryKey(),
   userId: uuid("user_id"),
   attemptId: text("attempt_id").notNull(),
-  score: integer("score").notNull(),
+  score: numeric("score", { precision: 5, scale: 2 }).notNull(),
   summary: text("summary").notNull(),
   correctJson: jsonb("correct_json").notNull().default([]),
   errorsJson: jsonb("errors_json").notNull().default([]),

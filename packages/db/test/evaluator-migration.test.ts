@@ -101,6 +101,23 @@ describe("golden cases", () => {
       }
     }
   });
+
+  it("remain equivalent after the JSON serialization used by versioned storage", () => {
+    for (const version of authoredExerciseVersions) {
+      const restored = JSON.parse(JSON.stringify(version)) as AuthoredExerciseVersion;
+
+      expect(restored.id).toBe(version.id);
+      expect(restored.version).toBe(version.version);
+      expect(restored.evaluationType).toBe(version.evaluationType);
+      expect(restored.testCases).toEqual(version.testCases);
+
+      for (const testCase of restored.testCases) {
+        expect(evaluate(restored, testCase.submission as SubmissionPayload)).toEqual(
+          evaluate(version, testCase.submission as SubmissionPayload)
+        );
+      }
+    }
+  });
 });
 
 /**

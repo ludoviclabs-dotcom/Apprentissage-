@@ -241,6 +241,36 @@ describe("journalEntryEvaluator.evaluate", () => {
     expect(result.score).toBe(20);
   });
 
+  it("accepts a declared account variant with its label, without weakening other lines", () => {
+    const spec: JournalEntrySpec = {
+      expectedLines: [
+        { account: "6815", debit: 14000, alsoAccept: ["681"], label: "Dotations" },
+        { account: "1511", credit: 14000, label: "Provisions" }
+      ]
+    };
+
+    const result = journalEntryEvaluator.evaluate(spec, {
+      lines: [
+        { account: "681 Dotations aux provisions", debit: 14000 },
+        { account: "1511 Provision pour litige", credit: 14000 }
+      ]
+    });
+
+    expect(result.score).toBe(20);
+  });
+
+  it("does not accept an undeclared neighbouring account as a variant", () => {
+    const result = journalEntryEvaluator.evaluate(PURCHASE, {
+      lines: [
+        { account: "6072", debit: 1000 },
+        { account: "44566", debit: 200 },
+        { account: "401", credit: 1200 }
+      ]
+    });
+
+    expect(result.criteria.find((criterion) => criterion.id === "accounts")?.outcome).not.toBe("met");
+  });
+
   it("is deterministic", () => {
     expect(journalEntryEvaluator.evaluate(PURCHASE, PERFECT)).toEqual(
       journalEntryEvaluator.evaluate(PURCHASE, PERFECT)

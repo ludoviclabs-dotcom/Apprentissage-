@@ -176,7 +176,10 @@ export async function submitAttempt(input: {
     remediationPlan: reference.remediationPlan
   });
 
-  await recordAttempt(input.userId, exercise.id, renderSubmission(input.payload), graded.correction);
+  await recordAttempt(input.userId, exercise.id, renderSubmission(input.payload), graded.correction, {
+    evaluationType: graded.evaluationType,
+    exerciseVersionId: graded.exerciseVersionId
+  });
 
   return graded;
 }
