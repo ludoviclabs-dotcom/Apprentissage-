@@ -15,19 +15,21 @@ import { migrationFiles, userOwnedTables } from "../src/schema";
  * as "isolation proven".
  */
 
-const DATABASE_URL = process.env.RLS_TEST_DATABASE_URL;
+const APP_DATABASE_URL = process.env.RLS_TEST_DATABASE_URL;
+const ADMIN_DATABASE_URL = process.env.RLS_TEST_ADMIN_DATABASE_URL;
 const packageRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 
-const describeWithDb = DATABASE_URL ? describe : describe.skip;
+const describeWithDb = APP_DATABASE_URL && ADMIN_DATABASE_URL ? describe : describe.skip;
 
-if (!DATABASE_URL) {
+if (!APP_DATABASE_URL || !ADMIN_DATABASE_URL) {
   console.warn(
-    "[rls.integration] RLS_TEST_DATABASE_URL is not set — isolation is NOT verified in this run."
+    "[rls.integration] RLS_TEST_DATABASE_URL and RLS_TEST_ADMIN_DATABASE_URL are required — isolation is NOT verified in this run."
   );
 }
 
 describeWithDb("row level security", () => {
   let sql: Sql;
+  let admin: Sql;
   let alice: string;
   let bob: string;
 
@@ -40,32 +42,33 @@ describeWithDb("row level security", () => {
   }
 
   beforeAll(async () => {
-    sql = postgres(DATABASE_URL!, { max: 1 });
+    sql = postgres(APP_DATABASE_URL!, { max: 1 });
+    admin = postgres(ADMIN_DATABASE_URL!, { max: 1 });
 
     for (const file of migrationFiles) {
-      await sql.unsafe(await readFile(resolve(packageRoot, file), "utf8"));
+      await admin.unsafe(await readFile(resolve(packageRoot, file), "utf8"));
     }
 
     // Global catalogue rows the owned tables reference by foreign key.
-    await sql`
+    await admin`
       insert into competencies (id, domain, name, level_min, level_max, status, strength)
       values ('cp-rls', 'compta-generale', 'RLS fixture', 1, 4, 'in-progress', 50)
       on conflict (id) do nothing`;
-    await sql`
+    await admin`
       insert into exercises (id, domain, topic, level, statement, expected_answer)
       values ('ex-rls', 'compta-generale', 'RLS', 1, 'statement', 'answer')
       on conflict (id) do nothing`;
-    await sql`
+    await admin`
       insert into exam_sessions (id, title, exercise_ids, duration_minutes, status)
       values ('exam-rls', 'RLS exam', array['ex-rls'], 30, 'draft')
       on conflict (id) do nothing`;
 
-    const [aliceRow] = await sql`
+    const [aliceRow] = await admin`
       insert into app_users (email, email_normalized, password_hash)
       values ('alice-rls@example.test', 'alice-rls@example.test', 'scrypt$fixture')
       on conflict (email_normalized) do update set updated_at = now()
       returning id`;
-    const [bobRow] = await sql`
+    const [bobRow] = await admin`
       insert into app_users (email, email_normalized, password_hash)
       values ('bob-rls@example.test', 'bob-rls@example.test', 'scrypt$fixture')
       on conflict (email_normalized) do update set updated_at = now()
@@ -89,15 +92,16 @@ describeWithDb("row level security", () => {
   }, 120_000);
 
   afterAll(async () => {
-    if (!sql) {
+    if (!sql || !admin) {
       return;
     }
 
-    await sql`delete from app_users where email_normalized in ('alice-rls@example.test', 'bob-rls@example.test')`;
-    await sql`delete from exam_sessions where id = 'exam-rls'`;
-    await sql`delete from exercises where id = 'ex-rls'`;
-    await sql`delete from competencies where id = 'cp-rls'`;
+    await admin`delete from app_users where email_normalized in ('alice-rls@example.test', 'bob-rls@example.test')`;
+    await admin`delete from exam_sessions where id = 'exam-rls'`;
+    await admin`delete from exercises where id = 'ex-rls'`;
+    await admin`delete from competencies where id = 'cp-rls'`;
     await sql.end();
+    await admin.end();
   });
 
   it("enables AND forces row level security on every owned table", async () => {

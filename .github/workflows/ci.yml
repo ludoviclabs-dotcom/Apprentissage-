@@ -57,8 +57,11 @@ jobs:
           --health-timeout 5s
           --health-retries 10
     env:
-      DATABASE_URL: postgresql://finance:finance_dev_password@localhost:5432/finance_hub
-      RLS_TEST_DATABASE_URL: postgresql://finance:finance_dev_password@localhost:5432/finance_hub
+      # Runtime and test queries use a non-superuser: superusers bypass RLS.
+      DATABASE_URL: postgresql://finance_app:finance_app_dev_password@localhost:5432/finance_hub
+      DATABASE_ADMIN_URL: postgresql://finance:finance_dev_password@localhost:5432/finance_hub
+      RLS_TEST_DATABASE_URL: postgresql://finance_app:finance_app_dev_password@localhost:5432/finance_hub
+      RLS_TEST_ADMIN_DATABASE_URL: postgresql://finance:finance_dev_password@localhost:5432/finance_hub
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -75,13 +78,25 @@ jobs:
       - name: Install
         run: corepack pnpm install --frozen-lockfile
 
+      - name: Configure constrained application role
+        run: corepack pnpm db:configure-app-role
+
+      # `set -o pipefail` is load-bearing: without it the exit status of the
+      # pipeline is tee's, so a failing suite reported success. This job was green
+      # for two PRs while the isolation assertions were failing.
       - name: Isolation tests
-        run: corepack pnpm exec vitest run packages/db/test/rls.integration.test.ts 2>&1 | tee rls.log
+        shell: bash
+        run: |
+          set -o pipefail
+          corepack pnpm exec vitest run \
+            packages/db/test/rls.integration.test.ts \
+            packages/db/test/user-context.integration.test.ts \
+            packages/db/test/mastery-isolation.integration.test.ts 2>&1 | tee rls.log
 
       - name: Fail if isolation was not actually verified
         run: |
-          if grep -q "isolation is NOT verified" rls.log; then
-            echo "::error::RLS tests skipped — isolation was not verified."
+          if grep -q "is NOT verified" rls.log; then
+            echo "::error::Isolation tests skipped — isolation was not verified."
             exit 1
           fi
 
@@ -102,8 +117,9 @@ jobs:
           --health-timeout 5s
           --health-retries 10
     env:
-      DATABASE_URL: postgresql://finance:finance_dev_password@localhost:5432/finance_hub
-      PLAYWRIGHT_AUTH_DATABASE_URL: postgresql://finance:finance_dev_password@localhost:5432/finance_hub
+      DATABASE_URL: postgresql://finance_app:finance_app_dev_password@localhost:5432/finance_hub
+      DATABASE_ADMIN_URL: postgresql://finance:finance_dev_password@localhost:5432/finance_hub
+      PLAYWRIGHT_AUTH_DATABASE_URL: postgresql://finance_app:finance_app_dev_password@localhost:5432/finance_hub
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -123,6 +139,9 @@ jobs:
       - name: Install Playwright browser
         run: corepack pnpm exec playwright install --with-deps chromium
 
+      - name: Configure constrained application role
+        run: corepack pnpm db:configure-app-role
+
       - name: Apply migrations
         run: corepack pnpm db:migrate
 
@@ -139,10 +158,15 @@ jobs:
       - name: Smoke and auth tests
         run: corepack pnpm test:e2e
 
+      # test-results/ carries the per-test error context and traces, which is what
+      # actually explains a CI-only failure; playwright-report/ is the readable index.
       - name: Upload report
         if: failure()
         uses: actions/upload-artifact@v4
         with:
           name: playwright-report
-          path: playwright-report/
+          path: |
+            playwright-report/
+            test-results/
           retention-days: 7
+          if-no-files-found: warn

@@ -4,10 +4,12 @@ import { fileURLToPath } from "node:url";
 import postgres from "postgres";
 import { migrationFiles } from "./schema";
 
-const databaseUrl = process.env.DATABASE_URL;
+// Schema changes must be applied by the database owner. The web app itself
+// deliberately connects through the constrained role in DATABASE_URL.
+const databaseUrl = process.env.DATABASE_ADMIN_URL ?? process.env.DATABASE_URL;
 
 if (!databaseUrl) {
-  console.log("DATABASE_URL is not set. Start Docker Compose and copy .env.example to .env first.");
+  console.log("DATABASE_ADMIN_URL (or DATABASE_URL for local setup) is not set. Start Docker Compose and copy .env.example to .env first.");
   process.exit(0);
 }
 

@@ -1,7 +1,9 @@
 import postgres from "postgres";
 import {
+  assertValidCurriculum,
   businessCases,
   competencies,
+  curriculumVersions,
   documents,
   examSessions,
   exercises,
@@ -12,10 +14,12 @@ import {
   sourcePacks
 } from "@finance/domain";
 
-const databaseUrl = process.env.DATABASE_URL;
+// Reference data is administration work. Never require the runtime role to
+// hold seed privileges simply because a developer runs `pnpm db:seed`.
+const databaseUrl = process.env.DATABASE_ADMIN_URL ?? process.env.DATABASE_URL;
 
 if (!databaseUrl) {
-  console.log("DATABASE_URL is not set. Start Docker Compose and copy .env.example to .env first.");
+  console.log("DATABASE_ADMIN_URL (or DATABASE_URL for local setup) is not set. Start Docker Compose and copy .env.example to .env first.");
   process.exit(0);
 }
 
@@ -186,6 +190,47 @@ try {
         minutes = EXCLUDED.minutes,
         status = EXCLUDED.status
     `;
+  }
+
+  // Curriculum versions and their levels are catalogue data: global, no owner,
+  // no row level security. Validating before writing means a malformed track
+  // fails the seed instead of producing levels nobody can clear.
+  for (const version of curriculumVersions) {
+    assertValidCurriculum(version);
+
+    await sql`
+      INSERT INTO curriculum_versions (id, label, effective_from, rules_json)
+      VALUES (${version.id}, ${version.label}, ${version.effectiveFrom}, ${JSON.stringify(version.rules)}::jsonb)
+      ON CONFLICT (id) DO UPDATE SET
+        label = EXCLUDED.label,
+        effective_from = EXCLUDED.effective_from,
+        rules_json = EXCLUDED.rules_json
+    `;
+
+    for (const level of version.levels) {
+      await sql`
+        INSERT INTO module_levels (
+          id, curriculum_version_id, track_id, module_id, domain, level, title, objective,
+          competency_ids, critical_competency_ids, estimated_minutes
+        )
+        VALUES (
+          ${level.id}, ${version.id}, ${level.trackId}, ${level.moduleId}, ${level.domainId},
+          ${level.level}, ${level.title}, ${level.objective}, ${level.competencyIds},
+          ${level.criticalCompetencyIds}, ${level.estimatedMinutes}
+        )
+        ON CONFLICT (id) DO UPDATE SET
+          curriculum_version_id = EXCLUDED.curriculum_version_id,
+          track_id = EXCLUDED.track_id,
+          module_id = EXCLUDED.module_id,
+          domain = EXCLUDED.domain,
+          level = EXCLUDED.level,
+          title = EXCLUDED.title,
+          objective = EXCLUDED.objective,
+          competency_ids = EXCLUDED.competency_ids,
+          critical_competency_ids = EXCLUDED.critical_competency_ids,
+          estimated_minutes = EXCLUDED.estimated_minutes
+      `;
+    }
   }
 
   console.log("Seeded Finance Learning Hub reference data.");

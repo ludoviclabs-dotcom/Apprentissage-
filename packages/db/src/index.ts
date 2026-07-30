@@ -3,3 +3,4 @@ export * from "./client";
 export * from "./user-context";
 export * from "./auth-repository";
 export * from "./repository";
+export * from "./mastery-repository";

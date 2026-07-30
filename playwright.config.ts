@@ -15,8 +15,12 @@ const authBaseURL = `http://127.0.0.1:${AUTH_PORT}`;
  */
 const authDatabaseUrl = process.env.PLAYWRIGHT_AUTH_DATABASE_URL;
 
-/** Specs that need accounts enabled; every other project must skip the file. */
-const AUTH_ENABLED_SPEC = /auth-enabled\.spec\.ts/;
+/**
+ * Specs that need accounts and a database. The `*-enabled.spec.ts` suffix is the
+ * convention: any project without a database must ignore them, and the
+ * `authenticated` project runs nothing else.
+ */
+const AUTH_ENABLED_SPEC = /-enabled\.spec\.ts$/;
 
 const projects = [
   {
@@ -52,7 +56,10 @@ export default defineConfig({
   forbidOnly: Boolean(process.env.CI),
   retries: process.env.CI ? 1 : 0,
   workers: process.env.CI ? 1 : undefined,
-  reporter: process.env.CI ? "list" : [["list"], ["html", { open: "never" }]],
+  // The HTML report is produced in CI too. With the list reporter alone no
+  // `playwright-report/` directory existed, so the workflow's upload-on-failure
+  // step had nothing to archive and a CI-only failure could not be inspected.
+  reporter: [["list"], ["html", { open: "never" }]],
   use: { trace: "on-first-retry" },
   projects,
   webServer: externallyManagedBaseURL
