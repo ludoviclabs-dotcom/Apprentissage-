@@ -18,13 +18,14 @@ import { migrationFiles } from "../src/schema";
  * learner's rows — a leak that looks like valid data rather than an error.
  */
 
-const DATABASE_URL = process.env.RLS_TEST_DATABASE_URL;
+const APP_DATABASE_URL = process.env.RLS_TEST_DATABASE_URL;
+const ADMIN_DATABASE_URL = process.env.RLS_TEST_ADMIN_DATABASE_URL;
 const packageRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
-const describeWithDb = DATABASE_URL ? describe : describe.skip;
+const describeWithDb = APP_DATABASE_URL && ADMIN_DATABASE_URL ? describe : describe.skip;
 
-if (!DATABASE_URL) {
+if (!APP_DATABASE_URL || !ADMIN_DATABASE_URL) {
   console.warn(
-    "[user-context.integration] RLS_TEST_DATABASE_URL is not set — pooled isolation is NOT verified in this run."
+    "[user-context.integration] RLS_TEST_DATABASE_URL and RLS_TEST_ADMIN_DATABASE_URL are required — pooled isolation is NOT verified in this run."
   );
 }
 
@@ -38,35 +39,35 @@ function rowsOf(result: unknown): Record<string, unknown>[] {
 }
 
 describeWithDb("withUserContext over a shared pool", () => {
-  let sql: Sql;
+  let admin: Sql;
   let alice: string;
   let bob: string;
   let withUserContext: (typeof import("../src/user-context"))["withUserContext"];
 
   beforeAll(async () => {
     // `createDb()` reads these at call time.
-    process.env.DATABASE_URL = DATABASE_URL;
+    process.env.DATABASE_URL = APP_DATABASE_URL;
     process.env.FINANCE_HUB_USE_DATABASE = "true";
 
     withUserContext = (await import("../src/user-context")).withUserContext;
 
-    sql = postgres(DATABASE_URL!, { max: 1 });
+    admin = postgres(ADMIN_DATABASE_URL!, { max: 1 });
 
     for (const file of migrationFiles) {
-      await sql.unsafe(await readFile(resolve(packageRoot, file), "utf8"));
+      await admin.unsafe(await readFile(resolve(packageRoot, file), "utf8"));
     }
 
-    await sql`
+    await admin`
       insert into exercises (id, domain, topic, level, statement, expected_answer)
       values ('ex-pool', 'compta-generale', 'Pool', 1, 'statement', 'answer')
       on conflict (id) do nothing`;
 
-    const [aliceRow] = await sql`
+    const [aliceRow] = await admin`
       insert into app_users (email, email_normalized, password_hash)
       values ('alice-pool@example.test', 'alice-pool@example.test', 'scrypt$fixture')
       on conflict (email_normalized) do update set updated_at = now()
       returning id`;
-    const [bobRow] = await sql`
+    const [bobRow] = await admin`
       insert into app_users (email, email_normalized, password_hash)
       values ('bob-pool@example.test', 'bob-pool@example.test', 'scrypt$fixture')
       on conflict (email_normalized) do update set updated_at = now()
@@ -77,13 +78,13 @@ describeWithDb("withUserContext over a shared pool", () => {
   }, 120_000);
 
   afterAll(async () => {
-    if (!sql) {
+    if (!admin) {
       return;
     }
 
-    await sql`delete from app_users where email_normalized in ('alice-pool@example.test', 'bob-pool@example.test')`;
-    await sql`delete from exercises where id = 'ex-pool'`;
-    await sql.end();
+    await admin`delete from app_users where email_normalized in ('alice-pool@example.test', 'bob-pool@example.test')`;
+    await admin`delete from exercises where id = 'ex-pool'`;
+    await admin.end();
   });
 
   it("binds the requested user, not whoever used the connection last", async () => {
@@ -121,7 +122,7 @@ describeWithDb("withUserContext over a shared pool", () => {
     expect(bobRows).toBe(0);
     expect(anonymousRows).toBe(0);
 
-    await sql`delete from attempts where id = 'attempt-pool-alice'`;
+    await admin`delete from attempts where id = 'attempt-pool-alice'`;
   });
 
   it("stays correct under repeated interleaving", async () => {

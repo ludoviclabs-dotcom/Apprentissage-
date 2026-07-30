@@ -3,7 +3,8 @@
 export const migrationFiles = [
   "migrations/0001_init.sql",
   "migrations/0002_auth_ownership_rls.sql",
-  "migrations/0003_mastery_unlocks.sql"
+  "migrations/0003_mastery_unlocks.sql",
+  "migrations/0004_application_role.sql"
 ] as const;
 
 /** Tables protected by row level security, keyed on `user_id`. */

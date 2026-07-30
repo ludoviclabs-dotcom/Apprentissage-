@@ -8,6 +8,7 @@
   },
   "scripts": {
     "migrate": "tsx src/migrate.ts",
+    "configure-app-role": "tsx src/configure-app-role.ts",
     "seed": "tsx src/seed.ts",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },

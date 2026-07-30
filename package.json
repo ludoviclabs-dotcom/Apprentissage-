@@ -16,6 +16,7 @@
     "test:e2e": "playwright test",
     "check": "pnpm lint && pnpm typecheck && pnpm test && pnpm build",
     "db:migrate": "pnpm --filter @finance/db migrate",
+    "db:configure-app-role": "pnpm --filter @finance/db configure-app-role",
     "db:seed": "pnpm --filter @finance/db seed",
     "ingest": "pnpm --filter @finance/ingest ingest"
   },

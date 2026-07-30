@@ -57,8 +57,11 @@ jobs:
           --health-timeout 5s
           --health-retries 10
     env:
-      DATABASE_URL: postgresql://finance:finance_dev_password@localhost:5432/finance_hub
-      RLS_TEST_DATABASE_URL: postgresql://finance:finance_dev_password@localhost:5432/finance_hub
+      # Runtime and test queries use a non-superuser: superusers bypass RLS.
+      DATABASE_URL: postgresql://finance_app:finance_app_dev_password@localhost:5432/finance_hub
+      DATABASE_ADMIN_URL: postgresql://finance:finance_dev_password@localhost:5432/finance_hub
+      RLS_TEST_DATABASE_URL: postgresql://finance_app:finance_app_dev_password@localhost:5432/finance_hub
+      RLS_TEST_ADMIN_DATABASE_URL: postgresql://finance:finance_dev_password@localhost:5432/finance_hub
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -74,6 +77,9 @@ jobs:
 
       - name: Install
         run: corepack pnpm install --frozen-lockfile
+
+      - name: Configure constrained application role
+        run: corepack pnpm db:configure-app-role
 
       # `set -o pipefail` is load-bearing: without it the exit status of the
       # pipeline is tee's, so a failing suite reported success. This job was green
@@ -111,8 +117,9 @@ jobs:
           --health-timeout 5s
           --health-retries 10
     env:
-      DATABASE_URL: postgresql://finance:finance_dev_password@localhost:5432/finance_hub
-      PLAYWRIGHT_AUTH_DATABASE_URL: postgresql://finance:finance_dev_password@localhost:5432/finance_hub
+      DATABASE_URL: postgresql://finance_app:finance_app_dev_password@localhost:5432/finance_hub
+      DATABASE_ADMIN_URL: postgresql://finance:finance_dev_password@localhost:5432/finance_hub
+      PLAYWRIGHT_AUTH_DATABASE_URL: postgresql://finance_app:finance_app_dev_password@localhost:5432/finance_hub
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -131,6 +138,9 @@ jobs:
 
       - name: Install Playwright browser
         run: corepack pnpm exec playwright install --with-deps chromium
+
+      - name: Configure constrained application role
+        run: corepack pnpm db:configure-app-role
 
       - name: Apply migrations
         run: corepack pnpm db:migrate

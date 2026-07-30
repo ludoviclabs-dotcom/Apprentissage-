@@ -14,10 +14,12 @@ import {
   sourcePacks
 } from "@finance/domain";
 
-const databaseUrl = process.env.DATABASE_URL;
+// Reference data is administration work. Never require the runtime role to
+// hold seed privileges simply because a developer runs `pnpm db:seed`.
+const databaseUrl = process.env.DATABASE_ADMIN_URL ?? process.env.DATABASE_URL;
 
 if (!databaseUrl) {
-  console.log("DATABASE_URL is not set. Start Docker Compose and copy .env.example to .env first.");
+  console.log("DATABASE_ADMIN_URL (or DATABASE_URL for local setup) is not set. Start Docker Compose and copy .env.example to .env first.");
   process.exit(0);
 }
 
