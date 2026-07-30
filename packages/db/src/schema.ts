@@ -4,7 +4,11 @@ export const migrationFiles = [
   "migrations/0001_init.sql",
   "migrations/0002_auth_ownership_rls.sql",
   "migrations/0003_mastery_unlocks.sql",
-  "migrations/0004_application_role.sql"
+  "migrations/0004_application_role.sql",
+  // After the role grant on purpose: 0004 ends with ALTER DEFAULT PRIVILEGES, so
+  // tables created from here on are reachable by `finance_app` without the
+  // migration having to re-grant them.
+  "migrations/0005_exercise_versions.sql"
 ] as const;
 
 /** Tables protected by row level security, keyed on `user_id`. */
@@ -63,7 +67,12 @@ export const tables = [
   "enrollments",
   "mastery_events",
   "mastery_snapshots",
-  "unlock_events"
+  "unlock_events",
+  // Authored content, like `exercises`: global, un-RLS'd, and therefore absent
+  // from `userOwnedTables` above.
+  "exercise_versions",
+  "exercise_criteria",
+  "exercise_test_cases"
 ] as const;
 
 export type TableName = (typeof tables)[number];

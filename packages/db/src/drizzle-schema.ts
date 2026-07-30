@@ -1,4 +1,5 @@
 import {
+  boolean,
   date,
   integer,
   jsonb,
@@ -134,7 +135,11 @@ export const attemptsTable = pgTable("attempts", {
   userAnswer: text("user_answer").notNull(),
   score: integer("score").notNull(),
   correctionJson: jsonb("correction_json").notNull().default({}),
-  createdAt: timestamp("created_at", { mode: "string" }).notNull().defaultNow()
+  createdAt: timestamp("created_at", { mode: "string" }).notNull().defaultNow(),
+  // Which engine produced the mark. Nullable because attempts predating the
+  // typed evaluators were graded by the rubric matcher and have no version.
+  evaluationType: text("evaluation_type"),
+  exerciseVersionId: text("exercise_version_id")
 });
 
 export const correctionsTable = pgTable("corrections", {
@@ -390,4 +395,49 @@ export const unlockEventsTable = pgTable("unlock_events", {
   rulesVersion: text("rules_version").notNull(),
   score: numeric("score", { precision: 5, scale: 2 }).notNull(),
   occurredAt: timestamp("occurred_at", { mode: "string" }).notNull().defaultNow()
+});
+
+// --- Exercise specifications ----------------------------------------------
+//
+// Authored content, like `exercises`: no `user_id`, no row level security. A
+// version pins the specification a mark was produced under, so republishing an
+// exercise cannot re-grade work already done. The partial unique index of
+// migration 0005 keeps exactly one `isActive` row per exercise.
+//
+// `specJson` is deliberately untyped here: its shape belongs to the evaluator
+// named by `evaluationType`, and `exercise-repository.ts` is the boundary that
+// hands it to the domain to validate.
+
+export const exerciseVersionsTable = pgTable("exercise_versions", {
+  id: text("id").primaryKey(),
+  exerciseId: text("exercise_id").notNull(),
+  version: integer("version").notNull(),
+  evaluationType: text("evaluation_type").notNull(),
+  specJson: jsonb("spec_json").notNull().default({}),
+  isActive: boolean("is_active").notNull().default(true),
+  createdAt: timestamp("created_at", { mode: "string" }).notNull().defaultNow()
+});
+
+// Points are NUMERIC because partial credit is awarded in halves and the
+// evaluators rescale the criteria total onto the 0–20 scale; the postgres-js
+// driver hands them back as strings, converted at the repository boundary.
+export const exerciseCriteriaTable = pgTable("exercise_criteria", {
+  id: text("id").primaryKey(),
+  exerciseVersionId: text("exercise_version_id").notNull(),
+  position: integer("position").notNull(),
+  label: text("label").notNull(),
+  points: numeric("points", { precision: 6, scale: 2 }).notNull(),
+  specJson: jsonb("spec_json").notNull().default({})
+});
+
+// The author's own expectations for their exercise. Grading is pure, so these
+// rows are executable: a spec change that breaks grading fails a test instead
+// of silently re-marking learners.
+export const exerciseTestCasesTable = pgTable("exercise_test_cases", {
+  id: text("id").primaryKey(),
+  exerciseVersionId: text("exercise_version_id").notNull(),
+  name: text("name").notNull(),
+  submissionJson: jsonb("submission_json").notNull(),
+  expectedScore: numeric("expected_score", { precision: 5, scale: 2 }).notNull(),
+  expectedOutcomesJson: jsonb("expected_outcomes_json").notNull().default({})
 });

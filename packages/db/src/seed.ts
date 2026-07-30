@@ -1,6 +1,8 @@
 import postgres from "postgres";
 import {
+  assertValidAuthoredVersions,
   assertValidCurriculum,
+  authoredExerciseVersions,
   businessCases,
   competencies,
   curriculumVersions,
@@ -229,6 +231,36 @@ try {
           competency_ids = EXCLUDED.competency_ids,
           critical_competency_ids = EXCLUDED.critical_competency_ids,
           estimated_minutes = EXCLUDED.estimated_minutes
+      `;
+    }
+  }
+
+  // Authored evaluation specifications. Validated before writing, so a malformed
+  // spec fails the seed rather than surfacing when a learner submits an answer.
+  // An exercise absent from this list keeps the previous grader (legacy_rubric).
+  assertValidAuthoredVersions();
+
+  for (const version of authoredExerciseVersions) {
+    await sql`
+      INSERT INTO exercise_versions (id, exercise_id, version, evaluation_type, spec_json, is_active)
+      VALUES (${version.id}, ${version.exerciseId}, ${version.version}, ${version.evaluationType},
+              ${JSON.stringify(version.spec)}::jsonb, true)
+      ON CONFLICT (id) DO UPDATE SET
+        evaluation_type = EXCLUDED.evaluation_type,
+        spec_json = EXCLUDED.spec_json,
+        is_active = EXCLUDED.is_active
+    `;
+
+    for (const [index, testCase] of version.testCases.entries()) {
+      await sql`
+        INSERT INTO exercise_test_cases (id, exercise_version_id, name, submission_json, expected_score, expected_outcomes_json)
+        VALUES (${`${version.id}-case-${index + 1}`}, ${version.id}, ${testCase.name},
+                ${JSON.stringify(testCase.submission)}::jsonb, ${testCase.expectedScore},
+                ${JSON.stringify(testCase.expectedOutcomes ?? {})}::jsonb)
+        ON CONFLICT (exercise_version_id, name) DO UPDATE SET
+          submission_json = EXCLUDED.submission_json,
+          expected_score = EXCLUDED.expected_score,
+          expected_outcomes_json = EXCLUDED.expected_outcomes_json
       `;
     }
   }
