@@ -494,18 +494,24 @@ export async function saveSnapshots(userId: string, snapshots: LevelSnapshot[]):
 
   await withUserContext(userId, async (tx) => {
     for (const snapshot of snapshots) {
+      // Drizzle serializes JSONB values in `.values()`, but interpolating an
+      // array of objects into a raw `sql` predicate expands it as a PostgreSQL
+      // record. Keep the exact JSON representation for both the insert and
+      // the idempotence comparison.
+      const detailJson = JSON.stringify({
+        components: snapshot.components,
+        missingKinds: snapshot.missingKinds,
+        finalDiagnosticCompleted: snapshot.finalDiagnosticCompleted
+      });
+      const blockersJson = JSON.stringify(snapshot.blockers);
       const values = {
         userId,
         levelId: snapshot.levelId,
         rulesVersion: snapshot.rulesVersion,
         status: snapshot.status,
         score: snapshot.score.toFixed(2),
-        detailJson: {
-          components: snapshot.components,
-          missingKinds: snapshot.missingKinds,
-          finalDiagnosticCompleted: snapshot.finalDiagnosticCompleted
-        },
-        blockersJson: snapshot.blockers,
+        detailJson,
+        blockersJson,
         computedAt: new Date().toISOString()
       };
 
