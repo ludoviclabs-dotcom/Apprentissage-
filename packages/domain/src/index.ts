@@ -1,4 +1,5 @@
 export * from "./types";
+export * from "./text";
 export * from "./taxonomy";
 export * from "./learning";
 export * from "./compta-v1";
@@ -6,4 +7,6 @@ export * from "./compta-extra";
 export * from "./progress";
 export * from "./mastery";
 export * from "./curriculum";
+export * from "./evaluators";
+export * from "./exercise-specs";
 export * from "./active-learning";
