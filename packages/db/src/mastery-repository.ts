@@ -496,14 +496,14 @@ export async function saveSnapshots(userId: string, snapshots: LevelSnapshot[]):
     for (const snapshot of snapshots) {
       // Drizzle serializes JSONB values in `.values()`, but interpolating an
       // array of objects into a raw `sql` predicate expands it as a PostgreSQL
-      // record. Keep the exact JSON representation for both the insert and
-      // the idempotence comparison.
-      const detailJson = JSON.stringify({
+      // record. Store JSON values normally, and cast only the comparison
+      // parameters to JSONB.
+      const detailJson = {
         components: snapshot.components,
         missingKinds: snapshot.missingKinds,
         finalDiagnosticCompleted: snapshot.finalDiagnosticCompleted
-      });
-      const blockersJson = JSON.stringify(snapshot.blockers);
+      };
+      const blockersJson = snapshot.blockers;
       const values = {
         userId,
         levelId: snapshot.levelId,
@@ -534,8 +534,8 @@ export async function saveSnapshots(userId: string, snapshots: LevelSnapshot[]):
             ${masterySnapshotsTable.rulesVersion} IS DISTINCT FROM ${values.rulesVersion}
             OR ${masterySnapshotsTable.status} IS DISTINCT FROM ${values.status}
             OR ${masterySnapshotsTable.score} IS DISTINCT FROM ${values.score}
-            OR ${masterySnapshotsTable.detailJson} IS DISTINCT FROM ${values.detailJson}
-            OR ${masterySnapshotsTable.blockersJson} IS DISTINCT FROM ${values.blockersJson}
+            OR ${masterySnapshotsTable.detailJson} IS DISTINCT FROM ${JSON.stringify(values.detailJson)}::jsonb
+            OR ${masterySnapshotsTable.blockersJson} IS DISTINCT FROM ${JSON.stringify(values.blockersJson)}::jsonb
           `
         });
     }
