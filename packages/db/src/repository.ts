@@ -261,7 +261,7 @@ function toAttempt(row: typeof attemptsTable.$inferSelect): Attempt {
     id: row.id,
     exerciseId: row.exerciseId,
     userAnswer: row.userAnswer,
-    score: row.score,
+    score: Number(row.score),
     correctionId: correctionJson.id ?? `corr-${row.id}`,
     createdAt: row.createdAt
   };
@@ -1301,7 +1301,8 @@ export async function recordAttempt(
   userId: string,
   exerciseId: string,
   userAnswer: string,
-  correction: Correction
+  correction: Correction,
+  evaluation: { evaluationType: string; exerciseVersionId: string | null }
 ) {
   if (!canUseDatabase()) {
     return;
@@ -1324,8 +1325,10 @@ export async function recordAttempt(
       userId,
       exerciseId,
       userAnswer,
-      score: correction.score,
+      score: correction.score.toFixed(2),
       correctionJson: correction,
+      evaluationType: evaluation.evaluationType,
+      exerciseVersionId: evaluation.exerciseVersionId,
       createdAt: new Date().toISOString()
     });
 
@@ -1333,7 +1336,7 @@ export async function recordAttempt(
       id: correction.id,
       userId,
       attemptId,
-      score: correction.score,
+      score: correction.score.toFixed(2),
       summary: correction.summary,
       correctJson: correction.correct,
       errorsJson: correction.errors,

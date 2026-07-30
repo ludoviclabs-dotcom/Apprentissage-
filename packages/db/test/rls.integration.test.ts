@@ -193,7 +193,7 @@ describeWithDb("row level security", () => {
     });
 
     const [bobRow] = await asUser(bob, (tx) => tx`select score from attempts where id = 'attempt-bob'`);
-    expect(bobRow.score).toBe(12);
+    expect(Number(bobRow.score)).toBe(12);
   });
 
   it("refuses to reassign one's own row to another user", async () => {

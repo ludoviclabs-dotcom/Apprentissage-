@@ -1,3 +1,4 @@
+import { normalizeForMatching } from "./text";
 import type {
   BusinessCase,
   BusinessCaseAttempt,
@@ -135,14 +136,6 @@ export function startExamSession(template: ExamSession, startedAt = new Date()):
     status: "in-progress",
     startedAt: startedAt.toISOString()
   };
-}
-
-/** Accent- and case-insensitive comparison key. */
-export function normalizeForMatching(input: string): string {
-  return input
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .toLowerCase();
 }
 
 export function scoreBusinessCase(caseItem: BusinessCase, userMemo: string): BusinessCaseAttempt {
