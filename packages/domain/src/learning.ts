@@ -26,6 +26,7 @@ import {
 } from "./compta-v1";
 import { comptaBusinessCase, comptaExamSessions } from "./compta-extra";
 import { comptaGeneraleV1Exercises } from "./compta-generale-v1";
+import { excelLabExercises } from "./excel-lab";
 
 export const sourcePacks: SourcePack[] = [
   {
@@ -669,7 +670,8 @@ export const exercises: Exercise[] = [
     sourceChunkIds: ["chunk-provision-42", "chunk-ias37-3"]
   },
   ...comptaExercises,
-  ...comptaGeneraleV1Exercises
+  ...comptaGeneraleV1Exercises,
+  ...excelLabExercises
 ];
 
 export const corrections: Correction[] = [

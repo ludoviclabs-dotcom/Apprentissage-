@@ -52,6 +52,8 @@ Review is a queue of due items, not a list of cards. `packages/domain/src/review
 
 An item is `(item_type, item_ref)`, pointing at either a flashcard or an exercise, which is what lets a failed submission be scheduled for retest alongside the cards. `packages/db/src/review-repository.ts` merges the learner's stored schedule over the seeded catalogue on read, so a new account has a queue and a newly authored card appears without a backfill.
 
+The answer to an item is never part of a queue read. It is fetched from `POST /api/revisions/reveal` when the learner asks, so it is absent from the page source until then. See `docs/adr/004-active-review-scheduler.md` for the reasoning and the assumed limits of this first version.
+
 ## Comptabilité générale v1
 
 The first track built to be finished, in `packages/domain/src/compta-generale-v1.ts`: fourteen exercises over two levels covering the invoice cycle, VAT, the bank and a fixed asset, plus a six-step mini-case. Every exercise ships an authored specification, so nothing in the module is graded by the rubric matcher — asserted by test, not by intention.
@@ -60,7 +62,13 @@ The first track built to be finished, in `packages/domain/src/compta-generale-v1
 
 Submitting a module exercise records a `direct` mastery event against its level, so answering a question moves progression. It cannot fail a submission: the outcome is reported as `progress.attributed` rather than raised. See `docs/adr/005-compta-generale-v1.md`.
 
-The answer to an item is never part of a queue read. It is fetched from `POST /api/revisions/reveal` when the learner asks, so it is absent from the page source until then. See `docs/adr/004-active-review-scheduler.md` for the reasoning and the assumed limits of this first version.
+## Excel Finance Lab
+
+A finance lab built on spreadsheet reasoning, with no spreadsheet engine: `packages/domain/src/evaluators/spreadsheet.ts` checks a typed-in result and, separately, whether the formula the learner would write matches an authored pattern. Nothing is parsed as an expression or recalculated — a half-working formula engine would leave a learner unable to tell their mistake from the tool's.
+
+Value and method are separate criteria (60/40), so a right figure hard-coded scores partial marks and is reported as a method error rather than an arithmetic one. Datasets live as committed CSV/JSON in `datasets/excel/`; a test parses them off disk and asserts they equal the typed constants the app runs on, so the two cannot drift.
+
+Module progression is resolved through `packages/domain/src/modules.ts` — one registry mapping an exercise to its curriculum level — so adding a module does not add a branch to the grading path. See `docs/adr/006-excel-finance-lab.md` for the assumed limits and the v2 plan.
 
 ## Public Demo Safeguard
 

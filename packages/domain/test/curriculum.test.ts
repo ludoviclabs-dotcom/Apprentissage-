@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   COMPTA_GENERALE_V1_TRACK,
+  EXCEL_LAB_TRACK,
   InvalidCurriculumError,
   activeCurriculum,
   assertValidCurriculum,
@@ -59,7 +60,8 @@ describe("shipped curriculum", () => {
     // publish is a track learners can enrol in, so it has to be noticed.
     expect(getTrackIds(activeCurriculum)).toEqual([
       "track-compta-generale",
-      COMPTA_GENERALE_V1_TRACK
+      COMPTA_GENERALE_V1_TRACK,
+      EXCEL_LAB_TRACK
     ]);
   });
 

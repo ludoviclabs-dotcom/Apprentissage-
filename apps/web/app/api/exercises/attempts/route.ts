@@ -18,11 +18,35 @@ const journalLineSchema = z.object({
   credit: z.number().nonnegative().optional()
 });
 
+/**
+ * A spreadsheet cell carries a value, a formula, or both — but not neither: an
+ * entry with nothing in it says the same as an absent key, and accepting it
+ * would let a payload claim cells the learner never filled.
+ */
+const spreadsheetCellSchema = z
+  .object({
+    value: z.number().finite().optional(),
+    // Bounded: a formula is a line of text, and the field is echoed back in
+    // feedback, so there is no reason to accept an essay here.
+    formula: z.string().max(200).optional()
+  })
+  .refine((cell) => cell.value !== undefined || (cell.formula ?? "").trim() !== "", {
+    message: "Une cellule doit porter une valeur ou une formule."
+  });
+
 const submissionSchema = z.discriminatedUnion("kind", [
   z.object({ kind: z.literal("text"), text: z.string().min(1).max(20000) }),
   z.object({ kind: z.literal("numeric"), value: z.number().finite() }),
   z.object({ kind: z.literal("choice"), selectedOptionIds: z.array(z.string().min(1)).max(40) }),
-  z.object({ kind: z.literal("journal"), lines: z.array(journalLineSchema).min(1).max(40) })
+  z.object({ kind: z.literal("journal"), lines: z.array(journalLineSchema).min(1).max(40) }),
+  z.object({
+    kind: z.literal("spreadsheet"),
+    cells: z
+      .record(z.string().regex(/^[A-Za-z]{1,3}\d{1,4}$/), spreadsheetCellSchema)
+      .refine((cells) => Object.keys(cells).length > 0, {
+        message: "Aucune cellule saisie."
+      })
+  })
 ]);
 
 const attemptSchema = z
