@@ -129,6 +129,26 @@ otherwise have revealed.
 
 ## Consequences
 
+### A migrated-but-unseeded database also silently lost the typed engine
+
+Writing the regression test for the foreign-key finding above surfaced a
+second, related gap: `getActiveExerciseVersion` only fell back to
+`authoredExerciseVersions` when `canUseDatabase()` was false. With a database
+that is active but has not (yet) been reseeded — the CI `rls` job's actual
+environment, since it migrates without seeding, and any real deployment
+between a code release and its next `pnpm db:seed` — the query for an active
+`exercise_versions` row returned nothing, and `gradeSubmission` fell back to
+`legacy_rubric`. The exact deployment state PR-05 exists to make safe was
+silently undoing PR-05's own point.
+
+`exercise_versions` has exactly one writer, `pnpm db:seed`, reading
+`authoredExerciseVersions` — there is no path that authors a specification in
+code and deliberately withholds it from the table. A missing row therefore
+always means "not yet (re-)seeded," never "intentionally absent," so
+`getActiveExerciseVersion` now falls back to the same in-memory catalogue
+whenever a database row is missing, active or not. `null` is reserved for an
+exercise with genuinely no specification anywhere.
+
 ### The form is not gated on `writes`
 
 `/api/exercises/attempts` has no public-demo guard — unlike

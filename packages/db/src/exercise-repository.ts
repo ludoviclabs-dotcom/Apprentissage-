@@ -186,15 +186,23 @@ const versionColumns = {
 } as const;
 
 /**
- * The authored catalogue as a resolved version, for seeded mode.
+ * The authored catalogue as a resolved version — the fallback used both with no
+ * database and with one that has not (yet) been seeded with this exercise.
  *
  * `authoredExerciseVersions` is committed content — the same standing as
  * `exercises` and `module_levels`, which already fall back to their seeded
- * arrays when there is no database. Returning null here instead meant every
- * exercise was graded by `legacy_rubric` in seeded mode however carefully its
- * specification had been authored, so the typed engine was unreachable in the
- * public demo, in local development and in the default Playwright project — the
- * three places the product is actually exercised.
+ * arrays when a row is missing. `exercise_versions` has exactly one writer,
+ * `pnpm db:seed`, reading this same array; there is no authoring path that
+ * defines a specification in code and deliberately withholds it from the
+ * table. A missing row therefore always means "not yet (re-)seeded," never
+ * "intentionally absent," so it is always safe to fall back here.
+ *
+ * Returning null instead meant every exercise was graded by `legacy_rubric`
+ * whenever the database lacked this specific row — which, before this
+ * fallback covered the database-active case too, included every freshly
+ * migrated database that had not been reseeded since the exercise's
+ * specification was authored. The typed engine was then unreachable in
+ * exactly the deployment state a real rollout passes through.
  *
  * Criteria are empty because none of the four evaluators reads them: `numeric`
  * and `multiple_choice` carry their weighting inside the spec, and
@@ -221,8 +229,12 @@ function seededVersion(exerciseId: string): ResolvedExerciseVersion | null {
  * The specification a new submission must be graded against.
  *
  * The partial unique index of migration 0005 allows at most one active version
- * per exercise, so this cannot be ambiguous; `null` means the exercise has no
- * published version and still belongs to the legacy rubric grader.
+ * per exercise, so a database row cannot be ambiguous. A missing one falls back
+ * to `seededVersion` rather than to `null` — see that function for why a
+ * missing row is always safe to treat as "not yet seeded." `null` therefore
+ * means only one thing here: the exercise genuinely has no authored
+ * specification anywhere, code or database, and belongs to the legacy rubric
+ * grader.
  */
 export async function getActiveExerciseVersion(exerciseId: string): Promise<ResolvedExerciseVersion | null> {
   if (!canUseDatabase()) {
@@ -235,7 +247,7 @@ export async function getActiveExerciseVersion(exerciseId: string): Promise<Reso
     .where(and(eq(exerciseVersionsTable.exerciseId, exerciseId), eq(exerciseVersionsTable.isActive, true)))
     .limit(1);
 
-  return (await resolveVersions(rows))[0] ?? null;
+  return (await resolveVersions(rows))[0] ?? seededVersion(exerciseId);
 }
 
 /**
