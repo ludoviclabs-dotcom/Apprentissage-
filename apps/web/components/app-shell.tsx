@@ -7,6 +7,7 @@ import type { RuntimeFlags } from "@/lib/runtime-flags";
 import {
   BookOpen,
   BriefcaseBusiness,
+  Calculator,
   ClipboardCheck,
   FileCheck,
   FlaskConical,
@@ -26,6 +27,7 @@ const navigation = [
   { href: "/", label: "Accueil", icon: Home },
   { href: "/parcours", label: "Parcours", icon: Route },
   { href: "/cours", label: "Cours", icon: BookOpen },
+  { href: "/modules/comptabilite-generale", label: "Compta générale", icon: Calculator },
   { href: "/apprendre", label: "Apprendre", icon: GraduationCap },
   { href: "/connaissances", label: "Connaissances", icon: Library },
   { href: "/recherche", label: "Recherche", icon: Search },

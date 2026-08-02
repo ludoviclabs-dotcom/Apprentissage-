@@ -1,5 +1,7 @@
 import { randomUUID } from "node:crypto";
 import {
+  MAX_SCORE,
+  getComptaGeneraleV1Level,
   getEvaluator,
   isSpecEvaluationType,
   toCorrection,
@@ -12,6 +14,7 @@ import {
 import { canUseDatabase } from "./client";
 import { getActiveExerciseVersion, type ResolvedExerciseVersion } from "./exercise-repository";
 import { getExerciseById, gradeExercise, recordAttempt } from "./repository";
+import { recordMasteryEvent } from "./mastery-repository";
 import { enqueueAttemptReview, type AttemptReviewResult } from "./review-repository";
 import { withUserContext } from "./user-context";
 
@@ -53,6 +56,16 @@ export interface GradedSubmission {
    * without touching state.
    */
   review?: AttemptReviewResult;
+  /** Whether the mark moved a module level's progression (PR-02). */
+  progress?: AttemptProgressResult;
+}
+
+export interface AttemptProgressResult {
+  attributed: boolean;
+  /** The level the exercise belongs to, even when the event was not recorded. */
+  levelId: string | null;
+  /** Why nothing was attributed. Null when it was. */
+  reason: string | null;
 }
 
 /**
@@ -134,7 +147,11 @@ export async function gradeSubmission(
   payload: SubmissionPayload,
   identity: { id: string; sourceReferences: SourceReference[]; remediationPlan: RemediationPlan }
 ): Promise<GradedSubmission> {
-  const version = canUseDatabase() ? await getActiveExerciseVersion(exercise.id) : null;
+  // No `canUseDatabase()` guard: `getActiveExerciseVersion` resolves the authored
+  // catalogue when there is no database, so a specification grades the same way
+  // in the public demo as in a database-backed install. Guarding here is what
+  // made the typed engine unreachable everywhere except a seeded PostgreSQL.
+  const version = await getActiveExerciseVersion(exercise.id);
 
   if (!version) {
     // No authored version: fall back to the previous grader untouched.
@@ -209,18 +226,82 @@ export async function submitAttempt(input: {
 
   // Seeded mode has no transaction to share: `recordAttempt` is a no-op and the
   // schedule comes back marked `persisted: false`.
+  let review: AttemptReviewResult;
+
   if (!canUseDatabase() || !input.userId) {
     await recordAttempt(input.userId, exercise.id, userAnswer, graded.correction, evaluation);
+    review = await enqueueAttemptReview(reviewInput);
+  } else {
+    let persisted: AttemptReviewResult | undefined;
 
-    return { ...graded, review: await enqueueAttemptReview(reviewInput) };
+    await withUserContext(input.userId, async (tx) => {
+      await recordAttempt(input.userId, exercise.id, userAnswer, graded.correction, evaluation, {
+        tx
+      });
+      persisted = await enqueueAttemptReview({ ...reviewInput, tx });
+    });
+
+    review = persisted as AttemptReviewResult;
   }
 
-  let review: AttemptReviewResult | undefined;
+  // Outside the branch, so a seeded submission reports which level it *would*
+  // have fed rather than reporting nothing at all — the early return used to
+  // skip this entirely, and the module page then had no progress to show.
+  return {
+    ...graded,
+    review,
+    progress: await recordModuleProgress(input.userId, exercise.id, graded.correction.score)
+  };
+}
 
-  await withUserContext(input.userId, async (tx) => {
-    await recordAttempt(input.userId, exercise.id, userAnswer, graded.correction, evaluation, { tx });
-    review = await enqueueAttemptReview({ ...reviewInput, tx });
-  });
+/**
+ * Feeds a graded module exercise into the PR-02 mastery model.
+ *
+ * Answering a question is the most common thing a learner does, and until now it
+ * moved no progression bar: mastery events only existed behind an API nothing in
+ * the product called. An exercise that belongs to a module level now records a
+ * `direct` event against it, so the level score is a consequence of the work
+ * rather than something to be entered separately.
+ *
+ * NOT IN THE TRANSACTION ABOVE, and it does not fail the submission. A missing
+ * level means the database predates this module's curriculum — real for anyone
+ * who migrated without re-seeding — and refusing a correctly graded answer over
+ * an analytics row would be the wrong trade. The outcome is reported rather than
+ * swallowed: `attributed: false` with a reason travels back to the caller, so
+ * "progression did not move" is visible instead of mysterious. Because the
+ * request still succeeds, there is no retry, and therefore no duplicate event.
+ */
+async function recordModuleProgress(
+  userId: string,
+  exerciseId: string,
+  score: number
+): Promise<AttemptProgressResult> {
+  const levelId = getComptaGeneraleV1Level(exerciseId);
 
-  return { ...graded, review };
+  if (!levelId) {
+    return { attributed: false, levelId: null, reason: "exercise-not-in-a-module" };
+  }
+
+  if (!canUseDatabase() || !userId) {
+    return { attributed: false, levelId, reason: "not-persisted" };
+  }
+
+  try {
+    // The marking scale is 0–20 and mastery is a percentage; converting here
+    // keeps the scale conversion in one place.
+    await recordMasteryEvent(userId, {
+      levelId,
+      kind: "direct",
+      scorePercent: Math.max(0, Math.min(100, (score / MAX_SCORE) * 100)),
+      sourceRef: exerciseId
+    });
+
+    return { attributed: true, levelId, reason: null };
+  } catch (error) {
+    return {
+      attributed: false,
+      levelId,
+      reason: error instanceof Error ? error.message : "unknown-error"
+    };
+  }
 }

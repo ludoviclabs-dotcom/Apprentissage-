@@ -1,5 +1,6 @@
 import type { Competency, Domain, DomainId } from "./types";
 import { comptaCompetencies } from "./compta-v1";
+import { comptaGeneraleV1Competencies } from "./compta-generale-v1";
 
 export const domains: Domain[] = [
   {
@@ -181,7 +182,8 @@ export const competencies: Competency[] = [
     strength: 61,
     focus: "Passer du ratio au phénomène économique."
   },
-  ...comptaCompetencies
+  ...comptaCompetencies,
+  ...comptaGeneraleV1Competencies
 ];
 
 export function getDomain(domainId: DomainId): Domain {

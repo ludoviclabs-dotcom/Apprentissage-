@@ -52,6 +52,14 @@ Review is a queue of due items, not a list of cards. `packages/domain/src/review
 
 An item is `(item_type, item_ref)`, pointing at either a flashcard or an exercise, which is what lets a failed submission be scheduled for retest alongside the cards. `packages/db/src/review-repository.ts` merges the learner's stored schedule over the seeded catalogue on read, so a new account has a queue and a newly authored card appears without a backfill.
 
+## Comptabilité générale v1
+
+The first track built to be finished, in `packages/domain/src/compta-generale-v1.ts`: fourteen exercises over two levels covering the invoice cycle, VAT, the bank and a fixed asset, plus a six-step mini-case. Every exercise ships an authored specification, so nothing in the module is graded by the rubric matcher — asserted by test, not by intention.
+
+`getActiveExerciseVersion` resolves `authoredExerciseVersions` when there is no database, which is what makes the typed evaluators grade identically in the public demo, locally and in CI. Before that they only ran against a seeded PostgreSQL.
+
+Submitting a module exercise records a `direct` mastery event against its level, so answering a question moves progression. It cannot fail a submission: the outcome is reported as `progress.attributed` rather than raised. See `docs/adr/005-compta-generale-v1.md`.
+
 The answer to an item is never part of a queue read. It is fetched from `POST /api/revisions/reveal` when the learner asks, so it is absent from the page source until then. See `docs/adr/004-active-review-scheduler.md` for the reasoning and the assumed limits of this first version.
 
 ## Public Demo Safeguard

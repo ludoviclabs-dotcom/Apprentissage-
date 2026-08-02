@@ -78,7 +78,11 @@ export async function POST(request: Request) {
       // What the mark did to the review schedule. Returned so the learner is
       // told the exercise is coming back, and when: a submission that silently
       // enqueues a retest is an effect they cannot see.
-      review: graded.review
+      review: graded.review,
+      // Same reasoning for progression: a level that did not move because the
+      // database predates the module's curriculum must say so rather than look
+      // like a level the answer did not deserve.
+      progress: graded.progress
     });
   } catch (error) {
     if (error instanceof UnsupportedSubmissionError) {
