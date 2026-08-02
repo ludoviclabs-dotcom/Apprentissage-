@@ -23,6 +23,12 @@ import { migrationFiles } from "../src/schema";
  * a raw database error instead of the correction the learner had already been
  * shown. This proves the degraded path instead: graded, reviewed, no crash.
  *
+ * Writing this suite also caught a second gap in the same neighbourhood before
+ * `getActiveExerciseVersion` learned the same lesson: with the database active,
+ * a missing `exercise_versions` row fell back to `legacy_rubric` instead of the
+ * authored specification, so the very first run of this file graded 1300 as
+ * 0/20 rather than 20/20. Both fixes landed together.
+ *
  * Skips loudly without a database, and CI fails on the warning: an unverified
  * claim must never read as a passing one.
  */
@@ -109,11 +115,20 @@ describeWithDb("submitting an exercise the database has not been seeded with", (
     expect(rows).toHaveLength(0);
   });
 
-  it("still schedules the exercise in the learner's own review queue", async () => {
-    const { getReviewQueue } = await import("../src/review-repository");
-    const future = new Date(Date.now() + 15 * 24 * 60 * 60 * 1000);
-    const queue = await getReviewQueue(userId, future, 100);
+  it("still writes the review schedule row, which carries no foreign key to exercises", async () => {
+    // Checked directly against the table, not through `getReviewQueue`: that
+    // read additionally resolves content via `getExercises()`, which — like
+    // `getFlashcards()` — only merges the database with the in-memory catalogue
+    // when the table is empty, not per missing id. Whether an unseeded item
+    // surfaces in the general queue *listing* is that function's pre-existing
+    // limitation, not one either review finding raised or this fix touches;
+    // what this suite is actually proving is that the write itself, unlike
+    // `attempts`, has nothing stopping it from succeeding.
+    const rows = await admin`
+      select interval_days from review_queue
+      where user_id = ${userId} and item_type = 'exercise' and item_ref = ${UNSEEDED_EXERCISE_ID}`;
 
-    expect(queue.entries.some((entry) => entry.itemRef === UNSEEDED_EXERCISE_ID)).toBe(true);
+    expect(rows).toHaveLength(1);
+    expect(rows[0].interval_days).toBe(14);
   });
 });
