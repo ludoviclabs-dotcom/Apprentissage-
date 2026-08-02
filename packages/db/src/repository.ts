@@ -1012,7 +1012,15 @@ function uniqueSources(sources: SourceReference[]) {
   });
 }
 
-function getExerciseSourceReferences(exercise: Exercise): SourceReference[] {
+/**
+ * The citations that back an exercise: its linked lessons' sources, falling back
+ * to the domain's.
+ *
+ * Exported because the review queue reveals an exercise's expected answer and
+ * must show the same references the correction panel does. `AGENTS.md` allows no
+ * uncited normative answer, and a revealed answer is exactly that.
+ */
+export function getExerciseSourceReferences(exercise: Exercise): SourceReference[] {
   const linkedLessons = lessons.filter((lesson) => lesson.linkedExerciseId === exercise.id);
 
   if (linkedLessons.length > 0) {
@@ -1256,12 +1264,21 @@ async function upsertCompetencyProgress(
     });
 }
 
+/**
+ * @param options.tx Run inside a transaction the caller already opened, rather
+ * than opening one. `submitAttempt` uses it to put the attempt and the review
+ * schedule it produces in the same transaction: two of them left a window where
+ * the attempt was committed and the scheduling was not, so the endpoint failed
+ * while the work was already recorded and a retry duplicated it. The caller is
+ * then responsible for having bound the user context.
+ */
 export async function recordAttempt(
   userId: string,
   exerciseId: string,
   userAnswer: string,
   correction: Correction,
-  evaluation: { evaluationType: string; exerciseVersionId: string | null }
+  evaluation: { evaluationType: string; exerciseVersionId: string | null },
+  options: { tx?: FinanceDb } = {}
 ) {
   if (!canUseDatabase()) {
     return;
@@ -1273,7 +1290,7 @@ export async function recordAttempt(
 
   // Everything lands in one transaction: this is also the scope `SET LOCAL
   // app.current_user_id` lives in, so RLS applies to every statement below.
-  await withUserContext(userId, async (tx) => {
+  const run = async (tx: FinanceDb) => {
     // Random ids, not `attempt-${Date.now()}`: with more than one account the
     // timestamp form collided whenever two people submitted in the same
     // millisecond, and the primary key would reject the second write.
@@ -1346,7 +1363,9 @@ export async function recordAttempt(
         lastReviewedAt: new Date().toISOString()
       });
     }
-  });
+  };
+
+  await (options.tx ? run(options.tx) : withUserContext(userId, run));
 }
 
 export async function recordDiagnostic(userId: string, levels: Record<string, number>) {

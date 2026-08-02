@@ -13,6 +13,7 @@ import { canUseDatabase } from "./client";
 import { getActiveExerciseVersion, type ResolvedExerciseVersion } from "./exercise-repository";
 import { getExerciseById, gradeExercise, recordAttempt } from "./repository";
 import { enqueueAttemptReview, type AttemptReviewResult } from "./review-repository";
+import { withUserContext } from "./user-context";
 
 /**
  * The single place an answer becomes a correction.
@@ -183,21 +184,42 @@ export async function submitAttempt(input: {
     remediationPlan: reference.remediationPlan
   });
 
-  await recordAttempt(input.userId, exercise.id, renderSubmission(input.payload), graded.correction, {
-    evaluationType: graded.evaluationType,
-    exerciseVersionId: graded.exerciseVersionId
-  });
-
   // Grading and retention are one act, not two. Routing this through the single
   // submission path is what stops a caller from recording a mark and forgetting
   // to schedule the retest — the failure mode that made "revision" a static list
   // before PR-04.
-  const review = await enqueueAttemptReview({
+  //
+  // ONE TRANSACTION, for the same reason. Recording the attempt and scheduling
+  // its retest ran in two, which left a window: the attempt committed, the
+  // scheduling failed, the endpoint returned 500, and the learner — told their
+  // work was not saved — resubmitted and produced a second attempt row for the
+  // same answer. Either both land or neither does.
+  const userAnswer = renderSubmission(input.payload);
+  const evaluation = {
+    evaluationType: graded.evaluationType,
+    exerciseVersionId: graded.exerciseVersionId
+  };
+  const reviewInput = {
     userId: input.userId,
     exercise,
     score: graded.correction.score,
     microLesson: graded.correction.remediationPlan.microLesson,
     nextAction: graded.correction.remediationPlan.nextAction
+  };
+
+  // Seeded mode has no transaction to share: `recordAttempt` is a no-op and the
+  // schedule comes back marked `persisted: false`.
+  if (!canUseDatabase() || !input.userId) {
+    await recordAttempt(input.userId, exercise.id, userAnswer, graded.correction, evaluation);
+
+    return { ...graded, review: await enqueueAttemptReview(reviewInput) };
+  }
+
+  let review: AttemptReviewResult | undefined;
+
+  await withUserContext(input.userId, async (tx) => {
+    await recordAttempt(input.userId, exercise.id, userAnswer, graded.correction, evaluation, { tx });
+    review = await enqueueAttemptReview({ ...reviewInput, tx });
   });
 
   return { ...graded, review };

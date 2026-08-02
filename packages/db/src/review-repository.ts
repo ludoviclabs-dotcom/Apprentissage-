@@ -26,7 +26,7 @@ import {
   reviewAttemptsTable,
   reviewQueueTable
 } from "./drizzle-schema";
-import { getExercises, getFlashcards } from "./repository";
+import { getExerciseSourceReferences, getExercises, getFlashcards } from "./repository";
 import { assertUserId, withUserContext } from "./user-context";
 
 /**
@@ -106,7 +106,10 @@ function exerciseContent(exercise: Exercise): ReviewContent {
     explanation: exercise.rubric.map((item) => `${item.label} (${item.points} pts)`).join(" · "),
     competencyId: exercise.competencyIds[0] ?? null,
     exerciseId: exercise.id,
-    sourceReferences: [],
+    // The same citations the correction panel shows. Revealing an expected
+    // answer with an empty source list would be an uncited normative answer,
+    // which `AGENTS.md` does not allow.
+    sourceReferences: getExerciseSourceReferences(exercise),
     // Exercises never enter the queue from the catalogue — only a graded attempt
     // puts one there — so this default is only ever a fallback for a stored row
     // whose date is somehow missing.
@@ -460,6 +463,18 @@ export async function recordReviewOutcome(
   });
 }
 
+/**
+ * Reads the item's row and holds it for the rest of the transaction.
+ *
+ * `FOR UPDATE` is load-bearing. `reviewCount` and `lapseCount` are computed from
+ * the value read here and written back as absolutes, so two overlapping reviews
+ * of the same item — two tabs, a double submit — would both read the same
+ * counters, both compute `+ 1`, and the second write would overwrite the first
+ * with the same number. Two rows would land in `review_attempts` and the queue
+ * would claim one review, leaving the cache disagreeing with the history it
+ * caches. The lock makes the read-modify-write serial, so the second review
+ * waits and reads what the first actually stored.
+ */
 async function selectQueueRow(
   tx: FinanceDb,
   userId: string,
@@ -476,7 +491,8 @@ async function selectQueueRow(
         eq(reviewQueueTable.itemRef, itemRef)
       )
     )
-    .limit(1);
+    .limit(1)
+    .for("update");
 
   return rows[0] ? toQueueItem(rows[0]) : null;
 }
@@ -540,13 +556,19 @@ async function upsertFlashcardState(tx: FinanceDb, userId: string, outcome: Revi
 }
 
 /**
- * Opens a remediation task unless one is already open for the same item.
+ * Opens a remediation task, or refreshes the one already open for the item.
  *
  * Checked rather than left to `ON CONFLICT`, because the uniqueness in migration
- * 0007 is a *partial* index and the existing task's id is worth returning: the
- * learner is told "you already owe yourself this" instead of silently getting
- * nothing back. The index remains the guarantee; this is the path that keeps it
- * from ever firing.
+ * 0007 is a *partial* index and the existing task's id is worth keeping: the
+ * learner keeps one task through repeated failures instead of accumulating
+ * identical ones. The index remains the guarantee; this is the path that keeps
+ * it from ever firing.
+ *
+ * REFRESHING IS NOT OPTIONAL. A second failure moves the item's own retest to a
+ * new J+1, and the promise this feature makes — the remediation falls on the day
+ * the item comes back — is broken the moment the task keeps the previous date.
+ * Returning the row untouched left the learner with a task dated to a review
+ * they had already done, while the response announced the new one.
  */
 async function openRemediationTask(
   tx: FinanceDb,
@@ -568,6 +590,20 @@ async function openRemediationTask(
     .limit(1);
 
   if (open[0]) {
+    await tx
+      .update(remediationTasksTable)
+      .set({
+        dueAt: draft.dueAt,
+        microLesson: draft.microLesson,
+        nextAction: draft.nextAction,
+        reason: draft.reason,
+        // Latest provenance wins: the task now answers for the most recent
+        // failure, which is the one whose retest date it carries.
+        queueItemId: provenance.queueItemId,
+        reviewAttemptId: provenance.reviewAttemptId
+      })
+      .where(eq(remediationTasksTable.id, open[0].id));
+
     return open[0].id;
   }
 
@@ -671,6 +707,12 @@ export async function enqueueAttemptReview(input: {
   microLesson: string;
   nextAction: string;
   reviewedAt?: Date;
+  /**
+   * Run inside a transaction the caller already opened. `submitAttempt` passes
+   * the one that recorded the attempt, so a mark and the retest it schedules
+   * commit together or not at all.
+   */
+  tx?: FinanceDb;
 }): Promise<AttemptReviewResult> {
   const plan = planAttemptReview({
     exerciseId: input.exercise.id,
@@ -685,7 +727,7 @@ export async function enqueueAttemptReview(input: {
     return { ...plan, persisted: false };
   }
 
-  await withUserContext(input.userId, async (tx) => {
+  const run = async (tx: FinanceDb) => {
     const competencyId = input.exercise.competencyIds[0] ?? null;
     const next = {
       competencyId,
@@ -719,7 +761,9 @@ export async function enqueueAttemptReview(input: {
         reviewAttemptId: null
       });
     }
-  });
+  };
+
+  await (input.tx ? run(input.tx) : withUserContext(input.userId, run));
 
   return { ...plan, persisted: true };
 }

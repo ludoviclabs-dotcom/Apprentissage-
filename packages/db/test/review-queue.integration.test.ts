@@ -213,17 +213,22 @@ describeWithDb("review queue persistence", () => {
   });
 
   it("opens exactly one remediation however many times the same item is failed", async () => {
+    // Explicit, distinct review times: the two retest dates must be far enough
+    // apart to tell one from the other, which back-to-back calls in the same
+    // millisecond would not guarantee.
     const first = await db.recordReviewOutcome(alice, {
       itemType: "flashcard",
       itemRef: OTHER_CARD,
       rating: "forgotten",
-      revealed: true
+      revealed: true,
+      reviewedAt: new Date("2026-03-01T08:00:00.000Z")
     });
     const second = await db.recordReviewOutcome(alice, {
       itemType: "flashcard",
       itemRef: OTHER_CARD,
       rating: "forgotten",
-      revealed: true
+      revealed: true,
+      reviewedAt: new Date("2026-03-02T08:00:00.000Z")
     });
 
     expect(first?.remediationId).toBeTruthy();
@@ -232,10 +237,17 @@ describeWithDb("review queue persistence", () => {
     );
 
     const open = await admin`
-      select id from remediation_tasks
+      select id, due_at from remediation_tasks
       where user_id = ${alice} and item_ref = ${OTHER_CARD} and status = 'open'`;
 
     expect(open).toHaveLength(1);
+
+    // Joining the open task must still move its date. The second failure pushed
+    // the item's own retest to a new J+1, and a task left on the previous date
+    // would no longer fall on the day the item comes back — the one promise
+    // remediation makes.
+    expect(new Date(open[0].due_at).toISOString()).toBe(second?.outcome.nextDueAt);
+    expect(new Date(open[0].due_at).toISOString()).not.toBe(first?.outcome.nextDueAt);
 
     const tasks = await db.getRemediationTasks(alice);
     expect(tasks.map((task) => task.itemRef)).toContain(OTHER_CARD);

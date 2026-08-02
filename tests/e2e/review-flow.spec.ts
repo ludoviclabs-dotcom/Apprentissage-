@@ -282,6 +282,24 @@ test("a graded submission tells the learner when the exercise comes back", async
   }
 });
 
+test("a revealed exercise answer carries its citations", async ({ request }) => {
+  // `AGENTS.md`: no uncited normative answer. A revealed expected answer is one,
+  // so it must arrive with the same references the correction panel shows.
+  const response = await request.post("/api/revisions/reveal", {
+    data: { itemType: "exercise", itemRef: "ex-provision-litige" }
+  });
+
+  expect(response.status()).toBe(200);
+
+  const { item } = (await response.json()) as {
+    item: { answer: string; sourceReferences: Array<{ pack: string; document: string }> };
+  };
+
+  expect(item.answer.length).toBeGreaterThan(0);
+  expect(item.sourceReferences.length).toBeGreaterThan(0);
+  expect(item.sourceReferences[0].document.length).toBeGreaterThan(0);
+});
+
 test("the dashboard offers the session and counts what is due", async ({ page }) => {
   await page.goto("/");
 
