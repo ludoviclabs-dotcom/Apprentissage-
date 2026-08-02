@@ -1,3 +1,4 @@
+import { REVIEW_INTERVAL_DAYS, addDays, reviewStatus } from "./review-scheduler";
 import { normalizeForMatching } from "./text";
 import type {
   BusinessCase,
@@ -12,33 +13,21 @@ import type {
   RevisionSession
 } from "./types";
 
-const DAY_MS = 24 * 60 * 60 * 1000;
-
+/**
+ * Both helpers below delegate to `review-scheduler.ts`.
+ *
+ * They used to own a second interval table, which disagreed with the review
+ * queue on `mastered` (21 days here, 14 there). Two ladders in one product means
+ * the next due date a learner is shown depends on which control they happened to
+ * use, so the tables were collapsed into one and this is the compatibility face
+ * of it.
+ */
 export function getRevisionIntervalDays(rating: ReviewRating): number {
-  const intervals: Record<ReviewRating, number> = {
-    forgotten: 1,
-    partial: 3,
-    correct: 7,
-    mastered: 21
-  };
-
-  return intervals[rating];
+  return REVIEW_INTERVAL_DAYS[rating];
 }
 
 export function getFlashcardStatusFromReview(rating: ReviewRating): FlashcardStatus {
-  if (rating === "forgotten") {
-    return "due";
-  }
-
-  if (rating === "partial") {
-    return "learning";
-  }
-
-  if (rating === "mastered") {
-    return "mastered";
-  }
-
-  return "learning";
+  return reviewStatus(rating);
 }
 
 export function reviewFlashcardSchedule(
@@ -47,13 +36,12 @@ export function reviewFlashcardSchedule(
   reviewedAt = new Date()
 ): RevisionReview {
   const intervalDays = getRevisionIntervalDays(rating);
-  const nextDueAt = new Date(reviewedAt.getTime() + intervalDays * DAY_MS);
 
   return {
     flashcardId,
     rating,
     reviewedAt: reviewedAt.toISOString(),
-    nextDueAt: nextDueAt.toISOString(),
+    nextDueAt: addDays(reviewedAt, intervalDays),
     intervalDays,
     nextStatus: getFlashcardStatusFromReview(rating)
   };

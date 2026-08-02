@@ -9,7 +9,8 @@ export const migrationFiles = [
   // tables created from here on are reachable by `finance_app` without the
   // migration having to re-grant them.
   "migrations/0005_exercise_versions.sql",
-  "migrations/0006_attempt_evaluation_provenance.sql"
+  "migrations/0006_attempt_evaluation_provenance.sql",
+  "migrations/0007_review_queue_remediation.sql"
 ] as const;
 
 /** Tables protected by row level security, keyed on `user_id`. */
@@ -27,7 +28,10 @@ export const userOwnedTables = [
   "enrollments",
   "mastery_events",
   "mastery_snapshots",
-  "unlock_events"
+  "unlock_events",
+  "review_queue",
+  "review_attempts",
+  "remediation_tasks"
 ] as const;
 
 export type UserOwnedTable = (typeof userOwnedTables)[number];
@@ -73,7 +77,12 @@ export const tables = [
   // from `userOwnedTables` above.
   "exercise_versions",
   "exercise_criteria",
-  "exercise_test_cases"
+  "exercise_test_cases",
+  // Active review: the schedule, its history and the work a failure earns. All
+  // owned, hence also present in `userOwnedTables` above.
+  "review_queue",
+  "review_attempts",
+  "remediation_tasks"
 ] as const;
 
 export type TableName = (typeof tables)[number];

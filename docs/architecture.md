@@ -41,9 +41,18 @@ Current persistence coverage:
 - exercises loaded from DB when enabled;
 - attempts and corrections;
 - competency strength updates after correction or diagnostic;
-- revision items scheduled after exercise correction.
+- revision items scheduled after exercise correction;
+- the active review queue, its attempt log and the remediation a failure opens.
 
 The next persistence gap is durable user profiles and cohort-level analytics.
+
+## Active Review
+
+Review is a queue of due items, not a list of cards. `packages/domain/src/review-scheduler.ts` holds the whole algorithm: one fixed interval per self-assessment (1 / 3 / 7 / 14 days), a total order over the queue, and the rule that a forgotten item opens exactly one remediation task dated on its own retest. It is pure, so the schedule is reproducible in a unit test and explainable to the learner.
+
+An item is `(item_type, item_ref)`, pointing at either a flashcard or an exercise, which is what lets a failed submission be scheduled for retest alongside the cards. `packages/db/src/review-repository.ts` merges the learner's stored schedule over the seeded catalogue on read, so a new account has a queue and a newly authored card appears without a backfill.
+
+The answer to an item is never part of a queue read. It is fetched from `POST /api/revisions/reveal` when the learner asks, so it is absent from the page source until then. See `docs/adr/004-active-review-scheduler.md` for the reasoning and the assumed limits of this first version.
 
 ## Public Demo Safeguard
 

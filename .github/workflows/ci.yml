@@ -84,15 +84,17 @@ jobs:
       # `set -o pipefail` is load-bearing: without it the exit status of the
       # pipeline is tee's, so a failing suite reported success. This job was green
       # for two PRs while the isolation assertions were failing.
+      #
+      # The config selects the suites and runs them one file at a time; they
+      # share a database and replay the migrations, so they cannot run in
+      # parallel. See vitest.integration.config.ts. It also replaces the file
+      # list this step used to carry by hand, where a new suite could be added
+      # to the repo and never run here.
       - name: Isolation tests
         shell: bash
         run: |
           set -o pipefail
-          corepack pnpm exec vitest run \
-            packages/db/test/rls.integration.test.ts \
-            packages/db/test/user-context.integration.test.ts \
-            packages/db/test/mastery-isolation.integration.test.ts \
-            packages/db/test/attempt-provenance.integration.test.ts 2>&1 | tee rls.log
+          corepack pnpm exec vitest run --config vitest.integration.config.ts 2>&1 | tee rls.log
 
       - name: Fail if isolation was not actually verified
         run: |

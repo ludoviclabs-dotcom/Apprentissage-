@@ -18,20 +18,33 @@ import {
   getLearningModules,
   getLessons,
   getProgressSnapshot,
+  getRemediationTasks,
+  getReviewQueue,
   getRevisionSession,
   getSourcePacks
 } from "@finance/db";
 
 export async function getDashboardModel(userId?: string | null) {
-  const [competencies, exercises, lessons, learningPath, correctionHistory, sourcePacks, documents] =
-    await Promise.all([
+  const [
+    competencies,
+    exercises,
+    lessons,
+    learningPath,
+    correctionHistory,
+    sourcePacks,
+    documents,
+    reviewQueue,
+    remediations
+  ] = await Promise.all([
       getCompetencies(userId),
       getExercises(),
       getLessons(),
       getLearningPath(),
       getCorrectionHistory(userId),
       getSourcePacks(),
-      getDocuments()
+      getDocuments(),
+      getReviewQueue(userId),
+      getRemediationTasks(userId)
     ]);
   const currentDay = learningPath.days.find((day) => day.status === "today") ?? learningPath.days[0];
   const currentLesson = lessons.find((lesson) => lesson.id === currentDay?.lessonId) ?? lessons[0];
@@ -57,7 +70,9 @@ export async function getDashboardModel(userId?: string | null) {
     learningPath,
     attempts: correctionHistory.attempts,
     sourcePacks,
-    documents
+    documents,
+    reviewQueue,
+    remediations
   };
 }
 
@@ -142,16 +157,25 @@ export async function getKnowledgeModel(userId?: string | null) {
   };
 }
 
+/**
+ * The active review screen.
+ *
+ * `queue` is what drives it: due items, prompts only, no answers. `session` is
+ * kept alongside for the flashcard counters the page has always shown — it reads
+ * the same per-user state, so the two never disagree about a card's due date.
+ */
 export async function getRevisionModel(userId?: string | null) {
-  const [session, flashcards, errorJournal] = await Promise.all([
+  const [queue, session, remediations, errorJournal] = await Promise.all([
+    getReviewQueue(userId),
     getRevisionSession(userId),
-    getFlashcards(userId),
+    getRemediationTasks(userId),
     getErrorJournal(userId)
   ]);
 
   return {
+    queue,
     session,
-    flashcards,
+    remediations,
     errorJournal
   };
 }

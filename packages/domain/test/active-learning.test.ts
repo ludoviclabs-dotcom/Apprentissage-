@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  REVIEW_INTERVAL_DAYS,
   buildRevisionSession,
   businessCases,
   createErrorJournalEntries,
@@ -11,11 +12,15 @@ import {
 } from "../src";
 
 describe("active learning helpers", () => {
-  it("maps review ratings to deterministic SRS intervals", () => {
+  it("reads its intervals from the one review ladder", () => {
+    // 21 days for `mastered` used to be hard-coded here while the review queue
+    // used 14, so the next due date depended on which control the learner
+    // happened to use. Both now delegate to REVIEW_INTERVAL_DAYS.
     expect(getRevisionIntervalDays("forgotten")).toBe(1);
     expect(getRevisionIntervalDays("partial")).toBe(3);
     expect(getRevisionIntervalDays("correct")).toBe(7);
-    expect(getRevisionIntervalDays("mastered")).toBe(21);
+    expect(getRevisionIntervalDays("mastered")).toBe(14);
+    expect(REVIEW_INTERVAL_DAYS.mastered).toBe(getRevisionIntervalDays("mastered"));
   });
 
   it("schedules the next flashcard review", () => {

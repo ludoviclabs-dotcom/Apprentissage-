@@ -103,7 +103,7 @@ test("public demo disables protected CTAs before submission and rejects writes",
   test.skip(testInfo.project.name !== "public-demo", "requires the dedicated public-demo server");
 
   await page.goto("/revisions");
-  await expect(page.getByRole("button", { name: "Réussie" }).first()).toBeDisabled();
+  await expect(page.getByRole("button", { name: "Su", exact: true }).first()).toBeDisabled();
   await expect(page.getByText(/Indisponible en démo publique/).first()).toBeVisible();
 
   await page.goto("/documents");

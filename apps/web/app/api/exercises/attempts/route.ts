@@ -74,7 +74,11 @@ export async function POST(request: Request) {
     return Response.json({
       correction: graded.correction,
       evaluationType: graded.evaluationType,
-      exerciseVersionId: graded.exerciseVersionId
+      exerciseVersionId: graded.exerciseVersionId,
+      // What the mark did to the review schedule. Returned so the learner is
+      // told the exercise is coming back, and when: a submission that silently
+      // enqueues a retest is an effect they cannot see.
+      review: graded.review
     });
   } catch (error) {
     if (error instanceof UnsupportedSubmissionError) {
