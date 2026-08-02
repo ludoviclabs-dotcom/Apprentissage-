@@ -1,22 +1,55 @@
+import { REVIEW_ITEM_TYPES } from "@finance/domain";
 import { getPublicDemoWriteResponse, getRuntimeFlags } from "@/lib/runtime-flags";
 import { resolveWriteUser } from "@/lib/auth/current-user";
-import { reviewFlashcard } from "@finance/db";
+import { recordReviewOutcome } from "@finance/db";
 import { z } from "zod";
 
-const reviewSchema = z.object({
-  flashcardId: z.string().min(1),
-  rating: z.enum(["forgotten", "partial", "correct", "mastered"])
-});
+/**
+ * Recording one self-assessment.
+ *
+ * The demo check comes first, before the body is even read, so a write attempt
+ * against the public demo is refused on the same grounds whatever it contains.
+ *
+ * `flashcardId` is accepted as a legacy alias for `itemRef`: the queue can now
+ * schedule an exercise as well as a card, but the previous payload shape is
+ * still valid and still means a flashcard.
+ */
+
+const reviewSchema = z
+  .object({
+    itemType: z.enum(REVIEW_ITEM_TYPES).default("flashcard"),
+    itemRef: z.string().min(1).max(200).optional(),
+    flashcardId: z.string().min(1).max(200).optional(),
+    rating: z.enum(["forgotten", "partial", "correct", "mastered"]),
+    // Self-reported, defaulting to true for the legacy payload that had no
+    // notion of revealing. Stored as given: a rating recorded without a reveal
+    // is weaker evidence and the log has to be able to say so.
+    revealed: z.boolean().default(true)
+  })
+  .refine((value) => Boolean(value.itemRef ?? value.flashcardId), {
+    message: "Fournir `itemRef` ou `flashcardId`."
+  });
 
 export async function POST(request: Request) {
   if (getRuntimeFlags().publicDemo) {
     return getPublicDemoWriteResponse();
   }
 
-  const body = reviewSchema.safeParse(await request.json());
+  let payload: unknown;
+
+  try {
+    payload = await request.json();
+  } catch {
+    return Response.json({ error: "Corps de requête illisible" }, { status: 400 });
+  }
+
+  const body = reviewSchema.safeParse(payload);
 
   if (!body.success) {
-    return Response.json({ error: "Invalid revision review", details: body.error.flatten() }, { status: 400 });
+    return Response.json(
+      { error: "Révision invalide", details: body.error.flatten() },
+      { status: 400 }
+    );
   }
 
   const writer = await resolveWriteUser();
@@ -25,7 +58,16 @@ export async function POST(request: Request) {
     return writer.response;
   }
 
-  const review = await reviewFlashcard(writer.userId ?? "", body.data.flashcardId, body.data.rating);
+  const result = await recordReviewOutcome(writer.userId, {
+    itemType: body.data.itemType,
+    itemRef: (body.data.itemRef ?? body.data.flashcardId) as string,
+    rating: body.data.rating,
+    revealed: body.data.revealed
+  });
 
-  return Response.json({ review });
+  if (!result) {
+    return Response.json({ error: "Élément de révision introuvable" }, { status: 404 });
+  }
+
+  return Response.json(result);
 }

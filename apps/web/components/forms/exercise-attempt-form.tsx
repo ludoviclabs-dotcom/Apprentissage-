@@ -1,26 +1,39 @@
 "use client";
 
+import Link from "next/link";
 import { useState } from "react";
-import type { Correction, Exercise } from "@finance/domain";
+import type { Correction, Exercise, RemediationDraft } from "@finance/domain";
 import { postJson } from "@/lib/api-client";
 import { CorrectionSummary } from "../correction-summary";
+
+/** The half of the response that says what happens next, not what just happened. */
+interface AttemptReview {
+  intervalDays: number;
+  dueAt: string;
+  remediation: RemediationDraft | null;
+}
 
 export function ExerciseAttemptForm({ exercise }: { exercise: Exercise }) {
   const [answer, setAnswer] = useState("");
   const [isPending, setIsPending] = useState(false);
   const [correction, setCorrection] = useState<Correction | null>(null);
+  const [review, setReview] = useState<AttemptReview | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   async function submitAttempt() {
     setIsPending(true);
     setError(null);
     setCorrection(null);
+    setReview(null);
 
     try {
-      const outcome = await postJson<{ correction?: Correction }>("/api/exercises/attempts", {
-        exerciseId: exercise.id,
-        userAnswer: answer
-      });
+      const outcome = await postJson<{ correction?: Correction; review?: AttemptReview }>(
+        "/api/exercises/attempts",
+        {
+          exerciseId: exercise.id,
+          userAnswer: answer
+        }
+      );
 
       if (!outcome.ok) {
         setError(outcome.error);
@@ -33,6 +46,7 @@ export function ExerciseAttemptForm({ exercise }: { exercise: Exercise }) {
       }
 
       setCorrection(outcome.data.correction);
+      setReview(outcome.data.review ?? null);
     } finally {
       setIsPending(false);
     }
@@ -60,6 +74,17 @@ export function ExerciseAttemptForm({ exercise }: { exercise: Exercise }) {
         </div>
       ) : null}
       {correction ? <CorrectionSummary correction={correction} /> : null}
+      {review ? (
+        <div className="remediation">
+          <strong>Révision programmée</strong>
+          <p>
+            Cet exercice revient le {review.dueAt.slice(0, 10)} (dans {review.intervalDays} jour
+            {review.intervalDays > 1 ? "s" : ""}).
+          </p>
+          {review.remediation ? <p>{review.remediation.nextAction}</p> : null}
+          <Link href="/revisions">Voir la file de révision</Link>
+        </div>
+      ) : null}
     </section>
   );
 }

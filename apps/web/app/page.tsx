@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { CompetencyMap } from "@/components/competency-map";
 import { CorrectionSummary } from "@/components/correction-summary";
 import { DomainBadge } from "@/components/domain-badge";
@@ -67,6 +68,27 @@ export default async function DashboardPage() {
           <strong>{model.latestCorrection.rubricScores.length} criteres</strong>
           <p>Le score separe bareme, erreurs, remediation et preuves citees.</p>
         </article>
+      </section>
+
+      <section className="panel">
+        <div className="panel-heading">
+          <div>
+            <span className="section-label">Révision active</span>
+            <h2>
+              {model.reviewQueue.dueCount === 0
+                ? "Rien n'est dû aujourd'hui"
+                : `${model.reviewQueue.dueCount} item(s) à revoir`}
+            </h2>
+          </div>
+          <Link className="primary-action" href="/revisions">
+            Réviser 5 min
+          </Link>
+        </div>
+        <p className="muted">
+          {model.remediations.length > 0
+            ? `${model.remediations.length} remédiation(s) ouverte(s) : chaque oubli programme un retest daté.`
+            : "La file remonte les items dus, réponse masquée jusqu'à la révélation."}
+        </p>
       </section>
 
       <section className="panel corpus-search">
