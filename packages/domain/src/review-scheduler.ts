@@ -91,7 +91,7 @@ export interface ReviewQueueItem {
   lapseCount: number;
 }
 
-export function isDue(item: ReviewQueueItem, now: Date = new Date()): boolean {
+export function isDue(item: ReviewQueueItem, now: Date): boolean {
   return new Date(item.dueAt).getTime() <= now.getTime();
 }
 
@@ -109,13 +109,13 @@ export function compareReviewQueueItems(left: ReviewQueueItem, right: ReviewQueu
   return byDue !== 0 ? byDue : left.itemRef.localeCompare(right.itemRef);
 }
 
-export function countDueItems(items: ReviewQueueItem[], now: Date = new Date()): number {
+export function countDueItems(items: ReviewQueueItem[], now: Date): number {
   return items.filter((item) => isDue(item, now)).length;
 }
 
 export function selectDueItems(
   items: ReviewQueueItem[],
-  now: Date = new Date(),
+  now: Date,
   limit: number = REVIEW_SESSION_LIMIT
 ): ReviewQueueItem[] {
   return items
@@ -128,7 +128,11 @@ export interface ReviewOutcomeInput {
   rating: ReviewRating;
   /** Whether the learner revealed the answer before rating themselves. */
   revealed: boolean;
-  reviewedAt?: Date;
+  /**
+   * The clock belongs to the application boundary, never to this reducer.
+   * Requiring it keeps identical inputs reproducible in every environment.
+   */
+  reviewedAt: Date;
 }
 
 /** What one review does to one item. Everything the caller needs to persist. */
@@ -159,7 +163,7 @@ export interface ReviewOutcome {
  * ever move forward.
  */
 export function scheduleReview(item: ReviewQueueItem, input: ReviewOutcomeInput): ReviewOutcome {
-  const reviewedAt = input.reviewedAt ?? new Date();
+  const reviewedAt = input.reviewedAt;
   const intervalDays = REVIEW_INTERVAL_DAYS[input.rating];
   const failed = isFailedReview(input.rating);
 
@@ -267,6 +271,13 @@ export function planReviewRemediation(
  * exists to avoid.
  */
 export function ratingFromScore(score: number, maxScore = 20): ReviewRating {
+  // A malformed numeric score must never become "mastered" merely because all
+  // comparisons with NaN are false. Runtime validation normally prevents this,
+  // but keeping the pure boundary total makes every caller safe and testable.
+  if (!Number.isFinite(score) || !Number.isFinite(maxScore) || maxScore <= 0) {
+    return "forgotten";
+  }
+
   const percent = maxScore <= 0 ? 0 : (score / maxScore) * 100;
 
   if (percent < 50) {
@@ -305,9 +316,9 @@ export function planAttemptReview(input: {
   maxScore?: number;
   microLesson: string;
   nextAction: string;
-  reviewedAt?: Date;
+  reviewedAt: Date;
 }): { rating: ReviewRating; intervalDays: number; dueAt: string; remediation: RemediationDraft | null } {
-  const reviewedAt = input.reviewedAt ?? new Date();
+  const reviewedAt = input.reviewedAt;
   const rating = ratingFromScore(input.score, input.maxScore ?? 20);
   const intervalDays = REVIEW_INTERVAL_DAYS[rating];
   const dueAt = addDays(reviewedAt, intervalDays);

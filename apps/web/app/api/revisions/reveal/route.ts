@@ -51,5 +51,10 @@ export async function POST(request: Request) {
     return Response.json({ error: "Élément de révision introuvable" }, { status: 404 });
   }
 
-  return Response.json({ item: revealed });
+  // Expected answers are study material, but still must never become a shared
+  // cached response that appears before a learner deliberately asks to reveal.
+  return Response.json(
+    { item: revealed },
+    { headers: { "Cache-Control": "no-store" } }
+  );
 }

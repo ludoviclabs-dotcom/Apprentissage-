@@ -1,4 +1,4 @@
-import { and, asc, eq } from "drizzle-orm";
+import { and, asc, eq, sql } from "drizzle-orm";
 import {
   REVIEW_ITEM_TYPES,
   REVIEW_SESSION_LIMIT,
@@ -391,11 +391,14 @@ export async function recordReviewOutcome(
     return null;
   }
 
+  // Reading the clock at the application boundary keeps the domain reducer
+  // deterministic, and makes every write in this transaction use one instant.
+  const reviewedAt = input.reviewedAt ?? new Date();
   const schedule = (item: ReviewQueueItem) =>
     scheduleReview(item, {
       rating: input.rating,
       revealed: input.revealed,
-      reviewedAt: input.reviewedAt
+      reviewedAt
     });
 
   if (!canUseDatabase()) {
@@ -418,6 +421,7 @@ export async function recordReviewOutcome(
   assertUserId(userId, "recordReviewOutcome");
 
   return withUserContext(userId as string, async (tx) => {
+    await lockReviewItem(tx, userId as string, input.itemType, input.itemRef);
     const existing = await selectQueueRow(tx, userId as string, input.itemType, input.itemRef);
     const outcome = schedule(existing ?? catalogueItem(content));
     const queueItemId = await upsertQueueRow(tx, userId as string, outcome, {
@@ -461,6 +465,26 @@ export async function recordReviewOutcome(
 
     return { outcome, remediation, remediationId, persisted: true };
   });
+}
+
+/**
+ * Serializes every mutation of one logical queue item, including its first
+ * insertion. A row lock alone cannot protect two concurrent first reviews:
+ * both transactions can observe that no row exists before either inserts it.
+ *
+ * PostgreSQL releases this transaction-scoped advisory lock automatically on
+ * commit or rollback. It is keyed by the same identity as the unique queue
+ * constraint, so unrelated learners and cards still run concurrently.
+ */
+async function lockReviewItem(
+  tx: FinanceDb,
+  userId: string,
+  itemType: ReviewItemType,
+  itemRef: string
+): Promise<void> {
+  await tx.execute(
+    sql`select pg_advisory_xact_lock(hashtext(${`review-queue:${userId}:${itemType}:${itemRef}`}))`
+  );
 }
 
 /**
@@ -714,13 +738,14 @@ export async function enqueueAttemptReview(input: {
    */
   tx?: FinanceDb;
 }): Promise<AttemptReviewResult> {
+  const reviewedAt = input.reviewedAt ?? new Date();
   const plan = planAttemptReview({
     exerciseId: input.exercise.id,
     competencyId: input.exercise.competencyIds[0] ?? null,
     score: input.score,
     microLesson: input.microLesson,
     nextAction: input.nextAction,
-    reviewedAt: input.reviewedAt
+    reviewedAt
   });
 
   if (!canUseDatabase() || !input.userId) {
@@ -728,13 +753,14 @@ export async function enqueueAttemptReview(input: {
   }
 
   const run = async (tx: FinanceDb) => {
+    await lockReviewItem(tx, input.userId as string, "exercise", input.exercise.id);
     const competencyId = input.exercise.competencyIds[0] ?? null;
     const next = {
       competencyId,
       dueAt: plan.dueAt,
       intervalDays: plan.intervalDays,
       lastRating: plan.rating,
-      lastReviewedAt: (input.reviewedAt ?? new Date()).toISOString(),
+      lastReviewedAt: reviewedAt.toISOString(),
       source: "attempt" as const
     };
 

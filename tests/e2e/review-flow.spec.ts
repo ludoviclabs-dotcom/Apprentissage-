@@ -250,6 +250,7 @@ test("revealing is a read, so even the public demo may study", async ({ request 
   });
 
   expect(response.status()).toBe(200);
+  expect(response.headers()["cache-control"]).toContain("no-store");
   expect(((await response.json()) as { item: { answer: string } }).item.answer).toBe(KNOWN_ANSWER);
 });
 

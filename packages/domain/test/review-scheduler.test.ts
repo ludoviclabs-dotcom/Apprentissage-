@@ -222,6 +222,13 @@ describe("a graded attempt entering the queue", () => {
     expect(ratingFromScore(5, 0)).toBe("forgotten");
   });
 
+  it.each([Number.NaN, Number.POSITIVE_INFINITY, Number.NEGATIVE_INFINITY])(
+    "treats a non-finite score (%s) as failed instead of rewarding it",
+    (score) => {
+      expect(ratingFromScore(score)).toBe("forgotten");
+    }
+  );
+
   it("schedules every graded exercise, and only opens work for a failing mark", () => {
     const passed = planAttemptReview({
       exerciseId: "ex-provision-litige",

@@ -46,6 +46,7 @@ if (!APP_DATABASE_URL || !ADMIN_DATABASE_URL) {
  */
 const CARD = "fc-review-fixture-a";
 const OTHER_CARD = "fc-review-fixture-b";
+const CONCURRENT_CARD = "fc-review-fixture-concurrent";
 const EXERCISE_ID = "ex-review-fixture";
 
 const FIXTURE_CARDS = [
@@ -58,6 +59,11 @@ const FIXTURE_CARDS = [
     id: OTHER_CARD,
     front: "Que signifie sortie probable de ressources ?",
     back: "Il est suffisamment probable que l'entreprise devra payer."
+  },
+  {
+    id: CONCURRENT_CARD,
+    front: "Quand une provision est-elle comptabilisee ?",
+    back: "Quand une obligation presente, une sortie probable et une estimation fiable existent."
   }
 ];
 
@@ -195,6 +201,40 @@ describeWithDb("review queue persistence", () => {
     expect(attempts).toHaveLength(2);
     expect(attempts.map((row) => row.rating)).toEqual(["correct", "partial"]);
     expect(attempts.every((row) => row.revealed === true)).toBe(true);
+  });
+
+  it("serializes concurrent first reviews so the queue counters match the append-only log", async () => {
+    const reviewedAt = new Date("2026-03-03T08:00:00.000Z");
+
+    await Promise.all([
+      db.recordReviewOutcome(alice, {
+        itemType: "flashcard",
+        itemRef: CONCURRENT_CARD,
+        rating: "correct",
+        revealed: true,
+        reviewedAt
+      }),
+      db.recordReviewOutcome(alice, {
+        itemType: "flashcard",
+        itemRef: CONCURRENT_CARD,
+        rating: "correct",
+        revealed: true,
+        reviewedAt
+      })
+    ]);
+
+    const [queue] = await admin`
+      select review_count, lapse_count
+      from review_queue
+      where user_id = ${alice} and item_type = 'flashcard' and item_ref = ${CONCURRENT_CARD}`;
+    const attempts = await admin`
+      select id
+      from review_attempts
+      where user_id = ${alice} and item_type = 'flashcard' and item_ref = ${CONCURRENT_CARD}`;
+
+    expect(queue.review_count).toBe(2);
+    expect(queue.lapse_count).toBe(0);
+    expect(attempts).toHaveLength(2);
   });
 
   it("keeps the flashcard overlay in step with the queue", async () => {
