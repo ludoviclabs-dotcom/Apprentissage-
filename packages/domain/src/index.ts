@@ -9,4 +9,5 @@ export * from "./mastery";
 export * from "./curriculum";
 export * from "./evaluators";
 export * from "./exercise-specs";
+export * from "./review-scheduler";
 export * from "./active-learning";
