@@ -65,20 +65,13 @@ export default async function ComptaGeneraleMiniCaseStepPage({
         persistence={features.persistence}
         nextHref={step.nextHref ?? `${COMPTA_MODULE_BASE}/cas-pratique`}
         nextLabel={isLast ? "Terminer le cas" : "Étape suivante"}
+        // The closing figures are the exact expected answer to this exercise,
+        // so they cannot be passed as a prop here: whatever this Server
+        // Component sends is part of the page's own initial payload regardless
+        // of any client-side gate placed around it. `ModuleExerciseForm` fetches
+        // them itself, only after grading this exercise perfectly.
+        revealMiniCaseClosing={isLast}
       />
-
-      {isLast ? (
-        <section className="panel">
-          <span className="section-label">Clôture</span>
-          <h2>{comptaGeneraleV1MiniCase.closing.label}</h2>
-          <p>
-            TVA collectée {comptaGeneraleV1MiniCase.closing.expectedTvaCollectee.toLocaleString("fr-FR")} € ·
-            TVA déductible {comptaGeneraleV1MiniCase.closing.expectedTvaDeductible.toLocaleString("fr-FR")} € ·
-            TVA à décaisser{" "}
-            {comptaGeneraleV1MiniCase.closing.expectedTvaADecaisser.toLocaleString("fr-FR")} €.
-          </p>
-        </section>
-      ) : null}
     </div>
   );
 }

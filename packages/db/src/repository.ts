@@ -1286,6 +1286,14 @@ export async function recordAttempt(
 
   assertUserId(userId, "recordAttempt");
 
+  // See `isExercisePersisted`: an exercise that only exists in the in-memory
+  // catalogue cannot be the target of `attempts.exercise_id`'s foreign key.
+  // Returning here — before any statement runs — is what keeps that case a
+  // silent no-op rather than a foreign key violation thrown mid-transaction.
+  if (!(await isExercisePersisted(exerciseId))) {
+    return;
+  }
+
   const exercise = await getExerciseById(exerciseId);
 
   // Everything lands in one transaction: this is also the scope `SET LOCAL
@@ -1559,6 +1567,39 @@ export async function searchKnowledge(query: string, limit = 5): Promise<Knowled
     }));
   } catch {
     return [];
+  }
+}
+
+/**
+ * Whether an exercise is an actual row in `exercises`, not merely resolvable.
+ *
+ * `getExerciseById` falls back to the in-memory catalogue whenever a database
+ * lookup misses, which is the right call for a read: the public demo, and any
+ * database that has been migrated but not re-seeded since new content landed in
+ * `@finance/domain`, must still be able to show and grade the exercise. It is
+ * the wrong call for a write. `attempts.exercise_id` carries a foreign key to
+ * this table, so persisting an attempt against an id that exists only in memory
+ * does not fail gracefully — it raises a foreign key violation from inside a
+ * transaction that also holds the review schedule and remediation for the same
+ * submission, discarding a correction the learner has already been shown.
+ * `recordAttempt` calls this first so that case degrades exactly like seeded
+ * mode — graded, nothing stored — instead of surfacing a raw database error.
+ */
+export async function isExercisePersisted(exerciseId: string): Promise<boolean> {
+  if (!canUseDatabase()) {
+    return false;
+  }
+
+  try {
+    const rows = await createDb()
+      .select({ id: exercisesTable.id })
+      .from(exercisesTable)
+      .where(eq(exercisesTable.id, exerciseId))
+      .limit(1);
+
+    return rows.length > 0;
+  } catch {
+    return false;
   }
 }
 

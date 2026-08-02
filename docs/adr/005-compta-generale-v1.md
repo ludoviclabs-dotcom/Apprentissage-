@@ -110,6 +110,23 @@ The case closes on a VAT declaration the entries imply, and a test asserts the
 closing figures reconcile — a month that "closes" on a number nothing produced
 would be theatre.
 
+**The closing figures are fetched, not rendered.** They are the exact expected
+answer to the case's last exercise, so they cannot reach the page as a prop —
+even one a client component only renders after grading. A first version tried
+exactly that: a server component passed the figures down and
+`ModuleExerciseForm` gated the render on `correction`. It still leaked, because
+a Server Component's props are serialized into the page's own initial payload
+regardless of whatever client-side condition later guards their rendering — the
+Playwright assertion that reads the response's own bytes caught the figures
+there before a single field was touched. `GET
+/api/modules/comptabilite-generale/mini-case/closing` is the fix: the form
+fetches it itself, only once this exercise is graded at `MAX_SCORE`, mirroring
+the flashcard reveal of PR-04 rather than the props path that looked like it
+would work. Gating on a perfect score rather than "any correction" also closes
+the narrower path of submitting a wrong guess first, being shown nothing new by
+this specific exercise, and retrying with what a wrong first attempt would not
+otherwise have revealed.
+
 ## Consequences
 
 ### The form is not gated on `writes`

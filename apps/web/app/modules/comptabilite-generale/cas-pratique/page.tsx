@@ -49,9 +49,9 @@ export default function ComptaGeneraleMiniCasePage() {
             <span className="section-label">Travail à faire</span>
             <h2>Enregistrer le mois, puis liquider la TVA</h2>
             <p>
-              Chaque étape est corrigée immédiatement. La dernière vérifie la déclaration de TVA que
-              les écritures impliquent : {miniCase.closing.expectedTvaCollectee.toLocaleString("fr-FR")} €
-              collectés moins {miniCase.closing.expectedTvaDeductible.toLocaleString("fr-FR")} € déductibles.
+              Chaque étape est corrigée immédiatement. La dernière liquide la déclaration de TVA du mois,
+              à partir des seules pièces ci-dessus : à toi de retrouver ce qui se déduit et ce qui ne se
+              déduit pas.
             </p>
           </div>
           <Link className="primary-action" href={`${COMPTA_MODULE_BASE}/cas-pratique/1`}>

@@ -270,8 +270,15 @@ test.describe("the mini-case", () => {
     await expect(page).toHaveURL(new RegExp(`${BASE}/cas-pratique/2$`));
 
     // The last step is the VAT liquidation, and it is a graded exercise.
-    await page.goto(`${BASE}/cas-pratique/6`);
+    const response = await page.goto(`${BASE}/cas-pratique/6`);
     await expect(page.getByText("Récapitulatif TVA de mars").first()).toBeVisible();
+
+    // The closing figure is the exact expected answer to the field below it.
+    // It must be absent from the server's own bytes, not merely out of view —
+    // the same guarantee PR-04 gave a flashcard's answer before its reveal.
+    const html = (await response?.text()) ?? "";
+    expect(html).not.toContain("Déclaration de TVA de mars N");
+    await expect(page.getByText("Déclaration de TVA de mars N")).toHaveCount(0);
 
     await page.getByLabel("Réponse numérique").fill("1300");
     expect((await submitAndWait(page)).status()).toBe(200);

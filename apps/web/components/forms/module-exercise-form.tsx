@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useState } from "react";
-import type { Correction, RemediationDraft } from "@finance/domain";
+import { MAX_SCORE, type Correction, type RemediationDraft } from "@finance/domain";
 import { CorrectionSummary } from "@/components/correction-summary";
 import {
   JournalEntryForm,
@@ -53,6 +53,13 @@ interface AttemptProgress {
   reason: string | null;
 }
 
+interface MiniCaseClosing {
+  label: string;
+  expectedTvaCollectee: number;
+  expectedTvaDeductible: number;
+  expectedTvaADecaisser: number;
+}
+
 export interface ModuleExerciseFormProps {
   exerciseId: string;
   kind: ModuleExerciseKind;
@@ -62,6 +69,20 @@ export interface ModuleExerciseFormProps {
   /** Where "next" goes once this exercise is answered. */
   nextHref?: string;
   nextLabel?: string;
+  /**
+   * Fetches and shows the mini-case's closing VAT figures once this exercise
+   * is answered perfectly.
+   *
+   * The closing figures are the exact expected answer to this exercise, so they
+   * cannot arrive as a prop: a Server Component prop is serialized into the
+   * page's own initial payload regardless of whatever client-side condition
+   * later guards its rendering — passing them that way was tried, and the
+   * Playwright assertion that reads the server's own response bytes caught them
+   * there. Gating on `MAX_SCORE` rather than "any correction" also closes the
+   * narrower path of submitting a wrong guess first — nothing this specific
+   * would otherwise reveal — retrying with the number just shown.
+   */
+  revealMiniCaseClosing?: boolean;
 }
 
 export function ModuleExerciseForm({
@@ -71,7 +92,8 @@ export function ModuleExerciseForm({
   unit = "€",
   persistence,
   nextHref,
-  nextLabel = "Étape suivante"
+  nextLabel = "Étape suivante",
+  revealMiniCaseClosing = false
 }: ModuleExerciseFormProps) {
   const [lines, setLines] = useState<JournalLineInput[]>(emptyJournal(3));
   const [numericValue, setNumericValue] = useState("");
@@ -81,6 +103,7 @@ export function ModuleExerciseForm({
   const [correction, setCorrection] = useState<Correction | null>(null);
   const [review, setReview] = useState<AttemptReview | null>(null);
   const [progress, setProgress] = useState<AttemptProgress | null>(null);
+  const [closing, setClosing] = useState<MiniCaseClosing | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
 
@@ -135,6 +158,23 @@ export function ModuleExerciseForm({
     setCorrection(outcome.data.correction);
     setReview(outcome.data.review ?? null);
     setProgress(outcome.data.progress ?? null);
+
+    if (revealMiniCaseClosing && outcome.data.correction.score >= MAX_SCORE) {
+      // A plain GET, not `postJson`: this is a read with no body, and the
+      // route accepts nothing but GET. Best-effort — the exercise is already
+      // graded and shown, so a failed reveal must not surface as an error on
+      // the correction itself.
+      try {
+        const closingResponse = await fetch("/api/modules/comptabilite-generale/mini-case/closing");
+
+        if (closingResponse.ok) {
+          const body = (await closingResponse.json()) as { closing: MiniCaseClosing };
+          setClosing(body.closing);
+        }
+      } catch {
+        // Network failure: leave `closing` unset.
+      }
+    }
   }
 
   return (
@@ -236,6 +276,18 @@ export function ModuleExerciseForm({
             ? "Progression mise à jour pour ce niveau."
             : "Progression non enregistrée dans cette configuration."}
         </p>
+      ) : null}
+
+      {closing ? (
+        <section className="panel" data-testid="mini-case-closing">
+          <span className="section-label">Clôture</span>
+          <h2>{closing.label}</h2>
+          <p>
+            TVA collectée {closing.expectedTvaCollectee.toLocaleString("fr-FR")} € · TVA déductible{" "}
+            {closing.expectedTvaDeductible.toLocaleString("fr-FR")} € · TVA à décaisser{" "}
+            {closing.expectedTvaADecaisser.toLocaleString("fr-FR")} €.
+          </p>
+        </section>
       ) : null}
 
       {correction && nextHref ? (
