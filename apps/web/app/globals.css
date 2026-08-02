@@ -1532,3 +1532,135 @@ button:disabled,
   padding: 4px 10px;
   white-space: nowrap;
 }
+
+/* --- Comptabilité générale v1 : journal interactif ---------------------- */
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.journal-entry {
+  display: grid;
+  gap: 12px;
+}
+
+.journal-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.92rem;
+}
+
+.journal-table th,
+.journal-table td {
+  padding: 6px;
+  text-align: left;
+  border-bottom: 1px solid var(--border);
+}
+
+/* Amount columns read as money: right-aligned and tabular so the digits line
+   up between rows and the totals sit under the figures they add. */
+.journal-table th:nth-child(3),
+.journal-table th:nth-child(4),
+.journal-table td:nth-child(3),
+.journal-table td:nth-child(4),
+.journal-table tfoot td {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.journal-table tfoot td {
+  font-weight: 800;
+  border-bottom: none;
+}
+
+.journal-table input {
+  width: 100%;
+  min-height: 36px;
+  padding: 0 8px;
+  border: 1px solid var(--border-strong);
+  background: #ffffff;
+  border-radius: var(--radius);
+  color: var(--text);
+  font: inherit;
+  font-size: 0.9rem;
+}
+
+.journal-table td:nth-child(3) input,
+.journal-table td:nth-child(4) input {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.journal-table td:last-child {
+  width: 44px;
+}
+
+.journal-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+
+.numeric-answer {
+  display: grid;
+  gap: 6px;
+  max-width: 260px;
+}
+
+.numeric-answer span {
+  font-size: 0.82rem;
+  font-weight: 800;
+  color: #475467;
+}
+
+.numeric-answer input {
+  min-height: 42px;
+  padding: 0 12px;
+  border: 1px solid var(--border-strong);
+  background: #ffffff;
+  border-radius: var(--radius);
+  color: var(--text);
+  font: inherit;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.choice-list {
+  display: grid;
+  gap: 10px;
+  border: none;
+  margin: 0;
+  padding: 0;
+}
+
+.choice-row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: baseline;
+  gap: 10px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: #fbfcfe;
+  cursor: pointer;
+}
+
+.choice-row small {
+  grid-column: 2;
+}
+
+@media (max-width: 720px) {
+  .journal-table th:nth-child(2),
+  .journal-table td:nth-child(2) {
+    display: none;
+  }
+}

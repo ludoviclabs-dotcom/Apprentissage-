@@ -1,4 +1,5 @@
 import { assertValidRules, type MasteryRules } from "./mastery";
+import { comptaGeneraleV1Levels } from "./compta-generale-v1";
 import { competencies } from "./taxonomy";
 import type { DomainId } from "./types";
 
@@ -114,7 +115,11 @@ export const curriculum2026Q3: CurriculumVersion = {
       competencyIds: ["cg-cutoff", "cg-provisions", "ifrs-ias37", "fisc-retraitements"],
       criticalCompetencyIds: ["cg-cutoff", "cg-provisions", "ifrs-ias37"],
       estimatedMinutes: 240
-    }
+    },
+    // A second track in the same version. Enrolment is per (user, track), so
+    // adding one leaves everybody progressing through the provisions track
+    // exactly where they were.
+    ...comptaGeneraleV1Levels
   ]
 };
 

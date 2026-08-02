@@ -1,5 +1,5 @@
 import { and, asc, eq, inArray } from "drizzle-orm";
-import { EVALUATION_TYPES } from "@finance/domain";
+import { EVALUATION_TYPES, authoredExerciseVersions } from "@finance/domain";
 import { z } from "zod";
 import { canUseDatabase, createDb } from "./client";
 import { exerciseCriteriaTable, exerciseTestCasesTable, exerciseVersionsTable } from "./drizzle-schema";
@@ -186,6 +186,38 @@ const versionColumns = {
 } as const;
 
 /**
+ * The authored catalogue as a resolved version, for seeded mode.
+ *
+ * `authoredExerciseVersions` is committed content — the same standing as
+ * `exercises` and `module_levels`, which already fall back to their seeded
+ * arrays when there is no database. Returning null here instead meant every
+ * exercise was graded by `legacy_rubric` in seeded mode however carefully its
+ * specification had been authored, so the typed engine was unreachable in the
+ * public demo, in local development and in the default Playwright project — the
+ * three places the product is actually exercised.
+ *
+ * Criteria are empty because none of the four evaluators reads them: `numeric`
+ * and `multiple_choice` carry their weighting inside the spec, and
+ * `journal_entry` and `short_text_rubric` derive theirs from it.
+ */
+function seededVersion(exerciseId: string): ResolvedExerciseVersion | null {
+  const authored = authoredExerciseVersions.find((version) => version.exerciseId === exerciseId);
+
+  if (!authored) {
+    return null;
+  }
+
+  return {
+    id: authored.id,
+    exerciseId: authored.exerciseId,
+    version: authored.version,
+    evaluationType: toEvaluationType(authored.evaluationType, authored.id),
+    spec: authored.spec,
+    criteria: []
+  };
+}
+
+/**
  * The specification a new submission must be graded against.
  *
  * The partial unique index of migration 0005 allows at most one active version
@@ -194,7 +226,7 @@ const versionColumns = {
  */
 export async function getActiveExerciseVersion(exerciseId: string): Promise<ResolvedExerciseVersion | null> {
   if (!canUseDatabase()) {
-    return null;
+    return seededVersion(exerciseId);
   }
 
   const rows = await createDb()

@@ -25,6 +25,7 @@ import {
   comptaSourcePack
 } from "./compta-v1";
 import { comptaBusinessCase, comptaExamSessions } from "./compta-extra";
+import { comptaGeneraleV1Exercises } from "./compta-generale-v1";
 
 export const sourcePacks: SourcePack[] = [
   {
@@ -667,7 +668,8 @@ export const exercises: Exercise[] = [
     competencyIds: ["cg-provisions", "cg-cutoff", "ifrs-ias37"],
     sourceChunkIds: ["chunk-provision-42", "chunk-ias37-3"]
   },
-  ...comptaExercises
+  ...comptaExercises,
+  ...comptaGeneraleV1Exercises
 ];
 
 export const corrections: Correction[] = [

@@ -1,3 +1,4 @@
+import { comptaGeneraleV1ExerciseVersions } from "./compta-generale-v1";
 import { assertValidEvaluationSpec, type EvaluationType } from "./evaluators";
 import { exercises } from "./learning";
 
@@ -196,7 +197,11 @@ export const authoredExerciseVersions: AuthoredExerciseVersion[] = [
         expectedScore: 0
       }
     ]
-  }
+  },
+  // The comptabilité générale v1 module (PR-05). Unlike the exercises migrated
+  // one at a time above, every exercise of that module ships a specification, so
+  // nothing in it falls back to the rubric matcher.
+  ...comptaGeneraleV1ExerciseVersions
 ];
 
 export class UnknownAuthoredExerciseError extends Error {

@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  COMPTA_GENERALE_V1_TRACK,
   InvalidCurriculumError,
   activeCurriculum,
   assertValidCurriculum,
@@ -54,7 +55,27 @@ describe("shipped curriculum", () => {
   });
 
   it("lists its tracks", () => {
-    expect(getTrackIds(activeCurriculum)).toEqual(["track-compta-generale"]);
+    // Exact rather than "contains": a track appearing here that nobody meant to
+    // publish is a track learners can enrol in, so it has to be noticed.
+    expect(getTrackIds(activeCurriculum)).toEqual([
+      "track-compta-generale",
+      COMPTA_GENERALE_V1_TRACK
+    ]);
+  });
+
+  it("gates the comptabilité générale v1 track on two contiguous levels", () => {
+    const levels = getTrackLevels(activeCurriculum, COMPTA_GENERALE_V1_TRACK);
+
+    expect(levels.map((level) => level.level)).toEqual([1, 2]);
+    expect(levels.map((level) => level.id)).toEqual([
+      "level-compta-generale-v1-1",
+      "level-compta-generale-v1-2"
+    ]);
+    // Each level must gate on something it actually teaches, or the unlock rule
+    // has nothing to measure.
+    for (const level of levels) {
+      expect(level.criticalCompetencyIds.length, level.id).toBeGreaterThan(0);
+    }
   });
 });
 

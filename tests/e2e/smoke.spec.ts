@@ -9,6 +9,7 @@ const NAV_DESTINATIONS = [
   { href: "/", label: "Accueil" },
   { href: "/parcours", label: "Parcours" },
   { href: "/cours", label: "Cours" },
+  { href: "/modules/comptabilite-generale", label: "Compta générale" },
   { href: "/apprendre", label: "Apprendre" },
   { href: "/connaissances", label: "Connaissances" },
   { href: "/recherche", label: "Recherche" },

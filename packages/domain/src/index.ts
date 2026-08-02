@@ -4,6 +4,7 @@ export * from "./taxonomy";
 export * from "./learning";
 export * from "./compta-v1";
 export * from "./compta-extra";
+export * from "./compta-generale-v1";
 export * from "./progress";
 export * from "./mastery";
 export * from "./curriculum";
