@@ -67,6 +67,27 @@ test("a level that does not exist is a 404, not a silent fallback to level 1", a
 });
 
 test.describe("the interactive journal", () => {
+  test("opens from the level, keeps dynamic rows stable, then grades the edited entry", async ({ page }) => {
+    await page.goto(`${BASE}/1`);
+
+    const exercise = page.locator(`article[data-exercise-id="${ACHAT}"]`);
+    await exercise.getByRole("link", { name: "Faire l'exercice" }).click();
+    await expect(page).toHaveURL(new RegExp(`${BASE}/exercices/${ACHAT}$`));
+
+    await fillLine(page, 1, { account: "607", debit: "1200" });
+    await fillLine(page, 2, { account: "44566", debit: "240" });
+    await fillLine(page, 3, { account: "401", credit: "1440" });
+
+    await page.getByRole("button", { name: "Ajouter une ligne" }).click();
+    await expect(page.getByLabel("Compte ligne 4")).toBeVisible();
+    await page.getByRole("button", { name: "Supprimer la ligne 4" }).click();
+    await expect(page.getByLabel("Compte ligne 4")).toHaveCount(0);
+    await expect(page.getByLabel("Compte ligne 1")).toHaveValue("607");
+
+    expect((await submitAndWait(page)).status()).toBe(200);
+    await expect(page.getByText(/Score 20([.,]00)?\/20/)).toBeVisible();
+  });
+
   test("keeps a running balance and grades a correct entry 20/20", async ({ page }) => {
     await page.goto(`${BASE}/exercices/${ACHAT}`);
 

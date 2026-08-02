@@ -152,7 +152,7 @@ function toExercise(seed: ExerciseSeed, type: Exercise["type"]): Exercise {
 const JOURNAL_POINTS = { accounts: 4, direction: 3, amounts: 4, balance: 2 };
 
 /** Every entry in this module is to the cent, so no tolerance is granted. */
-const JOURNAL_TOLERANCE = 0.01;
+const JOURNAL_TOLERANCE = 0;
 
 export const comptaGeneraleV1Exercises: Exercise[] = [
   // --- N1 : le cycle de la facture ----------------------------------------

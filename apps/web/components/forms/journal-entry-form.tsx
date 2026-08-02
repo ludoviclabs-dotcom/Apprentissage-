@@ -19,6 +19,8 @@ import { useMemo } from "react";
  */
 
 export interface JournalLineInput {
+  /** Stable UI identity: a row keeps its DOM node when a neighbour is removed. */
+  id: string;
   account: string;
   label: string;
   debit: string;
@@ -31,7 +33,9 @@ export interface JournalSubmissionLine {
   credit?: number;
 }
 
-const EMPTY_LINE: JournalLineInput = { account: "", label: "", debit: "", credit: "" };
+function emptyLine(): JournalLineInput {
+  return { id: crypto.randomUUID(), account: "", label: "", debit: "", credit: "" };
+}
 
 /**
  * Reads a French-formatted amount.
@@ -41,9 +45,11 @@ const EMPTY_LINE: JournalLineInput = { account: "", label: "", debit: "", credit
  * learners for transcribing the figure exactly as they were given it.
  */
 export function parseAmount(raw: string): number | null {
-  const cleaned = raw.replace(/\s/g, "").replace(",", ".");
+  const cleaned = raw.replace(/\u00A0/g, " ").replace(/\s/g, "").replace(",", ".");
 
-  if (cleaned === "") {
+  // Do not let Number coerce hexadecimal or exponent notation: accounting cells
+  // accept amounts as written in the statement, not every JavaScript literal.
+  if (!/^\d+(\.\d+)?$/.test(cleaned)) {
     return null;
   }
 
@@ -102,6 +108,9 @@ export function JournalEntryForm({
   return (
     <div className="journal-entry">
       <table className="journal-table">
+        <caption className="sr-only">
+          Saisir une écriture comptable : compte, libellé, débit et crédit par ligne.
+        </caption>
         <thead>
           <tr>
             <th scope="col">Compte</th>
@@ -115,7 +124,7 @@ export function JournalEntryForm({
         </thead>
         <tbody>
           {lines.map((line, index) => (
-            <tr key={index}>
+            <tr key={line.id}>
               <td>
                 <input
                   aria-label={`Compte ligne ${index + 1}`}
@@ -186,13 +195,16 @@ export function JournalEntryForm({
           type="button"
           className="secondary-action"
           disabled={disabled}
-          onClick={() => onChange([...lines, { ...EMPTY_LINE }])}
+          onClick={() => onChange([...lines, emptyLine()])}
         >
           Ajouter une ligne
         </button>
         <span
           className={`state-token ${balanced ? "ready" : "needs-review"}`}
           data-testid="journal-balance"
+          role="status"
+          aria-live="polite"
+          aria-atomic="true"
         >
           {balanced
             ? "Équilibrée"
@@ -206,5 +218,5 @@ export function JournalEntryForm({
 }
 
 export function emptyJournal(lineCount = 3): JournalLineInput[] {
-  return Array.from({ length: lineCount }, () => ({ ...EMPTY_LINE }));
+  return Array.from({ length: lineCount }, emptyLine);
 }

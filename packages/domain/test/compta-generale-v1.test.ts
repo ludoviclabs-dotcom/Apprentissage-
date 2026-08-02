@@ -147,6 +147,32 @@ describe("every exercise is graded by a typed evaluator", () => {
       , version.exerciseId).not.toThrow();
     }
   });
+
+  it("does not waive one cent on the module's exact journal amounts", () => {
+    for (const version of comptaGeneraleV1ExerciseVersions) {
+      if (version.evaluationType !== "journal_entry") {
+        continue;
+      }
+
+      const spec = version.spec as {
+        expectedLines: Array<{ account: string; debit?: number; credit?: number }>;
+      };
+      const lines = spec.expectedLines.map((line) => ({ ...line }));
+      const first = lines[0];
+
+      if (typeof first.debit === "number") {
+        first.debit -= 0.01;
+      } else if (typeof first.credit === "number") {
+        first.credit -= 0.01;
+      }
+
+      const result = getEvaluator("journal_entry").evaluate(version.spec as never, { lines });
+      const amounts = result.criteria.find((criterion) => criterion.id === "amounts");
+
+      expect(amounts?.outcome, version.exerciseId).not.toBe("met");
+      expect(result.score, version.exerciseId).toBeLessThan(20);
+    }
+  });
 });
 
 describe("the mini-case", () => {
