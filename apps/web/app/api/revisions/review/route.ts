@@ -58,16 +58,34 @@ export async function POST(request: Request) {
     return writer.response;
   }
 
-  const result = await recordReviewOutcome(writer.userId, {
-    itemType: body.data.itemType,
-    itemRef: (body.data.itemRef ?? body.data.flashcardId) as string,
-    rating: body.data.rating,
-    revealed: body.data.revealed
-  });
+  try {
+    const result = await recordReviewOutcome(writer.userId, {
+      itemType: body.data.itemType,
+      itemRef: (body.data.itemRef ?? body.data.flashcardId) as string,
+      rating: body.data.rating,
+      revealed: body.data.revealed
+    });
 
-  if (!result) {
-    return Response.json({ error: "Élément de révision introuvable" }, { status: 404 });
+    if (!result) {
+      return Response.json({ error: "Élément de révision introuvable" }, { status: 404 });
+    }
+
+    return Response.json(result);
+  } catch (error) {
+    // A migrated-but-unseeded database is the reachable case, and it used to
+    // surface as a bare framework 500. `flashcard_states.flashcard_id` points at
+    // `flashcards`, while `getFlashcards` falls back to the in-memory seed when
+    // that table is empty — so the card renders, and only the write finds out it
+    // does not exist. The learner gets the actual remedy instead of a stack.
+    return Response.json(
+      {
+        error: "Révision non enregistrée",
+        details:
+          error instanceof Error
+            ? `${error.message} — si la base est active mais vide, lance \`pnpm db:seed\`.`
+            : "Erreur inconnue"
+      },
+      { status: 500 }
+    );
   }
-
-  return Response.json(result);
 }

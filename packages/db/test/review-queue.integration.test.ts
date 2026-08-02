@@ -4,7 +4,7 @@ import { fileURLToPath } from "node:url";
 import postgres from "postgres";
 import type { Sql } from "postgres";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { exercises } from "@finance/domain";
+import type { Exercise } from "@finance/domain";
 import { migrationFiles } from "../src/schema";
 
 /**
@@ -31,9 +31,49 @@ if (!APP_DATABASE_URL || !ADMIN_DATABASE_URL) {
   );
 }
 
-/** A card from the seeded catalogue; `getFlashcards` supplies it with no rows. */
-const CARD = "fc-obligation-definition";
-const OTHER_CARD = "fc-sortie-probable-definition";
+/**
+ * Fixture content, inserted here and removed afterwards, as the sibling
+ * integration suites do with `ex-rls` and `ex-pool`.
+ *
+ * The first version of this file leaned on the seeded catalogue instead, which
+ * failed for two reasons worth writing down. `flashcard_states.flashcard_id`
+ * carries a foreign key to `flashcards`, so per-user state cannot be recorded
+ * for a card the database does not hold — and `getFlashcards` falls back to the
+ * in-memory seed when the table is empty, so the content *looked* present right
+ * up to the insert. `getExercises` has no such fallback and returned nothing,
+ * so an enqueued exercise was dropped on read for want of content to render.
+ * The CI database is migrated but never seeded; a suite must bring its own rows.
+ */
+const CARD = "fc-review-fixture-a";
+const OTHER_CARD = "fc-review-fixture-b";
+const EXERCISE_ID = "ex-review-fixture";
+
+const FIXTURE_CARDS = [
+  {
+    id: CARD,
+    front: "Qu'est-ce qu'une obligation actuelle ?",
+    back: "Un evenement passe cree une responsabilite presente envers un tiers."
+  },
+  {
+    id: OTHER_CARD,
+    front: "Que signifie sortie probable de ressources ?",
+    back: "Il est suffisamment probable que l'entreprise devra payer."
+  }
+];
+
+const FIXTURE_EXERCISE: Exercise = {
+  id: EXERCISE_ID,
+  domainId: "compta-generale",
+  type: "short-answer",
+  title: "Fixture",
+  level: 1,
+  estimatedMinutes: 10,
+  statement: "Enonce de fixture.",
+  expectedAnswer: "Reponse de fixture.",
+  rubric: [{ label: "Critere", points: 20 }],
+  competencyIds: ["cg-provisions"],
+  sourceChunkIds: []
+};
 
 describeWithDb("review queue persistence", () => {
   let admin: Sql;
@@ -51,6 +91,26 @@ describeWithDb("review queue persistence", () => {
     for (const file of migrationFiles) {
       await admin.unsafe(await readFile(resolve(packageRoot, file), "utf8"));
     }
+
+    // Due in the past, so every fixture card is in today's session from the
+    // start and the assertions never depend on when the suite runs.
+    for (const card of FIXTURE_CARDS) {
+      await admin`
+        insert into flashcards (id, module_id, concept_id, domain, type, front, back, explanation,
+                                competency_ids, status, due_at, interval_days)
+        values (${card.id}, 'module-fixture', 'concept-fixture', 'compta-generale', 'concept',
+                ${card.front}, ${card.back}, 'Explication de fixture.',
+                array['cg-provisions'], 'due', '2026-01-01T08:00:00Z', 1)
+        on conflict (id) do update set back = excluded.back`;
+    }
+
+    await admin`
+      insert into exercises (id, domain, type, topic, level, estimated_minutes, statement, expected_answer,
+                             rubric_json, competency_ids)
+      values (${EXERCISE_ID}, 'compta-generale', 'short-answer', 'Fixture', 1, 10,
+              ${FIXTURE_EXERCISE.statement}, ${FIXTURE_EXERCISE.expectedAnswer},
+              ${JSON.stringify(FIXTURE_EXERCISE.rubric)}::jsonb, array['cg-provisions'])
+      on conflict (id) do update set statement = excluded.statement`;
 
     const [aliceRow] = await admin`
       insert into app_users (email, email_normalized, password_hash)
@@ -75,6 +135,10 @@ describeWithDb("review queue persistence", () => {
     await admin`
       delete from app_users
       where email_normalized in ('alice-review@example.test', 'bob-review@example.test')`;
+    // Cascades clear review_queue, review_attempts and remediation_tasks with the
+    // accounts; the catalogue rows are this suite's own and go with it.
+    await admin`delete from flashcards where id in (${CARD}, ${OTHER_CARD})`;
+    await admin`delete from exercises where id = ${EXERCISE_ID}`;
     await admin.end();
   });
 
@@ -200,11 +264,9 @@ describeWithDb("review queue persistence", () => {
   });
 
   it("enqueues a graded exercise and only opens work for a failing mark", async () => {
-    const exercise = exercises[0];
-
     const passed = await db.enqueueAttemptReview({
       userId: bob,
-      exercise,
+      exercise: FIXTURE_EXERCISE,
       score: 17,
       microLesson: "m",
       nextAction: "n"
@@ -216,7 +278,7 @@ describeWithDb("review queue persistence", () => {
 
     const failed = await db.enqueueAttemptReview({
       userId: bob,
-      exercise,
+      exercise: FIXTURE_EXERCISE,
       score: 4,
       microLesson: "Reprendre les trois conditions.",
       nextAction: "Refaire l'exercice."
@@ -226,7 +288,7 @@ describeWithDb("review queue persistence", () => {
 
     const rows = await admin`
       select interval_days, source from review_queue
-      where user_id = ${bob} and item_type = 'exercise' and item_ref = ${exercise.id}`;
+      where user_id = ${bob} and item_type = 'exercise' and item_ref = ${EXERCISE_ID}`;
 
     expect(rows, "a re-attempt moves the same row").toHaveLength(1);
     expect(rows[0].interval_days).toBe(1);
@@ -235,12 +297,10 @@ describeWithDb("review queue persistence", () => {
     const tasks = await db.getRemediationTasks(bob);
     expect(tasks).toHaveLength(1);
     expect(tasks[0].reason).toBe("failed-attempt");
-    expect(tasks[0].exerciseId).toBe(exercise.id);
+    expect(tasks[0].exerciseId).toBe(EXERCISE_ID);
   });
 
   it("surfaces the enqueued exercise in the owner's queue and nobody else's", async () => {
-    const exercise = exercises[0];
-
     // Due in a day: not in today's session, but scheduled.
     const bobQueue = await db.getReviewQueue(bob);
     const aliceQueue = await db.getReviewQueue(alice);
@@ -252,7 +312,7 @@ describeWithDb("review queue persistence", () => {
     const bobTomorrow = await db.getReviewQueue(bob, tomorrow, 100);
     const aliceTomorrow = await db.getReviewQueue(alice, tomorrow, 100);
 
-    expect(bobTomorrow.entries.some((entry) => entry.itemRef === exercise.id)).toBe(true);
-    expect(aliceTomorrow.entries.some((entry) => entry.itemRef === exercise.id)).toBe(false);
+    expect(bobTomorrow.entries.some((entry) => entry.itemRef === EXERCISE_ID)).toBe(true);
+    expect(aliceTomorrow.entries.some((entry) => entry.itemRef === EXERCISE_ID)).toBe(false);
   });
 });
