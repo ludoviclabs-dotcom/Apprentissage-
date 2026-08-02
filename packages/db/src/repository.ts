@@ -17,7 +17,6 @@ import {
   learningPath,
   learningModules as seedLearningModules,
   lessons,
-  reviewFlashcardSchedule,
   scoreBusinessCase,
   sourcePacks as seedSourcePacks,
   startExamSession,
@@ -38,7 +37,6 @@ import {
   type LearningModule,
   type Lesson,
   type RemediationPlan,
-  type ReviewRating,
   type RubricItem,
   type RubricScore,
   type SourceReference,
@@ -68,7 +66,6 @@ import {
   lessonsTable,
   lessonSourcesTable,
   modulesTable,
-  revisionReviewsTable,
   revisionItemsTable,
   sourcePacksTable
 } from "./drizzle-schema";
@@ -707,52 +704,14 @@ export async function getRevisionSession(userId?: string | null, now = new Date(
   return buildRevisionSession(await getFlashcards(userId), now);
 }
 
-export async function reviewFlashcard(userId: string, flashcardId: string, rating: ReviewRating) {
-  const review = reviewFlashcardSchedule(flashcardId, rating);
-
-  if (!canUseDatabase()) {
-    return review;
-  }
-
-  assertUserId(userId, "reviewFlashcard");
-
-  await withUserContext(userId, async (tx) => {
-    // Spaced-repetition state is per user. It used to UPDATE the shared
-    // `flashcards` row, so one account's rating rescheduled the card for
-    // everybody.
-    await tx
-      .insert(flashcardStatesTable)
-      .values({
-        userId,
-        flashcardId,
-        status: review.nextStatus,
-        dueAt: review.nextDueAt,
-        intervalDays: review.intervalDays,
-        updatedAt: new Date().toISOString()
-      })
-      .onConflictDoUpdate({
-        target: [flashcardStatesTable.userId, flashcardStatesTable.flashcardId],
-        set: {
-          status: review.nextStatus,
-          dueAt: review.nextDueAt,
-          intervalDays: review.intervalDays,
-          updatedAt: new Date().toISOString()
-        }
-      });
-
-    await tx.insert(revisionReviewsTable).values({
-      id: `review-${randomUUID()}`,
-      userId,
-      flashcardId,
-      rating,
-      reviewedAt: review.reviewedAt,
-      nextDueAt: review.nextDueAt,
-      intervalDays: review.intervalDays
-    });
-  });
-
-  return review;
-}
+/*
+ * `reviewFlashcard` used to live here: it wrote `flashcard_states` and appended
+ * to `revision_reviews`. `recordReviewOutcome` in `review-repository.ts` replaces
+ * it and writes `flashcard_states` too, alongside the queue and its log. Keeping
+ * both would have left two write paths to the same per-user schedule, and a card
+ * rated through the older one would have silently drifted out of step with the
+ * queue that decides when it comes back.
+ */
 
 /**
  * The error journal is personal data.

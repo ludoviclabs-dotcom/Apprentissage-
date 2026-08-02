@@ -92,7 +92,8 @@ jobs:
             packages/db/test/rls.integration.test.ts \
             packages/db/test/user-context.integration.test.ts \
             packages/db/test/mastery-isolation.integration.test.ts \
-            packages/db/test/attempt-provenance.integration.test.ts 2>&1 | tee rls.log
+            packages/db/test/attempt-provenance.integration.test.ts \
+            packages/db/test/review-queue.integration.test.ts 2>&1 | tee rls.log
 
       - name: Fail if isolation was not actually verified
         run: |

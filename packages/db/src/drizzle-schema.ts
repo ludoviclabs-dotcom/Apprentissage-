@@ -8,6 +8,7 @@ import {
   primaryKey,
   text,
   timestamp,
+  unique,
   uuid,
   varchar
 } from "drizzle-orm/pg-core";
@@ -430,6 +431,73 @@ export const exerciseCriteriaTable = pgTable("exercise_criteria", {
   label: text("label").notNull(),
   points: numeric("points", { precision: 6, scale: 2 }).notNull(),
   specJson: jsonb("spec_json").notNull().default({})
+});
+
+// --- Active review --------------------------------------------------------
+//
+// Owned learner state, like `flashcard_states`. What is scheduled stays in the
+// shared catalogue; only the schedule is personal.
+//
+// `itemType` + `itemRef` is a two-catalogue reference — a flashcard id or an
+// exercise id — which is why there is no `references()` here and none in
+// migration 0007 either. It is what lets the queue carry an exercise to retest
+// alongside the cards, and it is resolved by `review-repository.ts`.
+
+export const reviewQueueTable = pgTable(
+  "review_queue",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: uuid("user_id").notNull(),
+    itemType: text("item_type").notNull(),
+    itemRef: text("item_ref").notNull(),
+    competencyId: text("competency_id"),
+    dueAt: timestamp("due_at", { mode: "string" }).notNull(),
+    intervalDays: integer("interval_days").notNull().default(0),
+    lastRating: text("last_rating"),
+    lastReviewedAt: timestamp("last_reviewed_at", { mode: "string" }),
+    reviewCount: integer("review_count").notNull().default(0),
+    lapseCount: integer("lapse_count").notNull().default(0),
+    source: text("source").notNull().default("catalogue"),
+    createdAt: timestamp("created_at", { mode: "string" }).notNull().defaultNow()
+  },
+  (table) => [unique().on(table.userId, table.itemType, table.itemRef)]
+);
+
+// Append-only. `review_queue` holds the current state; this holds how it got
+// there, including whether the answer was revealed before the self-assessment.
+export const reviewAttemptsTable = pgTable("review_attempts", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  userId: uuid("user_id").notNull(),
+  queueItemId: uuid("queue_item_id").notNull(),
+  itemType: text("item_type").notNull(),
+  itemRef: text("item_ref").notNull(),
+  rating: text("rating").notNull(),
+  revealed: boolean("revealed").notNull(),
+  intervalDays: integer("interval_days").notNull(),
+  previousDueAt: timestamp("previous_due_at", { mode: "string" }).notNull(),
+  nextDueAt: timestamp("next_due_at", { mode: "string" }).notNull(),
+  reviewedAt: timestamp("reviewed_at", { mode: "string" }).notNull().defaultNow()
+});
+
+// The partial unique index of migration 0007 — one open task per item per user
+// — cannot be expressed here, so `review-repository.ts` checks for an existing
+// open task before inserting and the index stays the backstop.
+export const remediationTasksTable = pgTable("remediation_tasks", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  userId: uuid("user_id").notNull(),
+  queueItemId: uuid("queue_item_id"),
+  reviewAttemptId: uuid("review_attempt_id"),
+  itemType: text("item_type").notNull(),
+  itemRef: text("item_ref").notNull(),
+  competencyId: text("competency_id"),
+  reason: text("reason").notNull(),
+  microLesson: text("micro_lesson").notNull(),
+  nextAction: text("next_action").notNull(),
+  exerciseId: text("exercise_id"),
+  status: text("status").notNull().default("open"),
+  dueAt: timestamp("due_at", { mode: "string" }).notNull(),
+  createdAt: timestamp("created_at", { mode: "string" }).notNull().defaultNow(),
+  completedAt: timestamp("completed_at", { mode: "string" })
 });
 
 // The author's own expectations for their exercise. Grading is pure, so these

@@ -12,6 +12,7 @@ import {
 import { canUseDatabase } from "./client";
 import { getActiveExerciseVersion, type ResolvedExerciseVersion } from "./exercise-repository";
 import { getExerciseById, gradeExercise, recordAttempt } from "./repository";
+import { enqueueAttemptReview, type AttemptReviewResult } from "./review-repository";
 
 /**
  * The single place an answer becomes a correction.
@@ -45,6 +46,12 @@ export interface GradedSubmission {
   /** Which engine produced it, so the caller can record and display it. */
   evaluationType: string;
   exerciseVersionId: string | null;
+  /**
+   * What the mark did to the learner's review schedule (PR-04). Present on a
+   * persisted submission, absent from {@link gradeSubmission}, which grades
+   * without touching state.
+   */
+  review?: AttemptReviewResult;
 }
 
 /**
@@ -181,5 +188,17 @@ export async function submitAttempt(input: {
     exerciseVersionId: graded.exerciseVersionId
   });
 
-  return graded;
+  // Grading and retention are one act, not two. Routing this through the single
+  // submission path is what stops a caller from recording a mark and forgetting
+  // to schedule the retest — the failure mode that made "revision" a static list
+  // before PR-04.
+  const review = await enqueueAttemptReview({
+    userId: input.userId,
+    exercise,
+    score: graded.correction.score,
+    microLesson: graded.correction.remediationPlan.microLesson,
+    nextAction: graded.correction.remediationPlan.nextAction
+  });
+
+  return { ...graded, review };
 }
