@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { ExercisePanel } from "@/components/exercise-panel";
 import { DomainBadge } from "@/components/domain-badge";
 import { ExerciseAttemptForm } from "@/components/forms/exercise-attempt-form";
+import { PageHeader } from "@/components/ui/page-header";
 import { getExercises } from "@finance/db";
 import Link from "next/link";
 
@@ -16,13 +17,11 @@ export default async function ExercisesPage() {
 
   return (
     <div className="page-stack">
-      <section className="page-header">
-        <div>
-          <span className="section-label">Exercices</span>
-          <h1>S'entraîner avec barème et compétence cible</h1>
-          <p>Le MVP affiche les exercices seedés ; la génération IA gardera ce format structuré.</p>
-        </div>
-      </section>
+      <PageHeader
+        label="Exercices"
+        title="S'entraîner avec barème et compétence cible"
+        description="Le MVP affiche les exercices seedés ; la génération IA gardera ce format structuré."
+      />
 
       <section className="generator-panel">
         <div>

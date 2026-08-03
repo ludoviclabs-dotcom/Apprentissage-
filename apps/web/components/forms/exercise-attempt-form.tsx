@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useState } from "react";
 import type { Correction, Exercise, RemediationDraft } from "@finance/domain";
 import { postJson } from "@/lib/api-client";
+import { Feedback } from "@/components/ui/feedback";
 import { CorrectionSummary } from "../correction-summary";
 
 /** The half of the response that says what happens next, not what just happened. */
@@ -68,14 +69,19 @@ export function ExerciseAttemptForm({ exercise }: { exercise: Exercise }) {
       <button type="button" className="primary-action" onClick={submitAttempt} disabled={isPending || answer.length < 12}>
         {isPending ? "Correction..." : "Corriger"}
       </button>
-      {error ? (
-        <div className="result-box error">
-          <strong>{error}</strong>
+      {/* Région persistante : les lecteurs d'écran suivent la correction du
+          « en cours » jusqu'au score, sans dépendre de l'apparition d'un bloc. */}
+      <p className="sr-only" role="status" aria-atomic="true">
+        {isPending ? "Correction en cours." : correction ? `Correction reçue : ${correction.score} sur 20.` : ""}
+      </p>
+      {error ? <Feedback tone="error">{error}</Feedback> : null}
+      {correction ? (
+        <div className="feedback-appear">
+          <CorrectionSummary correction={correction} />
         </div>
       ) : null}
-      {correction ? <CorrectionSummary correction={correction} /> : null}
       {review ? (
-        <div className="remediation">
+        <div className="remediation feedback-appear">
           <strong>Révision programmée</strong>
           <p>
             Cet exercice revient le {review.dueAt.slice(0, 10)} (dans {review.intervalDays} jour

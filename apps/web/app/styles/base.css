@@ -1,0 +1,51 @@
+/* Base — reset, éléments nus, politique de focus et d'états désactivés. */
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  min-width: 320px;
+  background: var(--bg);
+}
+
+body {
+  margin: 0;
+  color: var(--text);
+  background: var(--bg);
+  font-family: var(--font-sans);
+  letter-spacing: 0;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+button {
+  font: inherit;
+}
+
+/* Un seul anneau de focus pour tout le produit : visible, contrasté, jamais
+   supprimé. Les contrôles qui dessinent leur propre focus (topbar-search en
+   focus-within) le font par-dessus, pas à la place. */
+:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: var(--focus-ring-offset);
+}
+
+@media (max-width: 1120px) {
+  html,
+  body {
+      overflow-x: hidden;
+  
+  }
+}
+
+/* Any disabled control must read as disabled, wherever it lives. */
+button:disabled,
+.primary-action:disabled,
+.secondary-action:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}

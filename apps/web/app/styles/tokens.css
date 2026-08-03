@@ -1,0 +1,111 @@
+/* Design tokens — la seule source des couleurs, espaces, rayons, ombres,
+   typographie, hauteurs de contrôles, z-index et timings du produit.
+
+   L'identité reste sobre et financière : fonds froids très clairs, encre
+   sombre, un seul accent bleu, états sémantiques discrets. Aucun néon. */
+
+:root {
+  color-scheme: light;
+
+  /* --- Fonds et surfaces -------------------------------------------------- */
+  --bg: #f6f7f9;
+  --surface: #ffffff;
+  --surface-muted: #f1f5f9;
+  /* Cartes posées sur un panneau : un cran au-dessus de --surface. */
+  --surface-raised: #fbfcfe;
+  /* Zones calmes à l'intérieur d'une carte (stats, entêtes de table). */
+  --surface-subtle: #f8fafc;
+
+  /* --- Bordures ----------------------------------------------------------- */
+  --border: #d9e1ea;
+  --border-strong: #c7d0dc;
+
+  /* --- Textes ------------------------------------------------------------- */
+  --text: #101827;
+  --text-strong: #0f172a;
+  --text-secondary: #344054;
+  --text-tertiary: #475467;
+  --muted: #667085;
+  --text-on-accent: #ffffff;
+  /* Encre des contrôles pleins (boutons primaires, marque). */
+  --ink: #111827;
+
+  /* --- Accent et états sémantiques ---------------------------------------- */
+  --accent: #2563eb;
+  --accent-strong: #1d4ed8;
+  --accent-soft: #e8eef8;
+  --accent-softer: #eff6ff;
+  --success: #15803d;
+  --success-strong: #166534;
+  --success-soft: #dcfce7;
+  --success-surface: #f0fdf4;
+  --success-border: #bbf7d0;
+  --warning: #c2410c;
+  --warning-strong: #9a3412;
+  --warning-soft: #ffedd5;
+  --warning-surface: #fffbeb;
+  --danger: #be123c;
+  --danger-strong: #9f1239;
+  --danger-soft: #ffe4e6;
+  --danger-surface: #fff1f2;
+  --danger-border: #fecdd3;
+  --info: #1d4ed8;
+  --info-soft: #e8eef8;
+
+  /* --- Espaces ------------------------------------------------------------ */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-7: 28px;
+  --space-8: 32px;
+
+  /* --- Rayons ------------------------------------------------------------- */
+  --radius-sm: 6px;
+  --radius: 8px;
+  --radius-lg: 10px;
+  --radius-full: 999px;
+
+  /* --- Ombres ------------------------------------------------------------- */
+  --shadow-sm: 0 1px 2px rgba(15, 23, 42, 0.06);
+  --shadow: 0 14px 40px rgba(15, 23, 42, 0.08);
+  --shadow-menu: 0 10px 30px rgba(15, 23, 42, 0.12);
+
+  /* --- Typographie -------------------------------------------------------- */
+  --font-sans: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont,
+    "Segoe UI", sans-serif;
+  --font-mono: ui-monospace, "Cascadia Code", "Source Code Pro", monospace;
+  --font-size-xs: 0.76rem;
+  --font-size-sm: 0.84rem;
+  --font-size-base: 0.92rem;
+  --font-size-md: 1rem;
+  --font-size-lg: 1.25rem;
+  --font-weight-medium: 600;
+  --font-weight-semibold: 650;
+  --font-weight-bold: 750;
+  --font-weight-black: 800;
+
+  /* --- Contrôles ---------------------------------------------------------- */
+  --control-height: 42px;
+  --control-height-sm: 36px;
+  --control-height-lg: 46px;
+  /* Anneau de focus unique pour tout le produit. */
+  --focus-ring: 3px solid color-mix(in srgb, var(--accent) 55%, transparent);
+  --focus-ring-offset: 2px;
+
+  /* --- Z-index ------------------------------------------------------------ */
+  --z-topbar: 5;
+  --z-menu: 20;
+  --z-drawer: 40;
+  --z-skip-link: 50;
+
+  /* --- Motion ------------------------------------------------------------- */
+  /* 150–240 ms, opacity et transform en priorité. Rien de permanent. */
+  --motion-fast: 150ms;
+  --motion-base: 200ms;
+  --motion-slow: 240ms;
+  --ease-out: cubic-bezier(0.2, 0, 0, 1);
+  --ease-in-out: cubic-bezier(0.4, 0, 0.2, 1);
+}

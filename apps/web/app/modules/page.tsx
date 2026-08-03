@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
-import Link from "next/link";
+import { ModuleCard } from "@/components/ui/module-card";
+import { PageHeader } from "@/components/ui/page-header";
 import { getFeatures } from "@/lib/features";
 
 export const metadata: Metadata = {
@@ -37,34 +38,21 @@ export default function ModulesIndexPage() {
 
   return (
     <div className="page-stack">
-      <section className="page-header">
-        <div>
-          <span className="section-label">Modules</span>
-          <h1>Des parcours guidés, niveau par niveau</h1>
-          <p>
-            Chaque module se débloque au score : exercices directs, rétention, cas pratique et
-            justification comptent séparément.
-          </p>
-        </div>
-      </section>
+      <PageHeader
+        label="Modules"
+        title="Des parcours guidés, niveau par niveau"
+        description="Chaque module se débloque au score : exercices directs, rétention, cas pratique et justification comptent séparément."
+      />
 
       <section className="module-grid">
         {MODULE_TRACKS.map((track) => (
-          <article key={track.href} className="panel module-card">
-            <div className="panel-heading">
-              <div>
-                <span className="section-label">Module</span>
-                <h2>{track.title}</h2>
-              </div>
-              {track.premium && billing.enabled ? (
-                <span className="state-token processing">Premium</span>
-              ) : null}
-            </div>
-            <p>{track.description}</p>
-            <Link className="primary-action inline-link" href={track.href}>
-              Ouvrir le module
-            </Link>
-          </article>
+          <ModuleCard
+            key={track.href}
+            href={track.href}
+            title={track.title}
+            description={track.description}
+            premium={track.premium && billing.enabled}
+          />
         ))}
       </section>
     </div>

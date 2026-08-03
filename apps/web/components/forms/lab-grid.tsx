@@ -65,7 +65,12 @@ export function LabGridView({
   }
 
   return (
-    <div className="lab-grid-wrapper">
+    <div
+      className="lab-grid-wrapper table-scroll"
+      role="region"
+      aria-label="Grille de calcul, défilement horizontal possible"
+      tabIndex={0}
+    >
       <table className="lab-grid">
         <caption className="sr-only">
           Grille de calcul : les donn&eacute;es sont en lecture seule ; seules les cellules de r&eacute;ponse sont

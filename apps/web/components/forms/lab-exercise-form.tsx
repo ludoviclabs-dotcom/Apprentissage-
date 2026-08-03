@@ -10,6 +10,7 @@ import {
   toSpreadsheetCells,
   type LabCellValues
 } from "@/components/forms/lab-grid";
+import { Feedback } from "@/components/ui/feedback";
 import { postJson } from "@/lib/api-client";
 import type { FeatureState } from "@/lib/features";
 
@@ -103,16 +104,21 @@ export function LabExerciseForm({
         )}
       </div>
 
-      {error ? (
-        <div className="result-box error" role="alert">
-          <strong>{error}</strong>
+      {/* Région persistante pour lecteur d'écran : en cours puis score. */}
+      <p className="sr-only" role="status" aria-atomic="true">
+        {pending ? "Correction en cours." : correction ? `Correction reçue : ${correction.score} sur 20.` : ""}
+      </p>
+
+      {error ? <Feedback tone="error">{error}</Feedback> : null}
+
+      {correction ? (
+        <div className="feedback-appear">
+          <CorrectionSummary correction={correction} />
         </div>
       ) : null}
 
-      {correction ? <CorrectionSummary correction={correction} /> : null}
-
       {review ? (
-        <div className="remediation">
+        <div className="remediation feedback-appear">
           <strong>Révision programmée</strong>
           <p>
             Cet exercice revient le {review.dueAt.slice(0, 10)} (dans {review.intervalDays} jour
@@ -124,7 +130,7 @@ export function LabExerciseForm({
       ) : null}
 
       {progress ? (
-        <p className="result-inline" data-testid="progress-note">
+        <p className="result-inline" data-testid="progress-note" role="status">
           {progress.attributed
             ? "Progression mise à jour pour ce niveau."
             : "Progression non enregistrée dans cette configuration."}

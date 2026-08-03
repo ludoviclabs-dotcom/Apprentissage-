@@ -1,0 +1,65 @@
+/* Utilities — helpers transverses volontairement peu nombreux. */
+
+.skip-link {
+  position: absolute;
+  top: -48px;
+  left: 12px;
+  z-index: var(--z-skip-link);
+  padding: 10px 14px;
+  background: var(--ink);
+  color: var(--text-on-accent);
+  border-radius: var(--radius);
+  font-weight: 700;
+  transition: top 0.1s ease;
+}
+
+.skip-link:focus-visible {
+  top: 12px;
+}
+
+.page-stack {
+  display: grid;
+  gap: 22px;
+}
+
+.align-start {
+  align-items: start;
+}
+
+.inline-link {
+  justify-self: start;
+  display: inline-flex;
+  align-items: center;
+  text-decoration: none;
+}
+
+.muted {
+  color: var(--muted);
+}
+
+/* --- Comptabilité générale v1 : journal interactif ---------------------- */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* Conteneur de tableau large : le défilement est possible au clavier
+   (tabindex sur le conteneur) et signalé par un voile dégradé sur le bord. */
+.table-scroll {
+  overflow-x: auto;
+  background:
+    linear-gradient(to right, var(--surface) 30%, rgba(255, 255, 255, 0)),
+    linear-gradient(to left, var(--surface) 30%, rgba(255, 255, 255, 0)) 100% 0,
+    linear-gradient(to right, rgba(15, 23, 42, 0.08), rgba(255, 255, 255, 0)),
+    linear-gradient(to left, rgba(15, 23, 42, 0.08), rgba(255, 255, 255, 0)) 100% 0;
+  background-repeat: no-repeat;
+  background-size: 44px 100%, 44px 100%, 12px 100%, 12px 100%;
+  background-attachment: local, local, scroll, scroll;
+}

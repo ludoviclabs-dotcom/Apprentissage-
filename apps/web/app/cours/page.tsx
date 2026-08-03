@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { SourceReference } from "@/components/source-reference";
+import { PageHeader } from "@/components/ui/page-header";
 import { getKnowledgeModel } from "@/lib/view-model";
 import { getCurrentUser } from "@/lib/auth/current-user";
 
@@ -15,18 +16,16 @@ export default async function CoursPage() {
 
   return (
     <div className="page-stack">
-      <section className="page-header">
-        <div>
-          <span className="section-label">Cours</span>
-          <h1>Leçons structurées autour de la logique</h1>
-          <p>
-            Chaque leçon expose concept, règle, raisonnement, exemple, erreur fréquente et exercice lié.
-          </p>
-        </div>
-        <Link href="/exercices" className="primary-action">
-          Pratiquer
-        </Link>
-      </section>
+      <PageHeader
+        label="Cours"
+        title="Leçons structurées autour de la logique"
+        description="Chaque leçon expose concept, règle, raisonnement, exemple, erreur fréquente et exercice lié."
+        aside={
+          <Link href="/exercices" className="primary-action">
+            Pratiquer
+          </Link>
+        }
+      />
 
       <div className="course-list">
         {model.lessons.map((lesson) => (

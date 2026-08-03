@@ -1,6 +1,9 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { ReviewCard } from "@/components/forms/review-card";
+import { EmptyState } from "@/components/ui/empty-state";
+import { PageHeader } from "@/components/ui/page-header";
+import { StatCard } from "@/components/ui/stat-card";
 import { getFeatures } from "@/lib/features";
 import { getRevisionModel } from "@/lib/view-model";
 import { getCurrentUser } from "@/lib/auth/current-user";
@@ -27,38 +30,27 @@ export default async function RevisionsPage() {
 
   return (
     <div className="page-stack">
-      <section className="page-header">
-        <div>
-          <span className="section-label">Révisions</span>
-          <h1>À revoir aujourd'hui</h1>
-          <p>
-            La file remonte les items dus, du plus ancien au plus récent. La réponse reste masquée
-            jusqu'à ce que tu demandes à la voir : c'est le rappel qui ancre, pas la relecture.
-          </p>
-        </div>
-        <div className="hero-score">
-          <span>Dus</span>
-          <strong>{queue.dueCount}</strong>
-        </div>
-      </section>
+      <PageHeader
+        label="Révisions"
+        title="À revoir aujourd'hui"
+        description="La file remonte les items dus, du plus ancien au plus récent. La réponse reste masquée jusqu'à ce que tu demandes à la voir : c'est le rappel qui ancre, pas la relecture."
+        aside={
+          <div className="hero-score">
+            <span>Dus</span>
+            <strong>{queue.dueCount}</strong>
+          </div>
+        }
+      />
 
-      <section className="metric-strip">
-        <article>
-          <span>Dans cette session</span>
-          <strong>{queue.entries.length}</strong>
-        </article>
-        <article>
-          <span>En attente</span>
-          <strong>{remaining}</strong>
-        </article>
-        <article>
-          <span>Planifiés</span>
-          <strong>{queue.totalCount}</strong>
-        </article>
-        <article>
-          <span>Remédiations</span>
-          <strong>{model.remediations.length}</strong>
-        </article>
+      <section className="stat-strip" aria-label="Volumes de la session">
+        <StatCard label="Dans cette session" value={queue.entries.length} tone="accent" />
+        <StatCard label="En attente" value={remaining} />
+        <StatCard label="Planifiés" value={queue.totalCount} />
+        <StatCard
+          label="Remédiations"
+          value={model.remediations.length}
+          tone={model.remediations.length > 0 ? "warning" : "neutral"}
+        />
       </section>
 
       {queue.persisted ? null : (
@@ -70,17 +62,15 @@ export default async function RevisionsPage() {
       )}
 
       {queue.entries.length === 0 ? (
-        <section className="panel">
-          <span className="section-label">File vide</span>
-          <h2>Rien n'est dû pour le moment</h2>
-          <p>
-            Chaque item revient à sa date planifiée. En attendant, un exercice corrigé alimente
-            directement la file.
-          </p>
-          <Link className="primary-action" href="/exercices">
-            Faire un exercice
-          </Link>
-        </section>
+        <EmptyState
+          title="Rien n'est dû pour le moment"
+          description="Chaque item revient à sa date planifiée. En attendant, un exercice corrigé alimente directement la file."
+          action={
+            <Link className="primary-action inline-link" href="/exercices">
+              Faire un exercice
+            </Link>
+          }
+        />
       ) : (
         <section className="flashcard-grid">
           {queue.entries.map((entry) => (

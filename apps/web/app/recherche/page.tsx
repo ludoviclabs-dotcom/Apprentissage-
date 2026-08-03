@@ -1,4 +1,7 @@
 import type { Metadata } from "next";
+import { SearchX } from "lucide-react";
+import { EmptyState } from "@/components/ui/empty-state";
+import { PageHeader } from "@/components/ui/page-header";
 import { searchKnowledge } from "@finance/db";
 
 export const metadata: Metadata = {
@@ -17,16 +20,11 @@ export default async function RecherchePage({
 
   return (
     <div className="page-stack">
-      <section className="page-header">
-        <div>
-          <span className="section-label">Recherche</span>
-          <h1>Moteur de recherche documentaire</h1>
-          <p>
-            Recherche locale sur le corpus dérivé et cité (leçons, notions, flashcards). Chaque résultat conserve
-            sa source : pack, document, page et date.
-          </p>
-        </div>
-      </section>
+      <PageHeader
+        label="Recherche"
+        title="Moteur de recherche documentaire"
+        description="Recherche locale sur le corpus dérivé et cité (leçons, notions, flashcards). Chaque résultat conserve sa source : pack, document, page et date."
+      />
 
       <section className="panel">
         <form action="/recherche" method="get" className="search-form">
@@ -71,11 +69,11 @@ export default async function RecherchePage({
           ))}
         </section>
       ) : query.length >= 3 ? (
-        <section className="panel">
-          <p className="muted">
-            Aucun résultat. Essayez un terme plus général (par ex. « amortissement », « écart », « titres »).
-          </p>
-        </section>
+        <EmptyState
+          icon={<SearchX size={22} />}
+          title="Aucun résultat"
+          description={`Rien ne correspond à « ${query} ». Essayez un terme plus général (par ex. « amortissement », « écart », « titres »).`}
+        />
       ) : null}
     </div>
   );
