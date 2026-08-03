@@ -2,8 +2,8 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Fragment } from "react";
-import { Search } from "lucide-react";
+import { Fragment, useEffect, useState } from "react";
+import { LoaderCircle, Search } from "lucide-react";
 import { resolveTopbar } from "@/lib/topbar";
 import { AccountMenu } from "@/components/shell/account-menu";
 
@@ -24,6 +24,13 @@ export function Topbar({
 }) {
   const pathname = usePathname();
   const topbar = resolveTopbar(pathname);
+  // La recherche globale est une navigation GET : l'état « en cours » couvre
+  // le temps entre la soumission et l'arrivée sur /recherche.
+  const [searching, setSearching] = useState(false);
+
+  useEffect(() => {
+    setSearching(false);
+  }, [pathname]);
 
   return (
     <header className="topbar">
@@ -48,14 +55,27 @@ export function Topbar({
       </div>
 
       {topbar.search ? (
-        <form action="/recherche" method="get" className="topbar-search" role="search">
-          <Search size={16} aria-hidden="true" />
+        <form
+          action="/recherche"
+          method="get"
+          className="topbar-search"
+          role="search"
+          onSubmit={() => setSearching(true)}
+        >
+          {searching ? (
+            <LoaderCircle size={16} aria-hidden="true" className="search-pending-icon" />
+          ) : (
+            <Search size={16} aria-hidden="true" />
+          )}
           <input
             type="search"
             name="q"
             placeholder="Rechercher dans le hub..."
             aria-label="Recherche globale"
           />
+          <span className="sr-only" role="status">
+            {searching ? "Recherche en cours." : ""}
+          </span>
         </form>
       ) : null}
 

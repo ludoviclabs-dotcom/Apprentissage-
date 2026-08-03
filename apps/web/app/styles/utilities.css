@@ -49,3 +49,17 @@
   white-space: nowrap;
   border: 0;
 }
+
+/* Conteneur de tableau large : le défilement est possible au clavier
+   (tabindex sur le conteneur) et signalé par un voile dégradé sur le bord. */
+.table-scroll {
+  overflow-x: auto;
+  background:
+    linear-gradient(to right, var(--surface) 30%, rgba(255, 255, 255, 0)),
+    linear-gradient(to left, var(--surface) 30%, rgba(255, 255, 255, 0)) 100% 0,
+    linear-gradient(to right, rgba(15, 23, 42, 0.08), rgba(255, 255, 255, 0)),
+    linear-gradient(to left, rgba(15, 23, 42, 0.08), rgba(255, 255, 255, 0)) 100% 0;
+  background-repeat: no-repeat;
+  background-size: 44px 100%, 44px 100%, 12px 100%, 12px 100%;
+  background-attachment: local, local, scroll, scroll;
+}

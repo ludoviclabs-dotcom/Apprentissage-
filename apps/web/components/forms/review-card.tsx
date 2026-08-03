@@ -142,7 +142,7 @@ export function ReviewCard({
       </p>
 
       {revealed ? (
-        <div className="expected-answer">
+        <div className="expected-answer reveal-appear">
           <strong>Réponse attendue</strong>
           <p>{revealed.answer}</p>
           {revealed.explanation ? <p className="muted">{revealed.explanation}</p> : null}
@@ -171,7 +171,7 @@ export function ReviewCard({
       </div>
 
       {outcome ? (
-        <p className="result-inline">
+        <p className="result-inline feedback-appear" role="status">
           Prochaine révision : {formatDay(outcome.nextDueAt)} (dans {outcome.intervalDays} jour
           {outcome.intervalDays > 1 ? "s" : ""})
           {persistence.enabled ? "" : " — non enregistrée"}
@@ -179,7 +179,7 @@ export function ReviewCard({
       ) : null}
 
       {remediation ? (
-        <div className="remediation">
+        <div className="remediation feedback-appear" role="status">
           <strong>Remédiation créée</strong>
           <p>{remediation.microLesson}</p>
           <p>{remediation.nextAction}</p>
@@ -187,7 +187,11 @@ export function ReviewCard({
         </div>
       ) : null}
 
-      {error ? <span className="result-inline error">{error}</span> : null}
+      {error ? (
+        <span className="result-inline error" role="alert">
+          {error}
+        </span>
+      ) : null}
 
       {revealed ? <SourceReference sources={revealed.sourceReferences} /> : null}
     </article>

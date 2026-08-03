@@ -1660,3 +1660,69 @@
     max-width: none;
   }
 }
+
+/* --- Feedback des actions pédagogiques ------------------------------------
+   L'état est porté par l'icône et le préfixe textuel ; la couleur ne fait
+   que confirmer. */
+
+.feedback {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--border);
+  background: var(--surface-raised);
+  border-radius: var(--radius);
+  font-size: var(--font-size-base);
+}
+
+.feedback-icon {
+  flex: 0 0 auto;
+  margin-top: 2px;
+}
+
+.feedback-body {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.feedback-body strong {
+  font-size: var(--font-size-sm);
+}
+
+.feedback-body div {
+  color: var(--text-secondary);
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+
+.feedback--success {
+  border-color: var(--success-border);
+  background: var(--success-surface);
+  color: var(--success-strong);
+}
+
+.feedback--partial {
+  border-color: var(--border-strong);
+  background: var(--warning-surface);
+  color: var(--warning-strong);
+}
+
+.feedback--error {
+  border-color: var(--danger-border);
+  background: var(--danger-surface);
+  color: var(--danger-strong);
+}
+
+.feedback--info {
+  border-color: var(--border);
+  background: var(--surface-subtle);
+  color: var(--text-secondary);
+}
+
+.feedback--pending {
+  border-color: var(--border);
+  background: var(--surface-subtle);
+  color: var(--text-secondary);
+}
