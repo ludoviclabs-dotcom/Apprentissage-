@@ -10,6 +10,7 @@ const NAV_DESTINATIONS = [
   { href: "/parcours", label: "Parcours" },
   { href: "/cours", label: "Cours" },
   { href: "/modules/comptabilite-generale", label: "Compta générale" },
+  { href: "/modules/excel-finance-lab", label: "Excel Finance Lab" },
   { href: "/apprendre", label: "Apprendre" },
   { href: "/connaissances", label: "Connaissances" },
   { href: "/recherche", label: "Recherche" },

@@ -90,3 +90,63 @@ export function toCorrection(result: EvaluationResult, identity: CorrectionIdent
     sourceReferences: identity.sourceReferences
   };
 }
+
+/**
+ * A remediation plan derived from a structured evaluation.
+ *
+ * `submitAttempt` used to take the plan from the *legacy prose grader*, run over
+ * a rendered string of the submission, for every exercise — including those a
+ * typed evaluator had just graded. For a spreadsheet answer that string is
+ * `B12=600000 (=B2+B3)`, which contains none of the connectors the prose
+ * classifier looks for, so a flawless 20/20 came back advised to "relier les
+ * faits, la règle et la conclusion" and to "réécrire la réponse en quatre
+ * blocs". `CorrectionSummary` renders that plan unconditionally, so the learner
+ * read it under a perfect score.
+ *
+ * This builds the plan from what the evaluator actually found instead. The
+ * ordering is deliberate: a treatment error is named before a calculation slip,
+ * because knowing the rule was misapplied changes what to revise, whereas an
+ * arithmetic error usually does not.
+ */
+export function remediationFromResult(
+  result: EvaluationResult,
+  context: { expectedAnswer: string; competencyIds: string[] }
+): RemediationPlan {
+  const { feedback } = result;
+  const firstGap =
+    feedback.accountingTreatmentErrors[0] ??
+    feedback.calculationErrors[0] ??
+    feedback.reasoningErrors[0] ??
+    feedback.sourceQualityIssues[0] ??
+    feedback.missing[0] ??
+    null;
+  const perfect = result.score >= result.maxScore;
+
+  return {
+    microLesson: perfect
+      ? "Rien a reprendre sur cet exercice : la reponse est complete."
+      : `Point a reprendre : ${firstGap ?? "revoir la methode attendue."}`,
+    nextAction: perfect
+      ? "Refaire l'exercice a distance pour verifier que la methode tient sans le corrige."
+      : buildNextAction(feedback),
+    competencyTags: context.competencyIds,
+    expectedAnswer: context.expectedAnswer
+  };
+}
+
+/** Advice that names the failing criterion rather than a generic essay plan. */
+function buildNextAction(feedback: EvaluationResult["feedback"]): string {
+  if (feedback.accountingTreatmentErrors.length > 0) {
+    return "Reprendre la regle de calcul du solde concerne, puis refaire l'etape sans le corrige.";
+  }
+
+  if (feedback.reasoningErrors.length > 0) {
+    return "Reecrire la formule en referencant les cellules, puis verifier qu'elle suit un changement de donnees.";
+  }
+
+  if (feedback.calculationErrors.length > 0) {
+    return "Refaire le calcul a partir des cellules sources et comparer au resultat attendu.";
+  }
+
+  return "Completer les cellules manquantes, resultat et formule.";
+}

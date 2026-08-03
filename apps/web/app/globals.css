@@ -1664,3 +1664,93 @@ button:disabled,
     display: none;
   }
 }
+
+/* --- Excel Finance Lab : grille legere ---------------------------------- */
+
+.lab-grid-wrapper {
+  overflow-x: auto;
+}
+
+.lab-grid {
+  width: 100%;
+  min-width: 560px;
+  border-collapse: collapse;
+  font-size: 0.9rem;
+}
+
+.lab-grid th,
+.lab-grid td {
+  padding: 6px 8px;
+  border: 1px solid var(--border);
+  text-align: left;
+  vertical-align: top;
+}
+
+.lab-grid thead th {
+  background: #f8fafc;
+  font-size: 0.8rem;
+}
+
+/* The column letter is what makes "=B2+B3" in a statement point at something
+   the learner can actually see on screen. */
+.lab-column-letter {
+  display: block;
+  color: #667085;
+  font-weight: 800;
+  font-size: 0.72rem;
+}
+
+.lab-gutter {
+  width: 34px;
+  background: #f8fafc;
+  color: #667085;
+  text-align: right;
+  font-size: 0.76rem;
+  font-weight: 800;
+}
+
+/* Given figures read as data, not as something waiting to be filled in. */
+.lab-given {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  background: #fbfcfe;
+  color: #344054;
+}
+
+.lab-blank {
+  background: #fbfcfe;
+}
+
+.lab-input {
+  background: #ffffff;
+  min-width: 150px;
+}
+
+.lab-input input {
+  width: 100%;
+  min-height: 34px;
+  padding: 0 8px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius);
+  background: #ffffff;
+  color: var(--text);
+  font: inherit;
+  font-size: 0.88rem;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.lab-input input:focus-visible {
+  outline: 3px solid color-mix(in srgb, var(--accent) 45%, transparent);
+  outline-offset: 1px;
+}
+
+/* The formula box is monospaced and left-aligned: it holds text, not a figure,
+   and the distinction is the one this lab is teaching. */
+.lab-input input.lab-formula {
+  margin-top: 4px;
+  text-align: left;
+  font-family: ui-monospace, "Cascadia Code", "Source Code Pro", monospace;
+  font-size: 0.82rem;
+  color: #475467;
+}

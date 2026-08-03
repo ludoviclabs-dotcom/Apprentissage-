@@ -20,7 +20,8 @@ import {
   PackageOpen,
   Repeat,
   Route,
-  Search
+  Search,
+  Table2
 } from "lucide-react";
 
 const navigation = [
@@ -28,6 +29,7 @@ const navigation = [
   { href: "/parcours", label: "Parcours", icon: Route },
   { href: "/cours", label: "Cours", icon: BookOpen },
   { href: "/modules/comptabilite-generale", label: "Compta générale", icon: Calculator },
+  { href: "/modules/excel-finance-lab", label: "Excel Finance Lab", icon: Table2 },
   { href: "/apprendre", label: "Apprendre", icon: GraduationCap },
   { href: "/connaissances", label: "Connaissances", icon: Library },
   { href: "/recherche", label: "Recherche", icon: Search },

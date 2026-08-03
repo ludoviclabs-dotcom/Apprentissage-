@@ -1,7 +1,9 @@
 import { randomUUID } from "node:crypto";
 import {
   MAX_SCORE,
-  getComptaGeneraleV1Level,
+  getModuleLevelForExercise,
+  getModuleSourceReferences,
+  remediationFromResult,
   getEvaluator,
   isSpecEvaluationType,
   toCorrection,
@@ -36,7 +38,11 @@ export type SubmissionPayload =
   | { kind: "text"; text: string }
   | { kind: "numeric"; value: number }
   | { kind: "choice"; selectedOptionIds: string[] }
-  | { kind: "journal"; lines: Array<{ account: string; debit?: number; credit?: number }> };
+  | { kind: "journal"; lines: Array<{ account: string; debit?: number; credit?: number }> }
+  | {
+      kind: "spreadsheet";
+      cells: Record<string, { value?: number; formula?: string }>;
+    };
 
 export class UnsupportedSubmissionError extends Error {
   constructor(evaluationType: string, kind: string) {
@@ -119,6 +125,14 @@ function evaluateWith(
 
       return getEvaluator("short_text_rubric").evaluate(spec as never, { text: payload.text });
     }
+
+    case "spreadsheet": {
+      if (payload.kind !== "spreadsheet") {
+        throw new UnsupportedSubmissionError(evaluationType, payload.kind);
+      }
+
+      return getEvaluator("spreadsheet").evaluate(spec as never, { cells: payload.cells });
+    }
   }
 }
 
@@ -134,6 +148,13 @@ export function renderSubmission(payload: SubmissionPayload): string {
     case "journal":
       return payload.lines
         .map((line) => `${line.account} D${line.debit ?? 0} C${line.credit ?? 0}`)
+        .join(" | ");
+    case "spreadsheet":
+      // Sorted so the stored text is stable for one submission whatever order
+      // the client happened to serialise the cells in.
+      return Object.entries(payload.cells)
+        .sort(([left], [right]) => left.localeCompare(right))
+        .map(([cell, entry]) => `${cell}=${entry.value ?? ""}${entry.formula ? ` (${entry.formula})` : ""}`)
         .join(" | ");
   }
 }
@@ -168,8 +189,20 @@ export async function gradeSubmission(
     correction: toCorrection(result, {
       id: identity.id,
       exerciseId: exercise.id,
-      sourceReferences: identity.sourceReferences,
-      remediationPlan: identity.remediationPlan
+      // A module states its own sources. `identity.sourceReferences` comes from
+      // the lessons linked to an exercise, and a module with no lessons — the
+      // Excel lab has none, since there are no `finance` lessons — would
+      // otherwise produce a correction that cites nothing.
+      sourceReferences: getModuleSourceReferences(exercise.id) ?? identity.sourceReferences,
+      // Built from the structured result, not from `identity`, whose plan comes
+      // from the legacy prose grader run over a rendered submission string. For
+      // a spreadsheet or journal answer that string has none of the connectors
+      // the prose classifier looks for, so a flawless answer came back advised
+      // to "réécrire la réponse en quatre blocs".
+      remediationPlan: remediationFromResult(result, {
+        expectedAnswer: exercise.expectedAnswer,
+        competencyIds: exercise.competencyIds
+      })
     }),
     evaluationType: version.evaluationType,
     exerciseVersionId: version.id
@@ -276,7 +309,7 @@ async function recordModuleProgress(
   exerciseId: string,
   score: number
 ): Promise<AttemptProgressResult> {
-  const levelId = getComptaGeneraleV1Level(exerciseId);
+  const levelId = getModuleLevelForExercise(exerciseId);
 
   if (!levelId) {
     return { attributed: false, levelId: null, reason: "exercise-not-in-a-module" };

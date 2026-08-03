@@ -53,6 +53,9 @@ function evaluate(version: AuthoredExerciseVersion, payload: SubmissionPayload):
     case "short_text_rubric":
       if (payload.kind !== "text") throw new Error("payload mismatch");
       return getEvaluator("short_text_rubric").evaluate(version.spec as never, { text: payload.text });
+    case "spreadsheet":
+      if (payload.kind !== "spreadsheet") throw new Error("payload mismatch");
+      return getEvaluator("spreadsheet").evaluate(version.spec as never, { cells: payload.cells });
   }
 }
 

@@ -1,5 +1,6 @@
 import { assertValidRules, type MasteryRules } from "./mastery";
 import { comptaGeneraleV1Levels } from "./compta-generale-v1";
+import { excelLabLevels } from "./excel-lab";
 import { competencies } from "./taxonomy";
 import type { DomainId } from "./types";
 
@@ -119,7 +120,9 @@ export const curriculum2026Q3: CurriculumVersion = {
     // A second track in the same version. Enrolment is per (user, track), so
     // adding one leaves everybody progressing through the provisions track
     // exactly where they were.
-    ...comptaGeneraleV1Levels
+    ...comptaGeneraleV1Levels,
+    // Third track: the Excel Finance Lab (PR-06), on the same reasoning.
+    ...excelLabLevels
   ]
 };
 

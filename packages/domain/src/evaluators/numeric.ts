@@ -42,7 +42,7 @@ const DEFAULT_TOLERANCE_PCT = 0.0001;
  * This scales an epsilon to the magnitudes being compared without widening a
  * learner-facing tolerance in any material way.
  */
-function isAtMost(actual: number, limit: number, sourceMagnitude = 1): boolean {
+export function isAtMost(actual: number, limit: number, sourceMagnitude = 1): boolean {
   const epsilon =
     Number.EPSILON * Math.max(1, Math.abs(actual), Math.abs(limit), Math.abs(sourceMagnitude)) * 8;
   return actual <= limit || Math.abs(actual - limit) <= epsilon;
