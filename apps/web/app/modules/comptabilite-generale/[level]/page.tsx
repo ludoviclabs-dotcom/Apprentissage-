@@ -4,7 +4,6 @@ import { getCurrentUser } from "@/lib/auth/current-user";
 import {
   COMPTA_MODULE_BASE,
   getComptaModuleModel,
-  getModuleLevel,
   parseLevelParam
 } from "@/lib/compta-module";
 
@@ -22,16 +21,20 @@ export default async function ComptaGeneraleLevelPage({
 }) {
   const { level: rawLevel } = await params;
   const position = parseLevelParam(rawLevel);
-  const level = position === null ? null : getModuleLevel(position);
+  const user = await getCurrentUser();
+  const model = await getComptaModuleModel(user?.id);
+  const levelState =
+    position === null
+      ? null
+      : model.levelStates.find((candidate) => candidate.definition.level === position) ?? null;
 
-  if (!level) {
+  if (!levelState?.canOpen) {
     notFound();
   }
 
-  const user = await getCurrentUser();
-  const model = await getComptaModuleModel(user?.id);
+  const level = levelState.definition;
   const exercises = model.exercisesByLevel.get(level.id) ?? [];
-  const snapshot = model.snapshots.find((item) => item.levelId === level.id);
+  const snapshot = levelState.snapshot;
 
   return (
     <div className="page-stack">
@@ -43,7 +46,7 @@ export default async function ComptaGeneraleLevelPage({
         </div>
         <div className="hero-score">
           <span>Score</span>
-          <strong>{Math.round(snapshot?.score ?? 0)}%</strong>
+          <strong>{user ? `${Math.round(snapshot.score)}%` : "Exemple"}</strong>
         </div>
       </section>
 
@@ -58,7 +61,7 @@ export default async function ComptaGeneraleLevelPage({
         </article>
         <article>
           <span>État</span>
-          <strong>{snapshot?.status ?? "à commencer"}</strong>
+          <strong>{snapshot.status}</strong>
         </article>
         <article>
           <span>Seuil</span>
@@ -75,9 +78,15 @@ export default async function ComptaGeneraleLevelPage({
                 <h2>{view.exercise.title}</h2>
                 <p>{view.exercise.estimatedMinutes} minutes</p>
               </div>
-              <Link className="primary-action" href={view.href}>
-                Faire l'exercice
-              </Link>
+              {!user && view.exercise.id !== "ex-cgv1-achat-marchandises" ? (
+                <span className="secondary-action" aria-disabled="true">
+                  Réservé après inscription
+                </span>
+              ) : (
+                <Link className="primary-action" href={view.href}>
+                  Faire l'exercice
+                </Link>
+              )}
             </div>
             <div className="module-meta">
               {view.exercise.competencyIds.map((competencyId) => (

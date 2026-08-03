@@ -5,6 +5,8 @@ import { SourceReference } from "@/components/source-reference";
 import { LabExerciseForm } from "@/components/forms/lab-exercise-form";
 import { resolveEntitlement } from "@/lib/billing/entitlements";
 import { getFeatures } from "@/lib/features";
+import { getCurrentUser } from "@/lib/auth/current-user";
+import { getExerciseAccess } from "@/lib/learning-progression";
 import { EXCEL_LAB_BASE, getLabExercise, nextLabExercise } from "@/lib/excel-lab";
 import { excelLabSources } from "@finance/domain";
 
@@ -28,10 +30,20 @@ export default async function ExcelLabExercisePage({
     notFound();
   }
 
+  const user = await getCurrentUser();
+  const levelAccess = await getExerciseAccess({ userId: user?.id, exerciseId: id });
+
+  if (!levelAccess.allowed) {
+    notFound();
+  }
+
   const features = getFeatures();
   const access = await resolveEntitlement("excel-finance-lab");
   const { exercise } = definition;
   const next = nextLabExercise(exercise.id);
+  const nextAccess = next
+    ? await getExerciseAccess({ userId: user?.id, exerciseId: next.exercise.id })
+    : null;
 
   // The statement itself is withheld, not just the answer form. A locked
   // exercise that still prints its énoncé and its grid has given away the
@@ -89,7 +101,11 @@ export default async function ExcelLabExercisePage({
         exerciseId={exercise.id}
         grid={definition.grid}
         persistence={features.persistence}
-        nextHref={next ? `${EXCEL_LAB_BASE}/exercices/${next.exercise.id}` : undefined}
+        nextHref={
+          next && nextAccess?.allowed
+            ? `${EXCEL_LAB_BASE}/exercices/${next.exercise.id}`
+            : undefined
+        }
       />
 
       <section className="panel">

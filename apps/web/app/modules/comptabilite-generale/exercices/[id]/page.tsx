@@ -3,6 +3,8 @@ import { notFound } from "next/navigation";
 import { SourceReference } from "@/components/source-reference";
 import { ModuleExerciseForm } from "@/components/forms/module-exercise-form";
 import { getFeatures } from "@/lib/features";
+import { getCurrentUser } from "@/lib/auth/current-user";
+import { getExerciseAccess } from "@/lib/learning-progression";
 import { COMPTA_MODULE_BASE, getModuleExercise } from "@/lib/compta-module";
 import { comptaGeneraleV1Sources } from "@finance/domain";
 
@@ -23,6 +25,13 @@ export default async function ComptaGeneraleExercisePage({
   const view = getModuleExercise(id);
 
   if (!view) {
+    notFound();
+  }
+
+  const user = await getCurrentUser();
+  const levelAccess = await getExerciseAccess({ userId: user?.id, exerciseId: id });
+
+  if (!levelAccess.allowed) {
     notFound();
   }
 

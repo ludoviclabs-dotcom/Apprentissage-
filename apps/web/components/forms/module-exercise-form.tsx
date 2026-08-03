@@ -84,6 +84,7 @@ export interface ModuleExerciseFormProps {
    * would otherwise reveal — retrying with the number just shown.
    */
   revealMiniCaseClosing?: boolean;
+  activityContext?: "exercise" | "case_study";
 }
 
 export function ModuleExerciseForm({
@@ -94,7 +95,8 @@ export function ModuleExerciseForm({
   persistence,
   nextHref,
   nextLabel = "Étape suivante",
-  revealMiniCaseClosing = false
+  revealMiniCaseClosing = false,
+  activityContext = "exercise"
 }: ModuleExerciseFormProps) {
   const [lines, setLines] = useState<JournalLineInput[]>(emptyJournal(3));
   const [numericValue, setNumericValue] = useState("");
@@ -142,7 +144,11 @@ export function ModuleExerciseForm({
       correction?: Correction;
       review?: AttemptReview;
       progress?: AttemptProgress;
-    }>("/api/exercises/attempts", { exerciseId, submission: buildSubmission() });
+    }>("/api/exercises/attempts", {
+      exerciseId,
+      submission: buildSubmission(),
+      activityContext
+    });
 
     setPending(false);
 

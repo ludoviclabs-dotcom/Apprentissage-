@@ -1,4 +1,4 @@
-import { domains, learningPath, type DomainId } from "@finance/domain";
+import { domains, type DomainId } from "@finance/domain";
 import { recordDiagnostic } from "@finance/db";
 import { resolveWriteUser } from "@/lib/auth/current-user";
 import { z } from "zod";
@@ -60,9 +60,6 @@ export async function POST(request: Request) {
   return Response.json({
     recommendedStart: priorities[0],
     priorities,
-    path: {
-      ...learningPath,
-      goal: "Parcours recalibré depuis le diagnostic saisi."
-    }
+    note: "Diagnostic d'orientation uniquement : il ne modifie ni score, ni niveau, ni déblocage."
   });
 }

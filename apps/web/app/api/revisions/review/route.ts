@@ -1,7 +1,16 @@
-import { REVIEW_ITEM_TYPES } from "@finance/domain";
+import {
+  REVIEW_ITEM_TYPES,
+  getModuleLevelForExercise,
+  reviewScoreByRating
+} from "@finance/domain";
 import { getPublicDemoWriteResponse, getRuntimeFlags } from "@/lib/runtime-flags";
 import { resolveWriteUser } from "@/lib/auth/current-user";
-import { recordReviewOutcome } from "@finance/db";
+import {
+  getActiveExerciseVersion,
+  recordMasteryEvent,
+  recordReviewOutcome,
+  refreshTrackProgress
+} from "@finance/db";
 import { z } from "zod";
 
 /**
@@ -68,6 +77,31 @@ export async function POST(request: Request) {
 
     if (!result) {
       return Response.json({ error: "Élément de révision introuvable" }, { status: 404 });
+    }
+
+    if (
+      writer.userId &&
+      result.reviewAttemptId &&
+      result.outcome.itemType === "exercise" &&
+      result.masteryEligible
+    ) {
+      const levelId = getModuleLevelForExercise(result.outcome.itemRef);
+      const version = await getActiveExerciseVersion(result.outcome.itemRef);
+
+      if (levelId && version) {
+        const trackId = await recordMasteryEvent(writer.userId, {
+          levelId,
+          kind: "retention",
+          scorePercent: reviewScoreByRating[result.outcome.rating],
+          sourceRef: result.outcome.itemRef,
+          sourceEventId: result.reviewAttemptId,
+          exerciseVersionId: version.id,
+          sourceType: "review",
+          correctedAt: result.outcome.reviewedAt
+        });
+
+        await refreshTrackProgress(writer.userId, trackId);
+      }
     }
 
     return Response.json(result);
