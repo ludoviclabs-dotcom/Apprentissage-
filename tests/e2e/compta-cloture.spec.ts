@@ -175,7 +175,7 @@ test.describe("case study N4 : arrêté annuel", () => {
     // soldes qui permettent de les calculer, jamais les résultats — ni dans la
     // balance affichée, ni dans la feuille de contrôle, ni dans l'export.
     const response = await request.get(`${BASE}/cas/arrete-annuel`);
-    const html = (await response.text()).replace(/[  ]/g, " ");
+    const html = (await response.text()).replace(/[\u202f\u00a0]/g, " ");
 
     expect(response.status()).toBe(200);
 
