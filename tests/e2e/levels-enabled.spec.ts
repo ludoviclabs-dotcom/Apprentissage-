@@ -84,7 +84,9 @@ async function levelStatuses(page: Page): Promise<string[]> {
   await page.goto("/parcours");
   const track = page.locator('[data-canonical-track="track-compta-generale-v1"]');
   await expect(track).toBeVisible();
-  await expect(track.locator("[data-level-status]")).toHaveCount(2);
+  // PR-12a : la verticale complète — N1/N2 (cycle facture) puis N3 (clôture)
+  // et N4 (états financiers).
+  await expect(track.locator("[data-level-status]")).toHaveCount(4);
 
   return track
     .locator("[data-level-status]")
@@ -155,6 +157,9 @@ test("clearing level one opens level two", async ({ page }, testInfo) => {
   const statuses = await levelStatuses(page);
   expect(statuses[0]).toBe("passed");
   expect(statuses[1]).toBe("available");
+  // Le déblocage est strictement séquentiel : N1 acquis ouvre N2 seulement.
+  expect(statuses[2]).toBe("locked");
+  expect(statuses[3]).toBe("locked");
 });
 
 test("a cleared level stays acquired after a bad later result", async ({ page }, testInfo) => {

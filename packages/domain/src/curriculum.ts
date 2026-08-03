@@ -1,5 +1,6 @@
 import { assertValidRules, type MasteryRules } from "./mastery";
 import { comptaGeneraleV1Levels } from "./compta-generale-v1";
+import { comptaGeneraleClotureLevels } from "./compta-generale-cloture";
 import { excelLabLevels } from "./excel-lab";
 import { competencies } from "./taxonomy";
 import type { DomainId } from "./types";
@@ -127,6 +128,9 @@ export const curriculum2026Q3: CurriculumVersion = {
     // adding one leaves everybody progressing through the provisions track
     // exactly where they were.
     ...comptaGeneraleV1Levels,
+    // PR-12a: the same track continues into closing (N3) and financial
+    // statements (N4); enrolments and prior progression are untouched.
+    ...comptaGeneraleClotureLevels,
     // Third track: the Excel Finance Lab (PR-06), on the same reasoning.
     ...excelLabLevels
   ]

@@ -113,9 +113,81 @@ function amountsMatch(actual: number, expected: number, tolerance: number): bool
   return Math.abs(round2(actual - expected)) <= tolerance;
 }
 
+/**
+ * Pairs each expected line with a submitted line.
+ *
+ * Matching by account alone was ambiguous the moment a specification expected
+ * the same account on both sides — the normal shape of a régularisation de
+ * stocks (6037 débité à l'annulation, crédité à la constatation) : la première
+ * ligne 6037 soumise absorbait n'importe quelle attente 6037, et une réponse
+ * entièrement juste pouvait être notée fausse selon l'ordre de saisie.
+ *
+ * Three passes, most specific first, so no expectation steals a line another
+ * expectation matches better: (1) account + side + amount — the line is right;
+ * (2) account + amount — same movement, wrong side, which is exactly what the
+ * direction criterion must sanction; (3) account alone. With unique accounts
+ * the pairing (and the mark) is identical to @1.
+ */
+function pairLines(
+  expectedLines: JournalLineSpec[],
+  submitted: JournalLineSubmission[],
+  tolerance: number
+): { pairs: Array<{ expected: JournalLineSpec; actual: JournalLineSubmission | null }>; extras: JournalLineSubmission[] } {
+  const taken = new Set<number>();
+  const assigned = new Map<number, number>();
+
+  const passes: Array<(expected: JournalLineSpec, line: JournalLineSubmission) => boolean> = [
+    (expected, line) => {
+      const expectedSide = amountOf(expected);
+      const actualSide = amountOf(line);
+
+      return (
+        actualSide.side === expectedSide.side &&
+        amountsMatch(actualSide.value, expectedSide.value, tolerance)
+      );
+    },
+    (expected, line) => {
+      const expectedSide = amountOf(expected);
+      const actualSide = amountOf(line);
+
+      return amountsMatch(actualSide.value, expectedSide.value, tolerance);
+    },
+    () => true
+  ];
+
+  for (const pass of passes) {
+    for (const [expectedIndex, expected] of expectedLines.entries()) {
+      if (assigned.has(expectedIndex)) {
+        continue;
+      }
+
+      const index = submitted.findIndex(
+        (line, lineIndex) =>
+          !taken.has(lineIndex) && accountMatches(expected, line.account) && pass(expected, line)
+      );
+
+      if (index !== -1) {
+        assigned.set(expectedIndex, index);
+        taken.add(index);
+      }
+    }
+  }
+
+  return {
+    pairs: expectedLines.map((expected, expectedIndex) => {
+      const index = assigned.get(expectedIndex);
+
+      return { expected, actual: index === undefined ? null : submitted[index] };
+    }),
+    extras: submitted.filter((_, index) => !taken.has(index))
+  };
+}
+
 export const journalEntryEvaluator: Evaluator<JournalEntrySpec, JournalEntrySubmission> = {
   type: "journal_entry",
-  version: "journal_entry@1",
+  // @2: pass-based line pairing (account+side+amount, then account+amount,
+  // then account). Marks are unchanged for specifications with unique accounts.
+  version: "journal_entry@2",
 
   assertValidSpec(spec) {
     if (spec.expectedLines.length === 0) {
@@ -153,21 +225,18 @@ export const journalEntryEvaluator: Evaluator<JournalEntrySpec, JournalEntrySubm
     const tolerance = spec.amountToleranceAbs ?? DEFAULT_AMOUNT_TOLERANCE;
     const feedback = emptyFeedback();
 
-    const remaining = [...submission.lines];
+    const { pairs, extras } = pairLines(spec.expectedLines, submission.lines, tolerance);
     let accountHits = 0;
     let directionHits = 0;
     let amountHits = 0;
 
-    for (const expected of spec.expectedLines) {
-      const index = remaining.findIndex((line) => accountMatches(expected, line.account));
-
-      if (index === -1) {
+    for (const { expected, actual } of pairs) {
+      if (!actual) {
         feedback.accountingTreatmentErrors.push(`Compte manquant : ${expected.account}.`);
         feedback.missing.push(expected.label ?? expected.account);
         continue;
       }
 
-      const [actual] = remaining.splice(index, 1);
       accountHits += 1;
 
       const expectedSide = amountOf(expected);
@@ -197,7 +266,7 @@ export const journalEntryEvaluator: Evaluator<JournalEntrySpec, JournalEntrySubm
 
     const allowExtra = spec.allowExtraLines ?? false;
 
-    for (const extra of remaining) {
+    for (const extra of extras) {
       if (allowExtra) {
         continue;
       }
@@ -206,7 +275,7 @@ export const journalEntryEvaluator: Evaluator<JournalEntrySpec, JournalEntrySubm
     }
 
     const expectedCount = spec.expectedLines.length;
-    const extraPenalty = allowExtra ? 0 : remaining.length;
+    const extraPenalty = allowExtra ? 0 : extras.length;
     const accountRatio = Math.max(0, (accountHits - extraPenalty) / expectedCount);
     const balanced = isBalanced(submission.lines, tolerance);
 

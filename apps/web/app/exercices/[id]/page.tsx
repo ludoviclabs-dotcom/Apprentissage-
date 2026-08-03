@@ -1,7 +1,7 @@
 import { notFound } from "next/navigation";
 import { getExerciseById } from "@finance/db";
 import { ExercisePanel } from "@/components/exercise-panel";
-import { ExerciseAttemptForm } from "@/components/forms/exercise-attempt-form";
+import { AnyExerciseForm } from "@/components/forms/any-exercise-form";
 
 export default async function ExerciseDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -22,7 +22,7 @@ export default async function ExerciseDetailPage({ params }: { params: Promise<{
       </section>
 
       <ExercisePanel exercise={exercise} />
-      <ExerciseAttemptForm exercise={exercise} />
+      <AnyExerciseForm exercise={exercise} />
     </div>
   );
 }

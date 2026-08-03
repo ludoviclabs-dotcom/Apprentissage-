@@ -65,13 +65,17 @@ describe("shipped curriculum", () => {
     ]);
   });
 
-  it("gates the comptabilité générale v1 track on two contiguous levels", () => {
+  it("gates the comptabilité générale v1 track on four contiguous levels", () => {
     const levels = getTrackLevels(activeCurriculum, COMPTA_GENERALE_V1_TRACK);
 
-    expect(levels.map((level) => level.level)).toEqual([1, 2]);
+    // PR-12a published the closing (N3) and financial-statements (N4) levels:
+    // the full vertical « de la pièce au bilan », still gap-free.
+    expect(levels.map((level) => level.level)).toEqual([1, 2, 3, 4]);
     expect(levels.map((level) => level.id)).toEqual([
       "level-compta-generale-v1-1",
-      "level-compta-generale-v1-2"
+      "level-compta-generale-v1-2",
+      "level-compta-generale-v1-3",
+      "level-compta-generale-v1-4"
     ]);
     // Each level must gate on something it actually teaches, or the unlock rule
     // has nothing to measure.

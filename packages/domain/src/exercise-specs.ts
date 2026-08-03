@@ -1,4 +1,6 @@
 import { comptaGeneraleV1ExerciseVersions } from "./compta-generale-v1";
+import { comptaGeneraleClotureExerciseVersions } from "./compta-generale-cloture";
+import { parcoursMigratedVersions } from "./parcours-migrations";
 import { excelLabExerciseVersions } from "./excel-lab";
 import { assertValidEvaluationSpec, type EvaluationType } from "./evaluators";
 import { exercises } from "./learning";
@@ -203,6 +205,13 @@ export const authoredExerciseVersions: AuthoredExerciseVersion[] = [
   // one at a time above, every exercise of that module ships a specification, so
   // nothing in it falls back to the rubric matcher.
   ...comptaGeneraleV1ExerciseVersions,
+  // PR-12a: closing and financial-statements levels, same rule — every
+  // exercise ships a typed specification, nothing grades through the matcher.
+  ...comptaGeneraleClotureExerciseVersions,
+  // PR-12a: the ten learning-path exercises that still graded through the
+  // rubric matcher, migrated with expectations extracted from their own
+  // corrigés (see parcours-migrations.ts).
+  ...parcoursMigratedVersions,
   // The Excel Finance Lab (PR-06): every exercise graded by the `spreadsheet`
   // evaluator, value and formula checked separately.
   ...excelLabExerciseVersions

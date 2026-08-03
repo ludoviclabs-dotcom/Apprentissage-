@@ -1,3 +1,4 @@
+import { comptaCaseStudies, isCaseStudyExercise } from "./compta-generale-cloture";
 import { COMPTA_GENERALE_V1_TRACK, comptaGeneraleV1MiniCase } from "./compta-generale-v1";
 import { EXCEL_LAB_TRACK } from "./excel-lab";
 import type { ActivityKind, MasteryEventKind } from "./mastery";
@@ -38,7 +39,11 @@ export const canonicalLearningTracks: readonly CanonicalTrackDefinition[] = [
     premium: false,
     diagnosticExerciseIds: {
       "level-compta-generale-v1-1": "ex-cgv1-tva-deductible-qcm",
-      "level-compta-generale-v1-2": "ex-cgv1-tva-a-decaisser"
+      "level-compta-generale-v1-2": "ex-cgv1-tva-a-decaisser",
+      // PR-12a : la synthèse de chaque nouveau niveau — le total de la balance
+      // après inventaire (N3) et le total du bilan (N4) — clôt le diagnostic.
+      "level-compta-generale-v1-3": "ex-cgv1-balance-apres-inventaire",
+      "level-compta-generale-v1-4": "ex-cgv1-total-bilan"
     }
   },
   {
@@ -95,11 +100,13 @@ export function getAttemptEvidenceKinds(input: {
     return [];
   }
 
-  const belongsToMiniCase = comptaGeneraleV1MiniCase.steps.some(
-    (step) => step.exerciseId === input.exerciseId
-  );
-  const context =
-    input.context === "case_study" && belongsToMiniCase ? "case_study" : "exercise";
+  // Membership is checked against every authored case — the N2 mini-case and
+  // the PR-12a closing / annual cases — so a caller cannot claim case-study
+  // evidence for an exercise no case contains.
+  const belongsToCase =
+    comptaGeneraleV1MiniCase.steps.some((step) => step.exerciseId === input.exerciseId) ||
+    isCaseStudyExercise(input.exerciseId);
+  const context = input.context === "case_study" && belongsToCase ? "case_study" : "exercise";
 
   const kinds: MasteryEventKind[] = [
     context === "case_study" ? "caseStudy" : "direct",
@@ -108,7 +115,8 @@ export function getAttemptEvidenceKinds(input: {
   const diagnosticExerciseId = track.diagnosticExerciseIds[input.levelId];
   const isMiniCaseClosing =
     context === "case_study" &&
-    comptaGeneraleV1MiniCase.steps.at(-1)?.exerciseId === input.exerciseId;
+    (comptaGeneraleV1MiniCase.steps.at(-1)?.exerciseId === input.exerciseId ||
+      comptaCaseStudies.some((caseStudy) => caseStudy.steps.at(-1)?.exerciseId === input.exerciseId));
 
   if (diagnosticExerciseId === input.exerciseId || isMiniCaseClosing) {
     if (!kinds.includes("caseStudy")) {

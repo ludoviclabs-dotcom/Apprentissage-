@@ -8,16 +8,19 @@ import { expect, test } from "@playwright/test";
  * where a learner stands.
  */
 
-test("each published track starts with N1 available and N2 locked", async ({ page }) => {
+test("each published track starts with N1 available and the rest locked", async ({ page }) => {
   await page.goto("/parcours");
 
   const rows = page.locator("[data-level-status]");
-  await expect(rows).toHaveCount(4);
+  // PR-12a : la comptabilité générale publie quatre niveaux, le lab Excel deux.
+  await expect(rows).toHaveCount(6);
 
   await expect(rows.nth(0)).toHaveAttribute("data-level-status", "available");
   await expect(rows.nth(1)).toHaveAttribute("data-level-status", "locked");
-  await expect(rows.nth(2)).toHaveAttribute("data-level-status", "available");
+  await expect(rows.nth(2)).toHaveAttribute("data-level-status", "locked");
   await expect(rows.nth(3)).toHaveAttribute("data-level-status", "locked");
+  await expect(rows.nth(4)).toHaveAttribute("data-level-status", "available");
+  await expect(rows.nth(5)).toHaveAttribute("data-level-status", "locked");
 });
 
 test("a gated level explains what opens it", async ({ page }) => {

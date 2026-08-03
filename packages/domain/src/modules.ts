@@ -1,4 +1,8 @@
 import type { EntitlementFeature } from "./billing";
+import {
+  comptaGeneraleClotureLevelByExercise,
+  comptaGeneraleClotureSources
+} from "./compta-generale-cloture";
 import { comptaGeneraleV1Sources, getComptaGeneraleV1Level } from "./compta-generale-v1";
 import { excelLabSources, getExcelLabLevel } from "./excel-lab";
 import type { SourceReference } from "./types";
@@ -32,6 +36,14 @@ const MODULES: ModuleRegistration[] = [
   // The accounting core stays free: it is the track that has to be finishable
   // before anybody is asked to pay for anything.
   { level: getComptaGeneraleV1Level, sources: comptaGeneraleV1Sources, premiumFeature: null },
+  // PR-12a: the closing (N3) and financial-statements (N4) levels of the same
+  // free track, registered separately so their corrections cite the closing
+  // course and PCG/IFRS references rather than the N1/N2 invoice-cycle pages.
+  {
+    level: (exerciseId) => comptaGeneraleClotureLevelByExercise[exerciseId] ?? null,
+    sources: comptaGeneraleClotureSources,
+    premiumFeature: null
+  },
   { level: getExcelLabLevel, sources: excelLabSources, premiumFeature: "excel-finance-lab" }
 ];
 
