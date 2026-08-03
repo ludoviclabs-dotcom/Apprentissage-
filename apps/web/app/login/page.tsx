@@ -1,8 +1,14 @@
+import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { AuthForm } from "@/components/forms/auth-form";
 import { getCurrentUser } from "@/lib/auth/current-user";
 import { safeRedirectPath } from "@/lib/auth/safe-redirect";
 import { getFeatures } from "@/lib/features";
+
+export const metadata: Metadata = {
+  title: "Connexion",
+  description: "Se connecter pour retrouver sa progression privée."
+};
 
 export default async function LoginPage({
   searchParams

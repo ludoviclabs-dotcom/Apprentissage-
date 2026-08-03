@@ -1,4 +1,10 @@
+import type { Metadata } from "next";
 import { searchKnowledge } from "@finance/db";
+
+export const metadata: Metadata = {
+  title: "Recherche",
+  description: "Recherche locale sur le corpus documentaire, extraits cités à l'appui."
+};
 
 export default async function RecherchePage({
   searchParams

@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { CheckoutButton } from "@/components/forms/checkout-button";
 import { FeatureNotice } from "@/components/feature-notice";
@@ -7,6 +8,11 @@ import {
   subscriptionStatusLabel
 } from "@/lib/billing/status";
 import { getFeatures } from "@/lib/features";
+
+export const metadata: Metadata = {
+  title: "Offre — Compte",
+  description: "Abonnement, accès aux modules premium et état de la facturation."
+};
 
 /**
  * The pricing page, and the current state of the learner's access.

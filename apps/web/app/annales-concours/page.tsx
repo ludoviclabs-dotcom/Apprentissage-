@@ -1,6 +1,13 @@
+import type { Metadata } from "next";
 import { ExamSessionForm } from "@/components/forms/exam-session-form";
 import { getFeatures } from "@/lib/features";
+import { statusLabel } from "@/lib/status-labels";
 import { getExamModel } from "@/lib/view-model";
+
+export const metadata: Metadata = {
+  title: "Annales & concours — S'entraîner",
+  description: "Annales blanches et examens courts construits à partir du corpus."
+};
 
 export default async function AnnalesConcoursPage() {
   const model = await getExamModel();
@@ -33,7 +40,7 @@ export default async function AnnalesConcoursPage() {
               </span>
               <h2>{exam.title}</h2>
             </div>
-            <span className="state-token processing">{exam.status}</span>
+            <span className="state-token processing">{statusLabel(exam.status)}</span>
           </div>
           <ExamSessionForm
             exam={exam}

@@ -1,6 +1,12 @@
+import type { Metadata } from "next";
 import { DomainBadge } from "@/components/domain-badge";
 import { simulations } from "@/lib/simulations";
 import Link from "next/link";
+
+export const metadata: Metadata = {
+  title: "Simulations — S'entraîner",
+  description: "Scénarios métier : entretien, réunion, audit, note ou justification."
+};
 
 export default function SimulationsPage() {
   return (

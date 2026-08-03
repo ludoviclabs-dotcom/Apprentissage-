@@ -1,8 +1,15 @@
+import type { Metadata } from "next";
 import { BusinessCaseAttemptForm } from "@/components/forms/business-case-attempt-form";
 import { DomainBadge } from "@/components/domain-badge";
 import { SourceReference } from "@/components/source-reference";
 import { getFeatures } from "@/lib/features";
+import { statusLabel } from "@/lib/status-labels";
 import { getBusinessCaseModel } from "@/lib/view-model";
+
+export const metadata: Metadata = {
+  title: "Business cases — S'entraîner",
+  description: "Cas métier avancés : dossier, preuves, questions et correction de justification."
+};
 
 export default async function BusinessCasesPage() {
   const model = await getBusinessCaseModel();
@@ -12,10 +19,10 @@ export default async function BusinessCasesPage() {
     <div className="page-stack">
       <section className="page-header">
         <div>
-          <span className="section-label">Business Cases</span>
-          <h1>Lab avance pour decisions argumentees</h1>
+          <span className="section-label">Business cases</span>
+          <h1>Lab avancé pour décisions argumentées</h1>
           <p>
-            Les cas pratiques viennent apres les fondations : dossier, preuves, questions, rendu et correction de
+            Les cas pratiques viennent après les fondations : dossier, preuves, questions, rendu et correction de
             justification.
           </p>
         </div>
@@ -33,7 +40,7 @@ export default async function BusinessCasesPage() {
               <h2>{businessCase.title}</h2>
             </div>
             <span className={`state-token ${businessCase.status === "locked" ? "needs-review" : "ready"}`}>
-              {businessCase.status}
+              {statusLabel(businessCase.status)}
             </span>
           </div>
           <p>{businessCase.description}</p>

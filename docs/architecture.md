@@ -98,6 +98,35 @@ entitlement is active — but once issued it stays valid, because it records
 something that happened rather than granting access to anything. See
 `docs/adr/007-stripe-billing-entitlements.md`.
 
+## Navigation and Shells
+
+PR-09 split the chrome in two. `PublicShell` serves the public demo and
+signed-out visitors when accounts are on: product presentation, access to the
+demo content, sign-in and sign-up, no administration area, no personal
+branding and no seeded number presented as a personal score. `AppShell` serves
+an identified user — a signed-in account, or the owner of a private install
+without accounts — with the grouped learning navigation, personal indicators
+and the account menu. `apps/web/app/layout.tsx` picks the shell; both compose
+the same primitives (`SidebarNav`, `Topbar`, `MobileNav`).
+
+The information architecture is one data structure,
+`apps/web/lib/navigation.ts`: five primary destinations (Accueil, Apprendre,
+S'entraîner, Réviser, Progression) with sub-sections, plus a role-gated
+Administration area for Documents and Source packs. The contextual topbar is
+resolved from `apps/web/lib/topbar.ts` (section, title, breadcrumb, search) so
+a route cannot disagree with its own header. Roles come from
+`apps/web/lib/auth/roles.ts`, derived from runtime configuration —
+`LEARNING_HUB_ADMIN_EMAILS` restricts the administration area when accounts
+are enabled; without the list every account of the private install
+administers, and the public demo never does. No progression table changed.
+Hidden never means removed: every historic URL keeps answering, and
+`/modules` is the only new route (the landing page of the Modules entry).
+
+User-facing statuses are localized once in `apps/web/lib/status-labels.ts`;
+the raw model values (`done`, `today`, `mastered`, …) must not reach a screen.
+Below 1120 px the sidebar is replaced by a compact header and a modal drawer
+with a focus trap — never by a horizontal strip of tabs.
+
 ## Public Demo Safeguard
 
 Production without auth is read-only by default. The app shows a demo banner and blocks write routes for uploads and source-pack imports. Private mode requires auth plus a private database.

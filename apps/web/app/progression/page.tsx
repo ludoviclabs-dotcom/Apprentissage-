@@ -1,9 +1,17 @@
+import type { Metadata } from "next";
 import { CompetencyMap } from "@/components/competency-map";
 import { DomainBadge } from "@/components/domain-badge";
 import { ProgressMeter } from "@/components/progress-meter";
+import { statusLabel } from "@/lib/status-labels";
 import { getProgressModel } from "@/lib/view-model";
 import { getDomainAverage, getWeakestCompetencies } from "@finance/domain";
 import { getCurrentUser } from "@/lib/auth/current-user";
+
+export const metadata: Metadata = {
+  title: "Progression — Compétences",
+  description:
+    "Maîtrise par compétence : notions fragiles, badges attribués dans le temps et analyse des erreurs."
+};
 
 export default async function ProgressionPage() {
   const user = await getCurrentUser();
@@ -15,9 +23,9 @@ export default async function ProgressionPage() {
       <section className="page-header">
         <div>
           <span className="section-label">Progression</span>
-          <h1>Maitrise par competence, pas score global opaque</h1>
+          <h1>Maîtrise par compétence, pas score global opaque</h1>
           <p>
-            La progression met en avant les notions fragiles, les erreurs recurrentes et la prochaine action utile.
+            La progression met en avant les notions fragiles, les erreurs récurrentes et la prochaine action utile.
           </p>
         </div>
         <div className="hero-score">
@@ -45,9 +53,9 @@ export default async function ProgressionPage() {
 
       <div className="two-column align-start">
         <CompetencyMap competencies={weakest} />
-        <section className="panel">
-          <span className="section-label">Badges de maitrise</span>
-          <h2>Attribues seulement dans le temps</h2>
+        <section className="panel" id="badges">
+          <span className="section-label">Badges de maîtrise</span>
+          <h2>Attribués seulement dans le temps</h2>
           <div className="priority-list">
             {model.competencies
               .filter((competency) => competency.status === "mastered" || competency.strength >= 75)
@@ -57,7 +65,7 @@ export default async function ProgressionPage() {
                   <div>
                     <strong>{competency.name}</strong>
                     <p>{competency.focus}</p>
-                    <small>{competency.strength}% - statut {competency.status}</small>
+                    <small>{competency.strength}% · {statusLabel(competency.status)}</small>
                   </div>
                 </article>
               ))}
@@ -67,7 +75,7 @@ export default async function ProgressionPage() {
 
       <section className="panel">
         <span className="section-label">Analyse des erreurs</span>
-        <h2>Actions recommandees</h2>
+        <h2>Actions recommandées</h2>
         <div className="priority-list">
           {model.errorJournal.map((entry) => (
             <article key={entry.id} className="priority-row">

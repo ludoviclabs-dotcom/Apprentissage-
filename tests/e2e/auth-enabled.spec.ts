@@ -125,6 +125,54 @@ test("a forged session cookie cannot read personal API data", async ({ browser }
   }
 });
 
+test("a signed-out visitor gets the public shell with sign-in entry points", async ({ page }) => {
+  await page.goto("/");
+
+  const sidebar = page.locator("aside.sidebar");
+  await expect(sidebar.getByRole("link", { name: "Se connecter" })).toBeVisible();
+  await expect(sidebar.getByRole("link", { name: "Créer un compte" })).toBeVisible();
+
+  // Ni menu de compte, ni administration, ni branding privé pour un anonyme.
+  await expect(page.getByRole("button", { name: "Compte" })).toHaveCount(0);
+  await expect(sidebar.getByRole("link", { name: "Documents" })).toHaveCount(0);
+  await expect(sidebar).not.toContainText("Local-first privé");
+});
+
+test("a signed-in learner without the admin role never sees the administration area", async ({ page }, testInfo) => {
+  await signUp(page, emailFor(testInfo.workerIndex, "nav-learner"));
+
+  await page.goto("/");
+
+  const sidebar = page.locator("aside.sidebar");
+  await expect(sidebar.getByRole("button", { name: "Apprendre" })).toBeVisible();
+  await expect(sidebar.getByRole("link", { name: "Documents" })).toHaveCount(0);
+  await expect(sidebar.getByRole("link", { name: "Source packs" })).toHaveCount(0);
+  await expect(sidebar).not.toContainText("Administration");
+
+  // Masqué n'est pas supprimé : la route documentaire répond toujours.
+  const response = await page.goto("/documents");
+  expect(response?.status()).toBeLessThan(400);
+  await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
+});
+
+test("a signed-in user gets the personal continue CTA and the account menu", async ({ page }, testInfo) => {
+  const email = emailFor(testInfo.workerIndex, "nav-cta");
+
+  await signUp(page, email);
+  await page.goto("/");
+
+  // Le CTA « Continuer » est personnel ; la variante démo disparaît.
+  await expect(page.getByRole("link", { name: /^Continuer — / })).toBeVisible();
+  await expect(page.getByRole("link", { name: "Découvrir un exercice guidé" })).toHaveCount(0);
+  await expect(page.getByText("Niveau global")).toBeVisible();
+
+  // Le menu du compte porte l'e-mail et l'accès à l'offre.
+  await page.getByRole("button", { name: email }).click();
+  await expect(
+    page.locator("#account-menu-panel").getByRole("link", { name: "Offre & facturation" })
+  ).toBeVisible();
+});
+
 test("two accounts never see each other's identity", async ({ browser }, testInfo) => {
   // Separate contexts mean separate cookie jars: two genuinely different users.
   const [contextA, contextB] = await Promise.all([browser.newContext(), browser.newContext()]);

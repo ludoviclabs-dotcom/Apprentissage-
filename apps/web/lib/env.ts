@@ -60,6 +60,10 @@ const envSchema = z
     // Turns on account-based authentication. Since PR-01 this means real user
     // accounts in PostgreSQL, not the single shared HTTP basic credential.
     LEARNING_HUB_AUTH_ENABLED: booleanFlag(),
+    // Comma-separated e-mails allowed to see the document administration area
+    // (Documents, Source packs) when accounts are enabled. Absent, every
+    // account of the private install administers — the pre-PR-09 behavior.
+    LEARNING_HUB_ADMIN_EMAILS: z.string().min(1).optional(),
     // Retired in PR-01. Kept in the schema only so a stale `.env` fails loudly
     // instead of quietly losing its protection: someone who still sets these
     // would otherwise believe the app is gated when it is not.

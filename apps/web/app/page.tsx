@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { CompetencyMap } from "@/components/competency-map";
 import { CorrectionSummary } from "@/components/correction-summary";
@@ -6,9 +7,16 @@ import { ExercisePanel } from "@/components/exercise-panel";
 import { LearningCard } from "@/components/learning-card";
 import { ProgressMeter } from "@/components/progress-meter";
 import { getRuntimeFlags } from "@/lib/runtime-flags";
+import { statusLabel } from "@/lib/status-labels";
 import { getDashboardModel } from "@/lib/view-model";
 import { getDomain } from "@finance/domain";
 import { getCurrentUser } from "@/lib/auth/current-user";
+
+export const metadata: Metadata = {
+  title: "Tableau de bord",
+  description:
+    "Reprendre le parcours là où il s'est arrêté : prochaine action, révisions dues et niveau par domaine."
+};
 
 export default async function DashboardPage() {
   const user = await getCurrentUser();
@@ -17,7 +25,16 @@ export default async function DashboardPage() {
   const totalDocuments = model.sourcePacks.reduce((sum, pack) => sum + pack.documentsCount, 0);
   const totalChunks = model.sourcePacks.reduce((sum, pack) => sum + pack.chunksCount, 0);
 
-  if (!model.currentDay || !model.currentLesson || !model.currentExercise || !model.latestCorrection) {
+  // Un score n'est « le tien » que si un compte le porte. Sans compte, les
+  // moyennes viennent du socle seedé et sont présentées comme démonstration,
+  // jamais comme progression personnelle.
+  const personal = user !== null;
+
+  // `latestCorrection` est volontairement exclu de cette porte : un compte qui
+  // vient d'être créé n'a encore soumis aucune correction, et ce n'est pas une
+  // absence de catalogue. Le CTA « Continuer » doit rester visible dès la
+  // première connexion, pas seulement après une première soumission.
+  if (!model.currentDay || !model.currentLesson || !model.currentExercise) {
     return (
       <div className="page-stack">
         <section className="page-header">
@@ -39,34 +56,56 @@ export default async function DashboardPage() {
     <div className="page-stack">
       <section className="page-header">
         <div>
-          <span className="section-label">Tableau de bord</span>
-          <h1>Remise à niveau pilotée par compétences</h1>
+          <span className="section-label">{personal ? "Tableau de bord" : "Démonstration"}</span>
+          <h1>{personal ? "Remise à niveau pilotée par compétences" : "Découvre le cockpit d'apprentissage"}</h1>
           <p>
-            Aujourd'hui : jour {model.currentDay.day} sur {model.learningPath.durationDays}, avec une priorité
-            sur la logique avant l'automatisme.
+            {personal
+              ? `Aujourd'hui : jour ${model.currentDay.day} sur ${model.learningPath.durationDays}, avec une priorité sur la logique avant l'automatisme.`
+              : "Parcours guidé, exercices corrigés et révision active. Les chiffres affichés viennent d'un jeu de démonstration, pas d'une progression personnelle."}
+          </p>
+          <p className="next-action">
+            {personal ? (
+              <Link className="primary-action inline-link" href={`/exercices/${model.currentExercise.id}`}>
+                Continuer — {model.currentExercise.title} · {model.currentDay.minutes} min
+              </Link>
+            ) : (
+              <Link className="primary-action inline-link" href={`/exercices/${model.currentExercise.id}`}>
+                Découvrir un exercice guidé
+              </Link>
+            )}
           </p>
         </div>
-        <div className="hero-score">
-          <span>Niveau global</span>
-          <strong>{model.overallAverage}%</strong>
-        </div>
+        {personal ? (
+          <div className="hero-score">
+            <span>Niveau global</span>
+            <strong>{model.overallAverage}%</strong>
+          </div>
+        ) : (
+          <span className="state-token">Jeu de démonstration</span>
+        )}
       </section>
 
-      <section className="demo-proof-grid" aria-label="Garanties de la demonstration">
+      <section className="demo-proof-grid" aria-label="Garanties de la démonstration">
         <article>
           <span>Mode</span>
-          <strong>{runtime.publicDemo ? "Lecture seule" : "Prive local"}</strong>
-          <p>Imports, uploads et donnees personnelles restent bloques en demo publique.</p>
+          <strong>{runtime.publicDemo ? "Lecture seule" : "Privé local"}</strong>
+          <p>Imports, uploads et données personnelles restent bloqués en démo publique.</p>
         </article>
         <article>
           <span>Sources</span>
           <strong>{totalDocuments} documents</strong>
-          <p>{model.sourcePacks.length} packs · {totalChunks} extraits indexes alimentent les citations.</p>
+          <p>{model.sourcePacks.length} packs · {totalChunks} extraits indexés alimentent les citations.</p>
         </article>
         <article>
           <span>Correction</span>
-          <strong>{model.latestCorrection.rubricScores.length} criteres</strong>
-          <p>Le score separe bareme, erreurs, remediation et preuves citees.</p>
+          <strong>
+            {model.latestCorrection ? `${model.latestCorrection.rubricScores.length} critères` : "À venir"}
+          </strong>
+          <p>
+            {model.latestCorrection
+              ? "Le score sépare barème, erreurs, remédiation et preuves citées."
+              : "S'affiche dès la première correction : barème, erreurs, remédiation et preuves citées."}
+          </p>
         </article>
       </section>
 
@@ -162,7 +201,7 @@ export default async function DashboardPage() {
                   <div>
                     <strong>{day.title}</strong>
                     <small>
-                      {domain.shortName} · {day.minutes} min · {day.status}
+                      {domain.shortName} · {day.minutes} min · {statusLabel(day.status)}
                     </small>
                   </div>
                 </article>
@@ -178,7 +217,17 @@ export default async function DashboardPage() {
       </div>
 
       <div className="two-column align-start">
-        <CorrectionSummary correction={model.latestCorrection} />
+        {model.latestCorrection ? (
+          <CorrectionSummary correction={model.latestCorrection} />
+        ) : (
+          <section className="panel">
+            <span className="section-label">Dernière correction</span>
+            <h2>Aucune correction pour l'instant</h2>
+            <p className="muted">
+              Réponds à un exercice pour voir apparaître ici le barème, les erreurs et la remédiation.
+            </p>
+          </section>
+        )}
         <CompetencyMap competencies={model.weakestCompetencies} />
       </div>
     </div>

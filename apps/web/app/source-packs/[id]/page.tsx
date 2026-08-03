@@ -1,5 +1,6 @@
 import { notFound } from "next/navigation";
 import { DomainBadge } from "@/components/domain-badge";
+import { statusLabel } from "@/lib/status-labels";
 import { getDocuments, getSourcePacks } from "@finance/db";
 
 export default async function SourcePackDetailPage({ params }: { params: Promise<{ id: string }> }) {
@@ -36,7 +37,7 @@ export default async function SourcePackDetailPage({ params }: { params: Promise
           </div>
           <div>
             <dt>Statut</dt>
-            <dd>{pack.status}</dd>
+            <dd>{statusLabel(pack.status)}</dd>
           </div>
           <div>
             <dt>Documents</dt>
@@ -55,7 +56,7 @@ export default async function SourcePackDetailPage({ params }: { params: Promise
               <strong>{document.title}</strong>
               <span>{document.fileType.toUpperCase()}</span>
               <span>{document.pages} pages</span>
-              <span className={`state-token ${document.status}`}>{document.status}</span>
+              <span className={`state-token ${document.status}`}>{statusLabel(document.status)}</span>
             </article>
           ))}
         </div>

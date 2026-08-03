@@ -101,6 +101,11 @@ export default defineConfig({
                   FINANCE_HUB_USE_DATABASE: "true",
                   FINANCE_HUB_PUBLIC_DEMO: "false",
                   LEARNING_HUB_AUTH_ENABLED: "true",
+                  // Personne ne s'inscrit avec cette adresse : tout compte créé
+                  // par la suite est non-administrateur, ce que les specs de
+                  // navigation utilisent pour vérifier le masquage de
+                  // l'espace Administration.
+                  LEARNING_HUB_ADMIN_EMAILS: "admin-owner@example.test",
                   AI_PROVIDER: "none"
                 }
               }

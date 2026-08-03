@@ -72,6 +72,8 @@ Setting the flag without the URL is rejected at boot rather than falling back to
 
 Set `LEARNING_HUB_AUTH_ENABLED=true` (requires database mode) and register at `/signup`. Authentication is local: scrypt password hashing from `node:crypto`, opaque session tokens stored as digests, no external service.
 
+With accounts enabled, `LEARNING_HUB_ADMIN_EMAILS` (comma-separated) restricts the document administration area (Documents, Source packs) to the listed accounts. Unset, every account of the private install sees it; the public demo never does.
+
 Personal data is owned by `user_id` and isolated by PostgreSQL row level security — enabled *and* forced, so even the connecting role cannot read across accounts. Isolation is proven by 13 integration tests that run against a real PostgreSQL in CI; the build fails if they skip. See `docs/adr/001-local-auth-rls.md`.
 
 When database mode is enabled, source-pack imports persist packs, documents and Markdown chunks; attempts persist corrections and update competency strength. In seeded mode, submissions are scored but not stored, and the UI says so.

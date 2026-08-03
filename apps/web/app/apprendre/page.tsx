@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { LearningCard } from "@/components/learning-card";
 import { DomainBadge } from "@/components/domain-badge";
 import { DiagnosticForm } from "@/components/forms/diagnostic-form";
@@ -5,6 +6,11 @@ import { SourceSearchForm } from "@/components/forms/source-search-form";
 import { TutorAskForm } from "@/components/forms/tutor-ask-form";
 import { getLearningModel } from "@/lib/view-model";
 import { getDomain } from "@finance/domain";
+
+export const metadata: Metadata = {
+  title: "Leçon du jour — Apprendre",
+  description: "La notion du jour : concept, règle, raisonnement, exemple et exercice lié."
+};
 
 export default async function LearnPage() {
   const { learningPath, currentDay, lessons } = await getLearningModel();
