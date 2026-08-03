@@ -1,5 +1,5 @@
-import { getStripeCustomerId, linkStripeCustomer } from "@finance/db";
-import { BILLING_PLANS, isBillingPlanKey } from "@finance/domain";
+import { getStripeCustomerId, getSubscriptions, linkStripeCustomer } from "@finance/db";
+import { BILLING_PLANS, isBillingPlanKey, isEntitlingStatus } from "@finance/domain";
 import { z } from "zod";
 import { requireCurrentUser } from "@/lib/auth/current-user";
 import { getConfiguredPlan } from "@/lib/billing/plans";
@@ -90,6 +90,27 @@ export async function POST(request: Request) {
   const stripe = getStripeClient();
 
   try {
+    // One subscription per learner. Both plans open the same features, so a
+    // second one buys nothing and costs real money — and the entitlement row
+    // can only point at one subscription, so cancelling whichever it named
+    // would close access the *other* one is still paying for. Refusing here is
+    // cheaper than reconciling that afterwards.
+    const active = (await getSubscriptions(caller.user.id)).find((subscription) =>
+      isEntitlingStatus(subscription.status)
+    );
+
+    if (active) {
+      return Response.json(
+        {
+          error: "Abonnement déjà actif",
+          details:
+            "Un abonnement est déjà actif sur ce compte. Résilie-le depuis Stripe avant d'en souscrire un autre.",
+          planKey: active.planKey
+        },
+        { status: 409 }
+      );
+    }
+
     const existingCustomerId = await getStripeCustomerId(caller.user.id);
 
     const session = await stripe.checkout.sessions.create({

@@ -11,17 +11,27 @@ import { migrationFiles } from "../src/schema";
  * What `applyBillingIntent` actually writes, against a real PostgreSQL.
  *
  * The unit suites cover the decision — which event grants, which revokes, and
- * with what expiry. Three things can only be proven here, and each one is a way
- * a learner could end up with access nobody paid for, or lose access they did:
+ * with what expiry. What can only be proven here is what the *rows* do, and
+ * every case below is a way a learner could end up with access nobody paid for,
+ * or lose access they did:
  *
  *  1. The upsert's COALESCE. Stripe orders nothing, so the provisional grant
  *     made at checkout (no expiry, meaning "until revoked") can land *after* the
  *     dated grant from the subscription event. If it overwrote the date with
  *     NULL, that entitlement would never lapse again.
- *  2. Revocation by subscription rather than by feature. A plan retired from
+ *  2. The `last_event_at` watermark. Stripe retries a failed delivery for up to
+ *     three days, so the retry of an `active` update can arrive behind the
+ *     `past_due` that superseded it — and reopen paid access on a subscription
+ *     whose payment failed.
+ *  3. Revocation by subscription rather than by feature. A plan retired from
  *     `BILLING_PLANS` still has live entitlements pointing at it; a revocation
  *     that could only name features it still recognises would leave them open.
- *  3. Row level security on `entitlements`, `subscriptions` and `certificates` —
+ *  4. Manual grants surviving both paths. `revokeEntitlements` refuses to close
+ *     one; the grant path must equally refuse to convert one into a
+ *     subscription row, or the next cancellation would close it after all.
+ *  5. A subscription on an unmapped price being stored without being granted,
+ *     so an operator can see it rather than the event vanishing.
+ *  6. Row level security on `entitlements`, `subscriptions` and `certificates` —
  *     one learner's paid access must be invisible to another's session.
  *
  * Requires a real PostgreSQL, and is skipped, loudly, without one.
@@ -44,6 +54,11 @@ const PERIOD_END = "2027-07-27T00:00:00.000Z";
 const PERIOD_END_PLUS_GRACE = "2027-07-28T00:00:00.000Z";
 const LATER_PERIOD_END_PLUS_GRACE = "2028-07-27T00:00:00.000Z";
 
+/** Stripe's `event.created`. The tests below move it deliberately. */
+const EVENT_AT = "2026-07-27T00:00:00.000Z";
+const LATER_EVENT_AT = "2026-08-27T00:00:00.000Z";
+const NEWEST_EVENT_AT = "2026-09-27T00:00:00.000Z";
+
 describeWithDb("billing entitlements", () => {
   let admin: Sql;
   let alice: string;
@@ -59,8 +74,10 @@ describeWithDb("billing entitlements", () => {
     return {
       effect: "grant",
       reason: "subscription-entitling",
+      occurredAt: EVENT_AT,
       userId,
       stripeCustomerId: `cus_${userId.slice(0, 8)}`,
+      stripeSubscriptionId: subscriptionId,
       subscription: {
         stripeSubscriptionId: subscriptionId,
         stripeCustomerId: `cus_${userId.slice(0, 8)}`,
@@ -140,8 +157,11 @@ describeWithDb("billing entitlements", () => {
     await billing.applyBillingIntent({
       effect: "grant",
       reason: "checkout-paid",
+      // Raised *before* the subscription event, delivered after it.
+      occurredAt: EVENT_AT,
       userId: alice,
       stripeCustomerId: `cus_${alice.slice(0, 8)}`,
+      stripeSubscriptionId: "sub_alice",
       subscription: {
         stripeSubscriptionId: "sub_alice",
         stripeCustomerId: `cus_${alice.slice(0, 8)}`,
@@ -193,8 +213,10 @@ describeWithDb("billing entitlements", () => {
     const result = await billing.applyBillingIntent({
       effect: "revoke",
       reason: "subscription-deleted",
+      occurredAt: LATER_EVENT_AT,
       userId: alice,
       stripeCustomerId: `cus_${alice.slice(0, 8)}`,
+      stripeSubscriptionId: "sub_alice",
       subscription: {
         stripeSubscriptionId: "sub_alice",
         stripeCustomerId: `cus_${alice.slice(0, 8)}`,
@@ -226,14 +248,90 @@ describeWithDb("billing entitlements", () => {
     await billing.applyBillingIntent({
       effect: "revoke",
       reason: "subscription-deleted",
+      occurredAt: LATER_EVENT_AT,
       userId: alice,
       stripeCustomerId: `cus_${alice.slice(0, 8)}`,
+      stripeSubscriptionId: null,
       subscription: null,
       features: [],
       expiresAt: null
     });
 
     expect(await billing.hasEntitlement(alice, "excel-finance-lab")).toBe(true);
+  });
+
+  it("refuses an event Stripe raised before one already applied", async () => {
+    // The reactivation hole: Stripe retries a failed delivery for up to three
+    // days, so the retry of an `active` update can land *after* the `past_due`
+    // or cancellation that superseded it. Applying it would reopen paid access
+    // on a subscription whose payment failed. `sub_alice` was last touched by a
+    // LATER_EVENT_AT cancellation; this grant is older and must be refused.
+    const result = await billing.applyBillingIntent(
+      subscriptionIntent(alice, { occurredAt: EVENT_AT })
+    );
+
+    expect(result.outcome).toBe("ignored");
+    expect(result.features).toEqual([]);
+    expect(await billing.hasEntitlement(alice, "completion-certificate")).toBe(false);
+  });
+
+  it("accepts an event newer than the last applied one, without disturbing a manual grant", async () => {
+    const result = await billing.applyBillingIntent(
+      subscriptionIntent(alice, { occurredAt: NEWEST_EVENT_AT })
+    );
+
+    expect(result.outcome).toBe("granted");
+    expect(await billing.hasEntitlement(alice, "completion-certificate")).toBe(true);
+
+    // The manual row from the previous test is still manual. Letting a grant
+    // convert it into a subscription row would mean the next cancellation
+    // revoked access that was given by hand and never depended on Stripe —
+    // `revokeEntitlements` already refuses to close one, and the grant path
+    // must agree with it.
+    const lab = (await billing.getEntitlements(alice)).find(
+      (record) => record.feature === "excel-finance-lab"
+    );
+
+    expect(lab?.source).toBe("manual");
+    expect(lab?.stripeSubscriptionId).toBeNull();
+    expect(lab?.expiresAt).toBeNull();
+  });
+
+  it("persists a subscription it cannot price, while granting nothing", async () => {
+    // An active subscription created straight from the Stripe dashboard, on a
+    // price this deployment cannot map to a plan. The row has to appear so an
+    // operator can see it and fix the mapping; granting on a guess is what must
+    // not happen.
+    const result = await billing.applyBillingIntent({
+      effect: "none",
+      reason: "unknown-plan",
+      occurredAt: EVENT_AT,
+      userId: bob,
+      stripeCustomerId: null,
+      stripeSubscriptionId: "sub_bob_unpriced",
+      subscription: {
+        stripeSubscriptionId: "sub_bob_unpriced",
+        stripeCustomerId: null,
+        status: "active",
+        statusIsProvisional: false,
+        planKey: null,
+        priceId: "price_created_in_the_dashboard",
+        currentPeriodEnd: PERIOD_END,
+        cancelAtPeriodEnd: false
+      },
+      features: [],
+      expiresAt: null
+    });
+
+    expect(result.outcome).toBe("ignored");
+    expect(result.features).toEqual([]);
+
+    const stored = (await billing.getSubscriptions(bob)).find(
+      (subscription) => subscription.stripeSubscriptionId === "sub_bob_unpriced"
+    );
+
+    expect(stored).toMatchObject({ status: "active", planKey: null });
+    expect(await billing.hasEntitlement(bob, "excel-finance-lab")).toBe(false);
   });
 
   it("resolves a Stripe customer to its learner, and nobody to an unknown one", async () => {
@@ -325,8 +423,10 @@ describeWithDb("billing entitlements", () => {
     await billing.applyBillingIntent({
       effect: "revoke",
       reason: "subscription-deleted",
+      occurredAt: LATER_EVENT_AT,
       userId: bob,
       stripeCustomerId: null,
+      stripeSubscriptionId: null,
       subscription: null,
       features: [],
       expiresAt: null

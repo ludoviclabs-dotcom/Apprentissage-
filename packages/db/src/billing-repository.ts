@@ -301,7 +301,13 @@ export interface ApplyBillingIntentResult {
 export async function applyBillingIntent(intent: BillingIntent): Promise<ApplyBillingIntentResult> {
   assertDatabase("applyBillingIntent");
 
-  if (intent.effect === "none") {
+  // An understood event with nothing at all to write. A `none` intent that
+  // *does* carry a subscription draft — an active subscription on a price this
+  // deployment cannot map to a plan — is not one of these: the whole point of
+  // keeping its draft is that the row must appear so an operator can see the
+  // subscription and fix the mapping. It falls through and is persisted below,
+  // and only the grant is skipped.
+  if (intent.effect === "none" && !intent.subscription) {
     return { outcome: "ignored", userId: intent.userId, features: [] };
   }
 
@@ -322,6 +328,14 @@ export async function applyBillingIntent(intent: BillingIntent): Promise<ApplyBi
   }
 
   return withUserContext(userId, async (db) => {
+    if (intent.stripeSubscriptionId && (await isStaleEvent(db, intent))) {
+      // A retry of an event Stripe raised *before* one already applied. Applying
+      // it would rewind the subscription — most damagingly, an `active` update
+      // redelivered after the `past_due` that superseded it would re-grant paid
+      // access to a subscription whose payment had failed.
+      return { outcome: "ignored" as const, userId, features: [] };
+    }
+
     if (intent.subscription) {
       const draft = intent.subscription;
 
@@ -335,11 +349,17 @@ export async function applyBillingIntent(intent: BillingIntent): Promise<ApplyBi
           planKey: draft.planKey,
           priceId: draft.priceId,
           currentPeriodEnd: draft.currentPeriodEnd,
-          cancelAtPeriodEnd: draft.cancelAtPeriodEnd
+          cancelAtPeriodEnd: draft.cancelAtPeriodEnd,
+          lastEventAt: intent.occurredAt
         })
         .onConflictDoUpdate({
           target: subscriptionsTable.stripeSubscriptionId,
+          // The same rule as the read above, restated in SQL so it holds under
+          // concurrent deliveries too: the read cannot see a row a sibling
+          // transaction has not committed yet, and this cannot be raced.
+          setWhere: sql`${subscriptionsTable.lastEventAt} is null or ${subscriptionsTable.lastEventAt} <= ${intent.occurredAt}::timestamptz`,
           set: {
+            lastEventAt: sql`greatest(${intent.occurredAt}::timestamptz, ${subscriptionsTable.lastEventAt})`,
             // `subscriptions.status` is NOT NULL, so this coalesce always keeps
             // the stored value — which is exactly what a provisional status
             // means: the checkout event may create the row, never re-describe
@@ -361,9 +381,15 @@ export async function applyBillingIntent(intent: BillingIntent): Promise<ApplyBi
     }
 
     if (intent.effect === "revoke") {
-      const revoked = await revokeEntitlements(db, userId, intent.subscription?.stripeSubscriptionId ?? null);
+      const revoked = await revokeEntitlements(db, userId, intent.stripeSubscriptionId);
 
       return { outcome: "revoked" as const, userId, features: revoked };
+    }
+
+    // A `none` intent reaches here only to have had its subscription row
+    // written; it grants nothing, and `features` is empty anyway.
+    if (intent.effect === "none") {
+      return { outcome: "ignored" as const, userId, features: [] };
     }
 
     for (const feature of intent.features) {
@@ -375,19 +401,27 @@ export async function applyBillingIntent(intent: BillingIntent): Promise<ApplyBi
           status: "active",
           source: "subscription",
           planKey: intent.subscription?.planKey ?? null,
-          stripeSubscriptionId: intent.subscription?.stripeSubscriptionId ?? null,
+          // From the intent, not from the draft: an `invoice.paid` names its
+          // subscription without being allowed to rewrite that row, and an
+          // entitlement with no subscription id is one no cancellation can
+          // revoke.
+          stripeSubscriptionId: intent.stripeSubscriptionId,
           expiresAt: intent.expiresAt,
           revokedAt: null
         })
         .onConflictDoUpdate({
           target: [entitlementsTable.userId, entitlementsTable.feature],
+          // A manual grant is never touched by Stripe. `revokeEntitlements`
+          // already refuses to close one; without this the *grant* path would
+          // still quietly convert it into a subscription row, and the next
+          // cancellation would then revoke access that was given by hand and
+          // never depended on a subscription at all.
+          setWhere: sql`${entitlementsTable.source} <> 'manual'`,
           set: {
             status: "active",
             source: "subscription",
             planKey: sql`coalesce(${intent.subscription?.planKey ?? null}, ${entitlementsTable.planKey})`,
-            stripeSubscriptionId: sql`coalesce(${
-              intent.subscription?.stripeSubscriptionId ?? null
-            }, ${entitlementsTable.stripeSubscriptionId})`,
+            stripeSubscriptionId: sql`coalesce(${intent.stripeSubscriptionId}, ${entitlementsTable.stripeSubscriptionId})`,
             // A NULL expiry means "until revoked", which is what the provisional
             // grant made at checkout carries. Stripe does not order its events,
             // so that provisional grant can land *after* the dated one from the
@@ -407,6 +441,41 @@ export async function applyBillingIntent(intent: BillingIntent): Promise<ApplyBi
 }
 
 type BoundDb = Parameters<Parameters<typeof withUserContext<unknown>>[1]>[0];
+
+/**
+ * Has a newer event already been applied to this subscription?
+ *
+ * Stripe retries a failed delivery for up to three days and guarantees no
+ * ordering, so "the event that arrived last" and "the event Stripe raised last"
+ * are different things. Comparing `event.created` against the newest one
+ * applied is what tells them apart.
+ *
+ * This is checked before the write rather than left to the `setWhere` on the
+ * upsert, because the entitlement decision has to agree with the subscription
+ * row: a `setWhere` alone would correctly refuse to rewind the row while the
+ * grant below happily reopened access. Equal timestamps are allowed through —
+ * Stripe's `created` has one-second resolution, and refusing a same-second
+ * event would drop the second half of a legitimate pair.
+ */
+async function isStaleEvent(db: BoundDb, intent: BillingIntent): Promise<boolean> {
+  if (!intent.stripeSubscriptionId) {
+    return false;
+  }
+
+  const rows = await db
+    .select({ lastEventAt: subscriptionsTable.lastEventAt })
+    .from(subscriptionsTable)
+    .where(eq(subscriptionsTable.stripeSubscriptionId, intent.stripeSubscriptionId))
+    .limit(1);
+
+  const lastEventAt = rows[0]?.lastEventAt;
+
+  if (!lastEventAt) {
+    return false;
+  }
+
+  return Date.parse(lastEventAt) > Date.parse(intent.occurredAt);
+}
 
 /**
  * Revokes every entitlement tied to a subscription, or all of the learner's

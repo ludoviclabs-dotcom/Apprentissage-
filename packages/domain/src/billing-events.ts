@@ -82,14 +82,29 @@ export interface InvoiceSnapshot {
   paid: boolean;
 }
 
+/**
+ * `createdAt` is Stripe's `event.created`, not the moment of delivery.
+ *
+ * It is carried because Stripe retries a failed delivery for up to three days,
+ * so a *stale* event can arrive after a newer one — the retry of an `active`
+ * update landing after the `past_due` that superseded it. Without a timestamp
+ * to compare, applying the older event would reopen paid access on a
+ * subscription that had already failed or been cancelled.
+ */
 export type BillingWebhookEvent =
-  | { id: string; type: "checkout.session.completed"; session: CheckoutSessionSnapshot }
   | {
       id: string;
+      createdAt: string;
+      type: "checkout.session.completed";
+      session: CheckoutSessionSnapshot;
+    }
+  | {
+      id: string;
+      createdAt: string;
       type: "customer.subscription.created" | "customer.subscription.updated" | "customer.subscription.deleted";
       subscription: SubscriptionSnapshot;
     }
-  | { id: string; type: "invoice.paid"; invoice: InvoiceSnapshot };
+  | { id: string; createdAt: string; type: "invoice.paid"; invoice: InvoiceSnapshot };
 
 // --- The decision -----------------------------------------------------------
 
@@ -132,6 +147,8 @@ export interface BillingIntent {
   /** `none` is a decision too: the event was understood and changes nothing. */
   effect: "grant" | "revoke" | "none";
   reason: BillingIntentReason;
+  /** Stripe's `event.created`, so a stale redelivery can be recognised. */
+  occurredAt: string;
   /**
    * Who this is about. At least one of the two must be set for a `grant` or a
    * `revoke`; the repository resolves a customer id to a user through
@@ -139,6 +156,18 @@ export interface BillingIntent {
    */
   userId: string | null;
   stripeCustomerId: string | null;
+  /**
+   * The subscription this intent concerns — which is not the same thing as
+   * {@link subscription}, the row to write.
+   *
+   * An invoice names its subscription but must not rewrite that row, since an
+   * invoice does not know the subscription's status. The id still has to travel:
+   * it is what links the granted entitlement to a subscription, and a later
+   * cancellation revokes by exactly that id. Dropping it here would leave an
+   * `invoice.paid` that arrived before any subscription event holding an
+   * unlinked entitlement that no revocation could reach.
+   */
+  stripeSubscriptionId: string | null;
   /** Written whether the effect is a grant or a revocation, so the local
    * subscription row tracks Stripe even while access is off. */
   subscription: SubscriptionDraft | null;
@@ -154,8 +183,10 @@ function nothing(reason: BillingIntentReason, event: BillingWebhookEvent): Billi
   return {
     effect: "none",
     reason,
+    occurredAt: event.createdAt,
     userId: eventUserId(event),
     stripeCustomerId: eventCustomerId(event),
+    stripeSubscriptionId: eventSubscriptionId(event),
     subscription: null,
     features: [],
     expiresAt: null
@@ -181,6 +212,17 @@ function eventCustomerId(event: BillingWebhookEvent): string | null {
       return event.invoice.stripeCustomerId;
     default:
       return event.subscription.stripeCustomerId;
+  }
+}
+
+function eventSubscriptionId(event: BillingWebhookEvent): string | null {
+  switch (event.type) {
+    case "checkout.session.completed":
+      return event.session.stripeSubscriptionId;
+    case "invoice.paid":
+      return event.invoice.stripeSubscriptionId;
+    default:
+      return event.subscription.stripeSubscriptionId;
   }
 }
 
@@ -242,8 +284,10 @@ export function mapBillingEvent(event: BillingWebhookEvent): BillingIntent {
       return {
         effect: "grant",
         reason: "checkout-paid",
+        occurredAt: event.createdAt,
         userId: session.userId,
         stripeCustomerId: session.stripeCustomerId,
+        stripeSubscriptionId: session.stripeSubscriptionId,
         subscription: session.stripeSubscriptionId
           ? {
               stripeSubscriptionId: session.stripeSubscriptionId,
@@ -275,8 +319,10 @@ export function mapBillingEvent(event: BillingWebhookEvent): BillingIntent {
         return {
           effect: "revoke",
           reason: "subscription-not-entitling",
+          occurredAt: event.createdAt,
           userId: subscription.userId,
           stripeCustomerId: subscription.stripeCustomerId,
+          stripeSubscriptionId: subscription.stripeSubscriptionId,
           subscription: draft,
           features: [],
           expiresAt: null
@@ -296,8 +342,10 @@ export function mapBillingEvent(event: BillingWebhookEvent): BillingIntent {
       return {
         effect: "grant",
         reason: "subscription-entitling",
+        occurredAt: event.createdAt,
         userId: subscription.userId,
         stripeCustomerId: subscription.stripeCustomerId,
+        stripeSubscriptionId: subscription.stripeSubscriptionId,
         subscription: draft,
         features,
         expiresAt: entitlementExpiry(subscription.currentPeriodEnd)
@@ -310,8 +358,10 @@ export function mapBillingEvent(event: BillingWebhookEvent): BillingIntent {
       return {
         effect: "revoke",
         reason: "subscription-deleted",
+        occurredAt: event.createdAt,
         userId: subscription.userId,
         stripeCustomerId: subscription.stripeCustomerId,
+        stripeSubscriptionId: subscription.stripeSubscriptionId,
         // Forced to `canceled`: the deleted event is the end of the
         // subscription whatever status the payload happens to carry.
         subscription: { ...toDraft(subscription), status: "canceled" },
@@ -354,8 +404,13 @@ export function mapBillingEvent(event: BillingWebhookEvent): BillingIntent {
       return {
         effect: "grant",
         reason: "invoice-paid",
+        occurredAt: event.createdAt,
         userId: invoice.userId,
         stripeCustomerId: invoice.stripeCustomerId,
+        // Carried even though `subscription` stays null: the entitlement must
+        // be linked to the subscription, or a later cancellation — which
+        // revokes by subscription id — would not reach it.
+        stripeSubscriptionId: invoice.stripeSubscriptionId,
         subscription: null,
         features,
         expiresAt: entitlementExpiry(invoice.periodEnd)

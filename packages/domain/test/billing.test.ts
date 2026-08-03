@@ -26,6 +26,7 @@ import {
 const USER = "11111111-1111-4111-8111-111111111111";
 const PERIOD_END = "2027-07-27T00:00:00.000Z";
 const PERIOD_END_PLUS_GRACE = "2027-07-28T00:00:00.000Z";
+const EVENT_AT = "2026-07-27T00:00:00.000Z";
 
 function subscription(overrides: Partial<SubscriptionSnapshot> = {}): SubscriptionSnapshot {
   return {
@@ -45,7 +46,7 @@ function subscriptionEvent(
   type: "customer.subscription.created" | "customer.subscription.updated" | "customer.subscription.deleted",
   overrides: Partial<SubscriptionSnapshot> = {}
 ): BillingWebhookEvent {
-  return { id: `evt_${type}`, type, subscription: subscription(overrides) };
+  return { id: `evt_${type}`, createdAt: EVENT_AT, type, subscription: subscription(overrides) };
 }
 
 describe("plans", () => {
@@ -131,6 +132,7 @@ describe("isEntitlementActive", () => {
 describe("mapBillingEvent — checkout.session.completed", () => {
   const paidSession: BillingWebhookEvent = {
     id: "evt_1",
+    createdAt: EVENT_AT,
     type: "checkout.session.completed",
     session: {
       sessionId: "cs_1",
@@ -270,11 +272,35 @@ describe("mapBillingEvent — customer.subscription.*", () => {
     expect(intent.userId).toBeNull();
     expect(intent.stripeCustomerId).toBe("cus_1");
   });
+
+  it("carries the event's own timestamp, so a stale redelivery is recognisable", () => {
+    // Stripe retries for up to three days and orders nothing, so `occurredAt`
+    // is what distinguishes "arrived last" from "happened last".
+    for (const type of [
+      "customer.subscription.created",
+      "customer.subscription.updated",
+      "customer.subscription.deleted"
+    ] as const) {
+      expect(mapBillingEvent(subscriptionEvent(type)).occurredAt).toBe(EVENT_AT);
+    }
+  });
+
+  it("names its subscription even when it grants nothing", () => {
+    // The unknown-price case still has to be revocable and diagnosable.
+    const intent = mapBillingEvent(
+      subscriptionEvent("customer.subscription.created", { planKey: null, priceId: "price_unknown" })
+    );
+
+    expect(intent.effect).toBe("none");
+    expect(intent.stripeSubscriptionId).toBe("sub_1");
+    expect(intent.subscription).not.toBeNull();
+  });
 });
 
 describe("mapBillingEvent — invoice.paid", () => {
   const renewal: BillingWebhookEvent = {
     id: "evt_inv",
+    createdAt: EVENT_AT,
     type: "invoice.paid",
     invoice: {
       invoiceId: "in_1",
@@ -294,8 +320,11 @@ describe("mapBillingEvent — invoice.paid", () => {
     expect(intent.reason).toBe("invoice-paid");
     expect(intent.expiresAt).toBe(PERIOD_END_PLUS_GRACE);
     // An invoice does not know the subscription's status, so it must not write
-    // the subscription row.
+    // the subscription row…
     expect(intent.subscription).toBeNull();
+    // …but the id still travels, or an invoice that arrived before any
+    // subscription event would leave an entitlement no cancellation can reach.
+    expect(intent.stripeSubscriptionId).toBe("sub_1");
   });
 
   it("ignores an unpaid invoice", () => {

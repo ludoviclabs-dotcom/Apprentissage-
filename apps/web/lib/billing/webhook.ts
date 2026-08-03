@@ -175,10 +175,16 @@ export function toBillingWebhookEvent(
     return null;
   }
 
+  // `event.created`, not the delivery time: a retry three days later still
+  // describes the state Stripe observed when the event was raised, and that is
+  // what makes an out-of-order redelivery recognisable downstream.
+  const createdAt = toIso(event.created) ?? new Date(0).toISOString();
+
   switch (event.type) {
     case "checkout.session.completed":
       return {
         id: event.id,
+        createdAt,
         type: event.type,
         session: toCheckoutSnapshot(event.data.object)
       };
@@ -187,12 +193,14 @@ export function toBillingWebhookEvent(
     case "customer.subscription.deleted":
       return {
         id: event.id,
+        createdAt,
         type: event.type,
         subscription: toSubscriptionSnapshot(event.data.object, resolvePlanKey)
       };
     case "invoice.paid":
       return {
         id: event.id,
+        createdAt,
         type: event.type,
         invoice: toInvoiceSnapshot(event.data.object, resolvePlanKey)
       };

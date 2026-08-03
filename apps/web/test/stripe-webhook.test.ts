@@ -230,6 +230,14 @@ describe("customer.subscription.*", () => {
     });
   });
 
+  it("carries Stripe's event.created, not the delivery time", async () => {
+    // The fixture's `created` is 1785110401. Without this the repository could
+    // not tell a three-day-old retry from a fresh event.
+    await deliver("customer-subscription-created");
+
+    expect(store.intents[0]?.occurredAt).toBe(new Date(1785110401 * 1000).toISOString());
+  });
+
   it("revokes when the subscription falls past due", async () => {
     const result = await deliver("customer-subscription-updated-past-due");
 
@@ -276,6 +284,16 @@ describe("invoice.paid", () => {
       expiresAt: "2028-07-27T00:00:00.000Z",
       subscription: null
     });
+  });
+
+  it("keeps the subscription id on the intent without writing the subscription row", async () => {
+    await deliver("invoice-paid");
+
+    // An invoice.paid that lands before any subscription event would otherwise
+    // create an entitlement with no subscription id — one that a later
+    // cancellation, which revokes by subscription id, could never close.
+    expect(store.intents[0]?.stripeSubscriptionId).toBe("sub_TESTFOUNDER");
+    expect(store.intents[0]?.subscription).toBeNull();
   });
 
   it("resolves the subscription through parent.subscription_details", async () => {

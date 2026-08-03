@@ -77,6 +77,32 @@ still shortens access. That rule is asserted against a real PostgreSQL in
 `packages/db/test/billing-entitlements.integration.test.ts`, because it cannot
 be proven anywhere else.
 
+### A stale redelivery is refused, not applied
+
+Out-of-order delivery is not only a problem between *different* event types. Stripe
+retries a failed delivery for up to three days, so the retry of an `active`
+update can arrive behind the `past_due` — or the cancellation — that superseded
+it. Applying it would reopen paid access on a subscription whose payment had
+failed, and the re-granted expiry would be a real future date rather than an
+obviously dead one.
+
+`subscriptions.last_event_at` records the `event.created` of the newest event
+applied to that row, and anything older is refused outright — the whole intent,
+not merely the row update, because an entitlement grant that outlived a refused
+status change would be exactly the bug. Equal timestamps pass: Stripe's
+`created` has one-second resolution, and refusing a same-second event would drop
+the second half of a legitimate pair. The rule is also restated as a `WHERE` on
+the upsert, so it holds under concurrent deliveries the read cannot see.
+
+### An invoice names its subscription without rewriting it
+
+`invoice.paid` must not touch the subscription row — an invoice does not know the
+subscription's status — but the subscription *id* still travels on the intent.
+Without it, an `invoice.paid` delivered before any subscription event would
+create an entitlement with no subscription id, and every later revocation, which
+works by subscription id, would miss it. Access would then persist to the
+invoice-derived expiry despite an explicit cancellation.
+
 ### Revocation works from the subscription id, not from a feature list
 
 A plan retired from `BILLING_PLANS` still has live entitlements pointing at it.
@@ -85,6 +111,20 @@ open forever. Revoking every `source = 'subscription'` row tied to the
 subscription closes them regardless — and leaves `source = 'manual'` grants
 alone, which is what makes a beta tester or a hand-handled refund expressible
 without inventing a fake subscription.
+
+The *grant* path has to agree with that, which it did not at first. A manual
+grant followed by a subscription would rewrite the row's `source`, and the next
+cancellation would then close access that had been given by hand and never
+depended on Stripe at all. The upsert now refuses to touch a manual row, so the
+exemption holds on both paths rather than only on the one that advertises it.
+
+`UNIQUE (user_id, feature)` is kept, so a feature is one row and "do they have
+access" is never a question about precedence. The cost is that a learner may
+hold one subscription's worth of access at a time, which the checkout route now
+enforces directly: it refuses to open a session for somebody who already has an
+entitling subscription. A second subscription would buy nothing — both plans
+open the same features — while charging real money and leaving the entitlement
+row pointing at only one of them.
 
 ### Price ids never reach a client
 
@@ -162,7 +202,10 @@ churn.
 
 - **One Stripe customer per learner, one subscription's worth of access.** Seats,
   team plans and per-seat entitlements are not modelled. Adding them means a new
-  owner column, not a new column on `entitlements`.
+  owner column, not a new column on `entitlements`. A second concurrent
+  subscription is refused at checkout rather than reconciled; a subscription
+  created outside the app can still produce one, and it is stored but grants
+  independently of the existing row.
 - **No billing portal.** Cancellation and card updates go through the Stripe
   dashboard for this beta. A portal session is a small route to add later; it was
   left out because it is not needed to sell or to revoke.

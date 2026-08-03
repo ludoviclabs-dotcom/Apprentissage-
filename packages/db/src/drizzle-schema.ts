@@ -553,6 +553,9 @@ export const subscriptionsTable = pgTable("subscriptions", {
   priceId: text("price_id"),
   currentPeriodEnd: timestamp("current_period_end", { mode: "string" }),
   cancelAtPeriodEnd: boolean("cancel_at_period_end").notNull().default(false),
+  // `event.created` of the newest event applied here. Guards against Stripe
+  // redelivering a stale event after a newer one — see migration 0009.
+  lastEventAt: timestamp("last_event_at", { mode: "string" }),
   createdAt: timestamp("created_at", { mode: "string" }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { mode: "string" }).notNull().defaultNow()
 });

@@ -94,9 +94,21 @@ CREATE TABLE IF NOT EXISTS subscriptions (
   price_id TEXT,
   current_period_end TIMESTAMPTZ,
   cancel_at_period_end BOOLEAN NOT NULL DEFAULT false,
+  -- `event.created` of the newest event applied to this row, NOT the time it
+  -- was applied. Stripe retries a failed delivery for up to three days, so a
+  -- stale event can land after a newer one: the retry of an `active` update
+  -- arriving behind the `past_due` that superseded it would otherwise reopen
+  -- paid access on a subscription that had already failed. The application
+  -- refuses any event older than this value.
+  last_event_at TIMESTAMPTZ,
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+
+-- Idempotent add for anyone who applied an earlier revision of this file before
+-- it shipped. `CREATE TABLE IF NOT EXISTS` above is a no-op once the table
+-- exists, so a new column needs saying twice — the same pattern as 0002.
+ALTER TABLE IF EXISTS subscriptions ADD COLUMN IF NOT EXISTS last_event_at TIMESTAMPTZ;
 
 CREATE INDEX IF NOT EXISTS subscriptions_user_idx ON subscriptions (user_id, updated_at DESC);
 
