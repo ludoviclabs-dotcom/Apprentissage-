@@ -8,6 +8,7 @@ import {
   type EvaluationResult,
   type StructuredFeedback
 } from "./types";
+import { isAtMost } from "./numeric";
 
 /**
  * Spreadsheet cells: a result, and optionally the shape of the formula that
@@ -36,7 +37,17 @@ import {
  * over, and the reason a value check normally accompanies it.
  */
 
-export type CellErrorKind = "calculation" | "method";
+/**
+ * Which bucket a formula mismatch belongs in.
+ *
+ * `AGENTS.md` requires corrections to separate calculation, accounting-treatment
+ * and reasoning errors. A wrong formula is usually a reasoning error, but on the
+ * SIG items it is specifically an accounting one: deducting depreciation before
+ * the EBE stage is a treatment mistake, not a slip in method, and filing it
+ * under "reasoning" would tell the learner the wrong thing about what they got
+ * wrong.
+ */
+export type CellErrorKind = "accounting-treatment" | "reasoning";
 
 export interface CellCheck {
   /** A1-style reference, e.g. "B12". Uppercased when compared. */
@@ -55,6 +66,8 @@ export interface CellCheck {
   requiredFormulaPattern?: string;
   /** Shown when the formula is missing or does not match. Never before. */
   formulaHint?: string;
+  /** Where a formula mismatch is reported. Defaults to `reasoning`. */
+  errorKind?: CellErrorKind;
   unit?: string;
 }
 
@@ -106,7 +119,10 @@ function valueMatches(actual: number, check: CellCheck): boolean {
 
   const diff = Math.abs(actual - check.expectedValue);
 
-  if (typeof check.toleranceAbs === "number" && diff <= check.toleranceAbs) {
+  if (
+    typeof check.toleranceAbs === "number" &&
+    isAtMost(diff, check.toleranceAbs, Math.max(Math.abs(actual), Math.abs(check.expectedValue)))
+  ) {
     return true;
   }
 
@@ -120,7 +136,7 @@ function valueMatches(actual: number, check: CellCheck): boolean {
   // Relative to the expected magnitude, with a floor of 1 so a tolerance stays
   // meaningful when the expected value is zero — a real case here, since a
   // budget variance is legitimately 0.
-  return diff <= Math.max(Math.abs(check.expectedValue), 1) * pct;
+  return isAtMost(diff / Math.max(Math.abs(check.expectedValue), 1), pct);
 }
 
 /**
@@ -157,8 +173,8 @@ function gradeValue(
   const actual = submitted?.value;
   const unit = check.unit ? ` ${check.unit}` : "";
 
-  if (typeof actual !== "number") {
-    feedback.missing.push(`${check.cell} — ${check.label} : cellule vide.`);
+  if (typeof actual !== "number" || !Number.isFinite(actual)) {
+    feedback.missing.push(`${check.cell} — ${check.label} : valeur numérique absente ou invalide.`);
 
     return {
       id: `${normalizeCellRef(check.cell)}-value`,
@@ -166,7 +182,7 @@ function gradeValue(
       maxPoints: points,
       awardedPoints: 0,
       outcome: "missed",
-      justification: "Aucune valeur saisie."
+      justification: "Aucune valeur numérique exploitable."
     };
   }
 
@@ -223,7 +239,15 @@ function gradeFormula(
     // error, not an arithmetic one.
     const hardCoded = /^=-?[\d.,]+$/.test(formula);
 
-    feedback.reasoningErrors.push(
+    // A hard-coded result is always a method error, whatever the item is
+    // about: the learner did not use the wrong accounting rule, they used no
+    // rule at all. Only a genuinely different formula is routed by `errorKind`.
+    const bucket =
+      !hardCoded && check.errorKind === "accounting-treatment"
+        ? feedback.accountingTreatmentErrors
+        : feedback.reasoningErrors;
+
+    bucket.push(
       hardCoded
         ? `${check.cell} : le résultat est saisi en dur (${formula}). Une formule doit référencer les cellules, sinon elle ne suit pas les données.`
         : `${check.cell} : la formule ${formula} ne correspond pas au calcul attendu.`
@@ -268,8 +292,10 @@ export const spreadsheetEvaluator: Evaluator<SpreadsheetSpec, SpreadsheetSubmiss
 
       seen.add(cell);
 
-      if (check.points <= 0) {
-        throw new InvalidEvaluationSpecError(`spreadsheet: "${cell}" must carry positive points.`);
+      if (!Number.isFinite(check.points) || check.points <= 0) {
+        throw new InvalidEvaluationSpecError(
+          `spreadsheet: "${cell}" must carry a finite number of points greater than zero.`
+        );
       }
 
       const hasValue = typeof check.expectedValue === "number";
@@ -287,7 +313,22 @@ export const spreadsheetEvaluator: Evaluator<SpreadsheetSpec, SpreadsheetSubmiss
         throw new InvalidEvaluationSpecError(`spreadsheet: "${cell}" has a non-finite expected value.`);
       }
 
+      for (const [name, tolerance] of [
+        ["tolerancePct", check.tolerancePct],
+        ["toleranceAbs", check.toleranceAbs]
+      ] as const) {
+        if (typeof tolerance === "number" && (!Number.isFinite(tolerance) || tolerance < 0)) {
+          throw new InvalidEvaluationSpecError(
+            `spreadsheet: "${cell}" has an invalid ${name}; it must be finite and non-negative.`
+          );
+        }
+      }
+
       if (hasFormula) {
+        if ((check.requiredFormulaPattern as string).trim() === "") {
+          throw new InvalidEvaluationSpecError(`spreadsheet: "${cell}" has an empty formula pattern.`);
+        }
+
         try {
           compileFormulaPattern(check.requiredFormulaPattern as string);
         } catch {

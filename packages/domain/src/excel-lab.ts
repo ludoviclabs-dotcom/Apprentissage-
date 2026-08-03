@@ -1,7 +1,7 @@
 import type { AuthoredExerciseVersion } from "./exercise-specs";
 import type { ModuleLevelDefinition } from "./curriculum";
 import type { SpreadsheetSpec } from "./evaluators/spreadsheet";
-import type { Competency, Exercise, SourceReference } from "./types";
+import type { Competency, Exercise, SourcePack, SourceReference } from "./types";
 
 /**
  * Excel Finance Lab — spreadsheet reasoning without a spreadsheet.
@@ -27,23 +27,55 @@ import type { Competency, Exercise, SourceReference } from "./types";
  * re-grading somebody.
  */
 
-const labSource: SourceReference = {
-  pack: "pack-finance-lab",
-  document: "Datasets — datasets/excel (P&L, prévision de trésorerie, budget)",
-  sourceType: "personal-note",
-  effectiveDate: "2026-08-01"
+/**
+ * Sources.
+ *
+ * Every citation here points at a file that is actually in this repository. An
+ * earlier version of this module cited a "Cours — soldes intermédiaires de
+ * gestion" at pages 4–27; no such document exists anywhere in the checkout, so
+ * the page range was invented. `AGENTS.md` requires that all knowledge come
+ * from local files or imported packs and that a citation carry document, page,
+ * pack and date *when available* — inventing provenance to fill those fields is
+ * the opposite of what the rule is for, and a fabricated page number is worse
+ * than an absent one because it looks checkable.
+ *
+ * So: three citations, one per committed dataset, typed `personal-note` because
+ * that is what they are, and with no page numbers because CSV files have none.
+ */
+function datasetSource(file: string, document: string): SourceReference {
+  return {
+    pack: EXCEL_LAB_PACK_ID,
+    document: `${file} — ${document}`,
+    sourceType: "personal-note",
+    effectiveDate: "2026-08-01"
+  };
+}
+
+export const EXCEL_LAB_PACK_ID = "pack-finance-lab";
+
+/**
+ * The pack the citations name, so it resolves to something on /source-packs
+ * rather than being a label nothing backs.
+ */
+export const excelLabSourcePack: SourcePack = {
+  id: EXCEL_LAB_PACK_ID,
+  name: EXCEL_LAB_PACK_ID,
+  description:
+    "Jeux de donnees du lab finance, versionnes dans le depot sous datasets/excel.",
+  domainId: "finance",
+  versionLabel: "2026-08",
+  effectiveDate: "2026-08-01",
+  importedAt: "2026-08-01",
+  status: "ready",
+  documentsCount: 4,
+  chunksCount: 0
 };
 
-const sigSource: SourceReference = {
-  pack: "pack-finance-lab",
-  document: "Cours — soldes intermédiaires de gestion et analyse d'écarts",
-  sourceType: "course",
-  pageStart: 4,
-  pageEnd: 27,
-  effectiveDate: "2026-03-01"
-};
-
-export const excelLabSources: SourceReference[] = [labSource, sigSource];
+export const excelLabSources: SourceReference[] = [
+  datasetSource("datasets/excel/monthly_pnl.csv", "compte de resultat du mois"),
+  datasetSource("datasets/excel/cash_forecast.csv", "prevision de tresorerie du trimestre"),
+  datasetSource("datasets/excel/budget_vs_actual.csv", "budget et reel par poste")
+];
 
 // --- CSV --------------------------------------------------------------------
 
@@ -441,7 +473,7 @@ export const excelLabDefinitions: LabExerciseDefinition[] = [
     minutes: 10,
     title: "Totaux de la prevision de tresorerie",
     statement:
-      "La prevision de tresorerie du trimestre est donnee en lignes 2 a 4.\nEn B5 et C5, totalisez les encaissements et les decaissements du trimestre.\nChaque total doit etre obtenu par une formule qui couvre les trois mois.",
+      "La prevision de tresorerie du trimestre est donnee en lignes 2 a 4.\nEn B5 et C5, totalisez les encaissements et les decaissements du trimestre.\nChaque total doit etre obtenu par une somme sur la plage (SUM), pas par l'addition des trois cellules.",
     expectedAnswer:
       "B5 = 464 000 EUR avec =SUM(B2:B4) ; C5 = 431 000 EUR avec =SUM(C2:C4).\nUne somme ecrite sur la plage suit l'ajout d'un mois ; trois references additionnees ne le font pas.",
     competencyIds: ["xl-tresorerie-budget", "xl-formules"],
@@ -682,7 +714,8 @@ export const excelLabExerciseVersions: AuthoredExerciseVersion[] = [
           ...EURO,
           unit: "EUR",
           requiredFormulaPattern: "=(B4\\+B5|B5\\+B4|SUM\\(B4:B5\\))",
-          formulaHint: "Ajoutez la variation de stock aux achats : =B4+B5."
+          formulaHint: "Ajoutez la variation de stock aux achats : =B4+B5.",
+          errorKind: "accounting-treatment"
         }
       ]
     },
@@ -712,7 +745,8 @@ export const excelLabExerciseVersions: AuthoredExerciseVersion[] = [
           ...EURO,
           unit: "EUR",
           requiredFormulaPattern: "=(B2-B4-B5|B2-\\(B4\\+B5\\))",
-          formulaHint: "Ventes de marchandises moins le cout d'achat : =B2-B4-B5."
+          formulaHint: "Ventes de marchandises moins le cout d'achat : =B2-B4-B5.",
+          errorKind: "accounting-treatment"
         }
       ]
     },
@@ -776,8 +810,13 @@ export const excelLabExerciseVersions: AuthoredExerciseVersion[] = [
           expectedValue: 464000,
           ...EURO,
           unit: "EUR",
-          requiredFormulaPattern: "=(SUM\\(B2:B4\\)|B2\\+B3\\+B4)",
-          formulaHint: "Sommez la colonne sur les trois mois : =SUM(B2:B4)."
+          // Only the range form. The authored correction teaches that three
+          // added references do not follow an inserted month, so accepting
+          // `=B2+B3+B4` would certify the very method this exercise argues
+          // against. The value marks are untouched: adding the three cells
+          // still earns 6 of the 10 points.
+          requiredFormulaPattern: "=SUM\\(B2:B4\\)",
+          formulaHint: "Sommez la plage sur les trois mois : =SUM(B2:B4)."
         },
         {
           cell: "C5",
@@ -786,8 +825,8 @@ export const excelLabExerciseVersions: AuthoredExerciseVersion[] = [
           expectedValue: 431000,
           ...EURO,
           unit: "EUR",
-          requiredFormulaPattern: "=(SUM\\(C2:C4\\)|C2\\+C3\\+C4)",
-          formulaHint: "Sommez la colonne sur les trois mois : =SUM(C2:C4)."
+          requiredFormulaPattern: "=SUM\\(C2:C4\\)",
+          formulaHint: "Sommez la plage sur les trois mois : =SUM(C2:C4)."
         }
       ]
     },
@@ -808,6 +847,19 @@ export const excelLabExerciseVersions: AuthoredExerciseVersion[] = [
         name: "une-seule-colonne",
         submission: { kind: "spreadsheet", cells: { B5: { value: 464000, formula: "=SUM(B2:B4)" } } },
         expectedScore: 10
+      },
+      {
+        // Right figures, obtained by adding the three cells — the method this
+        // exercise exists to argue against. The values still earn their marks.
+        name: "addition-des-trois-cellules",
+        submission: {
+          kind: "spreadsheet",
+          cells: {
+            B5: { value: 464000, formula: "=B2+B3+B4" },
+            C5: { value: 431000, formula: "=C2+C3+C4" }
+          }
+        },
+        expectedScore: 12
       }
     ]
   ),
@@ -823,7 +875,8 @@ export const excelLabExerciseVersions: AuthoredExerciseVersion[] = [
           ...EURO,
           unit: "EUR",
           requiredFormulaPattern: "=(B12\\+B3-B6|B3\\+B12-B6)",
-          formulaHint: "Marge plus production vendue moins charges externes : =B12+B3-B6."
+          formulaHint: "Marge plus production vendue moins charges externes : =B12+B3-B6.",
+          errorKind: "accounting-treatment"
         }
       ]
     },
@@ -853,7 +906,8 @@ export const excelLabExerciseVersions: AuthoredExerciseVersion[] = [
           ...EURO,
           unit: "EUR",
           requiredFormulaPattern: "=(B12\\+B9-B7-B8|B12\\+B9-B8-B7)",
-          formulaHint: "VA plus subventions, moins impots et personnel : =B12+B9-B7-B8."
+          formulaHint: "VA plus subventions, moins impots et personnel : =B12+B9-B7-B8.",
+          errorKind: "accounting-treatment"
         }
       ]
     },
@@ -886,7 +940,8 @@ export const excelLabExerciseVersions: AuthoredExerciseVersion[] = [
           ...EURO,
           unit: "EUR",
           requiredFormulaPattern: "=B12-B10",
-          formulaHint: "EBE moins les dotations : =B12-B10."
+          formulaHint: "EBE moins les dotations : =B12-B10.",
+          errorKind: "accounting-treatment"
         }
       ]
     },

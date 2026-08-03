@@ -47,12 +47,14 @@ test("the lab lists both levels, its datasets, and says what it is not", async (
   // reasonably conclude the thing is broken, so the page has to say so.
   await expect(page.getByText(/Rien n'est recalculé ici/)).toBeVisible();
 
+  // Each path appears twice now: once in the dataset list, once in the sources
+  // panel, since the citations point at the very files the list describes.
   for (const file of [
     "datasets/excel/monthly_pnl.csv",
     "datasets/excel/cash_forecast.csv",
     "datasets/excel/budget_vs_actual.csv"
   ]) {
-    await expect(page.getByText(file)).toBeVisible();
+    await expect(page.getByText(file).first()).toBeVisible();
   }
 });
 
@@ -70,6 +72,7 @@ test.describe("the grid", () => {
   test("shows the dataset read-only and only opens the answer cell", async ({ page }) => {
     await page.goto(`${BASE}/exercices/${CA}`);
 
+    await expect(page.locator("caption")).toContainText("Grille de calcul");
     // The nine P&L lines are rendered as given values, not as inputs.
     await expect(page.locator("td.lab-given")).toHaveCount(9);
     await expect(page.locator("td.lab-input")).toHaveCount(1);
@@ -96,6 +99,16 @@ test.describe("the grid", () => {
 
     await fillCell(page, "B12", "600000");
     await expect(page.getByRole("button", { name: "Corriger" })).toBeEnabled();
+  });
+
+  test("opens a level, edits a cell, then submits the result", async ({ page }) => {
+    await page.goto(BASE);
+    await page.getByRole("link", { name: "Ouvrir le niveau 1" }).click();
+    await page.getByRole("link", { name: "Ouvrir l'exercice" }).first().click();
+
+    await fillCell(page, "B12", "600 000", "=B2+B3");
+    expect((await submitAndWait(page)).status()).toBe(200);
+    await expect(page.getByText(/Score 20([.,]00)?\/20/)).toBeVisible();
   });
 });
 
@@ -239,6 +252,70 @@ test("submitting a lab exercise schedules it for review and names its level", as
   expect(body.review.intervalDays).toBe(14);
   expect(body.review.remediation).toBeNull();
   expect(body.progress.levelId).toBe("level-excel-finance-2");
+});
+
+test("a perfect answer is not advised to rewrite an essay", async ({ request }) => {
+  // The remediation used to come from the legacy prose grader run over the
+  // rendered submission string, so a flawless spreadsheet answer came back told
+  // to "réécrire la réponse en quatre blocs" — and `CorrectionSummary` renders
+  // that plan unconditionally, under the 20/20.
+  const response = await request.post("/api/exercises/attempts", {
+    data: {
+      exerciseId: CA,
+      submission: { kind: "spreadsheet", cells: { B12: { value: 600000, formula: "=B2+B3" } } }
+    }
+  });
+
+  const body = (await response.json()) as {
+    correction: {
+      score: number;
+      remediationPlan: { microLesson: string; nextAction: string };
+      sourceReferences: Array<{ pack: string; document: string }>;
+    };
+  };
+
+  expect(body.correction.score).toBe(20);
+  expect(body.correction.remediationPlan.nextAction).not.toMatch(/quatre blocs/);
+  expect(body.correction.remediationPlan.microLesson).toMatch(/Rien a reprendre/);
+  // And the correction cites the module's own sources, which resolve to files
+  // that exist rather than to nothing.
+  expect(body.correction.sourceReferences.length).toBeGreaterThan(0);
+  expect(body.correction.sourceReferences[0].document).toContain("datasets/excel/");
+});
+
+test("a wrong SIG formula is reported as a treatment error, not a reasoning slip", async ({
+  request
+}) => {
+  const response = await request.post("/api/exercises/attempts", {
+    data: {
+      exerciseId: EBE,
+      submission: {
+        kind: "spreadsheet",
+        cells: { B13: { value: 46000, formula: "=B12+B9-B7-B8-B10" } }
+      }
+    }
+  });
+
+  const body = (await response.json()) as {
+    correction: { accountingTreatmentErrors: string[]; reasoningErrors: string[] };
+  };
+
+  expect(body.correction.accountingTreatmentErrors.length).toBeGreaterThan(0);
+  expect(body.correction.reasoningErrors).toHaveLength(0);
+});
+
+test("too many cells is a 400 rather than an unbounded write", async ({ request }) => {
+  const cells: Record<string, { value: number }> = {};
+
+  for (let row = 1; row <= 60; row += 1) {
+    cells[`A${row}`] = { value: row };
+  }
+
+  const response = await request.post("/api/exercises/attempts", {
+    data: { exerciseId: CA, submission: { kind: "spreadsheet", cells } }
+  });
+
+  expect(response.status()).toBe(400);
 });
 
 test("a failed lab exercise opens a remediation", async ({ request }) => {

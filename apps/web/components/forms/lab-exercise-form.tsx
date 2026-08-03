@@ -104,7 +104,7 @@ export function LabExerciseForm({
       </div>
 
       {error ? (
-        <div className="result-box error">
+        <div className="result-box error" role="alert">
           <strong>{error}</strong>
         </div>
       ) : null}

@@ -1740,6 +1740,11 @@ button:disabled,
   font-variant-numeric: tabular-nums;
 }
 
+.lab-input input:focus-visible {
+  outline: 3px solid color-mix(in srgb, var(--accent) 45%, transparent);
+  outline-offset: 1px;
+}
+
 /* The formula box is monospaced and left-aligned: it holds text, not a figure,
    and the distinction is the one this lab is teaching. */
 .lab-input input.lab-formula {

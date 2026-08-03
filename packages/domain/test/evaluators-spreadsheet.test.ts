@@ -122,7 +122,7 @@ describe("missing and malformed submissions", () => {
     const result = evaluator.evaluate(spec(), { cells: {} });
 
     expect(result.score).toBe(0);
-    expect(result.feedback.missing.join(" ")).toMatch(/cellule vide/);
+    expect(result.feedback.missing.join(" ")).toMatch(/valeur numérique absente/);
   });
 
   it("reaches the check however the learner cased the reference", () => {
@@ -145,7 +145,9 @@ describe("tolerance", () => {
     const cents = spec({ expectedValue: 2.58, toleranceAbs: 0.01, requiredFormulaPattern: undefined });
 
     expect(evaluator.evaluate(cents, { cells: { B12: { value: 2.59 } } }).score).toBe(20);
+    expect(evaluator.evaluate(cents, { cells: { B12: { value: 2.57 } } }).score).toBe(20);
     expect(evaluator.evaluate(cents, { cells: { B12: { value: 2.6 } } }).score).toBe(0);
+    expect(evaluator.evaluate(cents, { cells: { B12: { value: 2.56 } } }).score).toBe(0);
   });
 
   it("keeps a relative tolerance usable when the expected value is zero", () => {
@@ -189,12 +191,64 @@ describe("specification validation", () => {
   });
 
   it("rejects zero or negative points", () => {
-    expect(() => evaluator.assertValidSpec(spec({ points: 0 }))).toThrow(/positive points/);
+    expect(() => evaluator.assertValidSpec(spec({ points: 0 }))).toThrow(/greater than zero/);
+  });
+
+  it("rejects non-finite points and invalid tolerances", () => {
+    expect(() => evaluator.assertValidSpec(spec({ points: Number.NaN }))).toThrow(
+      /finite number of points/
+    );
+    expect(() => evaluator.assertValidSpec(spec({ toleranceAbs: -0.01 }))).toThrow(
+      /invalid toleranceAbs/
+    );
+    expect(() => evaluator.assertValidSpec(spec({ tolerancePct: Number.POSITIVE_INFINITY }))).toThrow(
+      /invalid tolerancePct/
+    );
   });
 
   it("rejects an uncompilable formula pattern", () => {
     expect(() => evaluator.assertValidSpec(spec({ requiredFormulaPattern: "=(" }))).toThrow(
       /invalid formula pattern/
     );
+  });
+
+  it("rejects an empty formula pattern that could never match a formula", () => {
+    expect(() => evaluator.assertValidSpec(spec({ requiredFormulaPattern: "" }))).toThrow(
+      /empty formula pattern/
+    );
+  });
+});
+
+describe("error classification", () => {
+  it("files a different formula under reasoning by default", () => {
+    const result = evaluator.evaluate(spec(), {
+      cells: { B12: { value: 600000, formula: "=B2*B3" } }
+    });
+
+    expect(result.feedback.reasoningErrors).toHaveLength(1);
+    expect(result.feedback.accountingTreatmentErrors).toHaveLength(0);
+  });
+
+  it("files it under accounting treatment when the check says so", () => {
+    // On the SIG items the formula encodes an accounting rule: deducting
+    // depreciation before the EBE stage is a treatment mistake, and calling it
+    // a reasoning slip would tell the learner the wrong thing.
+    const treatment = spec({ errorKind: "accounting-treatment" });
+    const result = evaluator.evaluate(treatment, {
+      cells: { B12: { value: 600000, formula: "=B2*B3" } }
+    });
+
+    expect(result.feedback.accountingTreatmentErrors).toHaveLength(1);
+    expect(result.feedback.reasoningErrors).toHaveLength(0);
+  });
+
+  it("still calls a hard-coded result a method error on a treatment item", () => {
+    // Typing the number is not misapplying a rule — it is applying none.
+    const result = evaluator.evaluate(spec({ errorKind: "accounting-treatment" }), {
+      cells: { B12: { value: 600000, formula: "=600000" } }
+    });
+
+    expect(result.feedback.reasoningErrors.join(" ")).toMatch(/en dur/);
+    expect(result.feedback.accountingTreatmentErrors).toHaveLength(0);
   });
 });

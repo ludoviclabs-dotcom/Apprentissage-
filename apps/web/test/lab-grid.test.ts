@@ -42,6 +42,9 @@ describe("parseCellNumber", () => {
     expect(parseCellNumber("")).toBeNull();
     expect(parseCellNumber("   ")).toBeNull();
     expect(parseCellNumber("abc")).toBeNull();
+    expect(parseCellNumber("1e3")).toBeNull();
+    expect(parseCellNumber("0x10")).toBeNull();
+    expect(parseCellNumber("1,2,3")).toBeNull();
     expect(parseCellNumber("0")).toBe(0);
   });
 });

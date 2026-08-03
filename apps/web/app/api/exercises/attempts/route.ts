@@ -46,6 +46,13 @@ const submissionSchema = z.discriminatedUnion("kind", [
       .refine((cells) => Object.keys(cells).length > 0, {
         message: "Aucune cellule saisie."
       })
+      // Bounded like the choice and journal payloads above. The largest
+      // authored grid grades two cells; without a cap a direct client could
+      // post thousands of valid references, and `renderSubmission` would
+      // materialise, sort and store the lot in `attempts.user_answer`.
+      .refine((cells) => Object.keys(cells).length <= 40, {
+        message: "Trop de cellules soumises."
+      })
   })
 ]);
 

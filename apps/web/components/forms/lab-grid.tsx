@@ -31,9 +31,12 @@ export const EMPTY_CELL: LabCellValue = { value: "", formula: "" };
  * which is how every amount in the datasets and statements is written.
  */
 export function parseCellNumber(raw: string): number | null {
-  const cleaned = raw.replace(/\s/g, "").replace(",", ".");
+  const cleaned = raw.replace(/\u00A0/g, " ").replace(/\s/g, "").replace(",", ".");
 
-  if (cleaned === "") {
+  // Do not silently accept JavaScript-only notations such as `1e3` or `0x10`.
+  // The lab asks for figures as they appear in its statements: decimal numbers,
+  // optionally signed for a variance or a cash movement.
+  if (!/^[+-]?\d+(\.\d+)?$/.test(cleaned)) {
     return null;
   }
 
@@ -64,6 +67,10 @@ export function LabGridView({
   return (
     <div className="lab-grid-wrapper">
       <table className="lab-grid">
+        <caption className="sr-only">
+          Grille de calcul : les donn&eacute;es sont en lecture seule ; seules les cellules de r&eacute;ponse sont
+          modifiables.
+        </caption>
         <thead>
           <tr>
             <th scope="col" className="lab-gutter">
@@ -110,8 +117,12 @@ export function LabGridView({
 
                   return (
                     <td key={ref} className="lab-input" data-cell={ref}>
+                      <span id={`${ref}-value-help`} className="sr-only">
+                        Saisissez une valeur num&eacute;rique pour la cellule {ref}.
+                      </span>
                       <input
                         aria-label={`Cellule ${ref}`}
+                        aria-describedby={`${ref}-value-help`}
                         value={current.value}
                         inputMode="decimal"
                         placeholder="0"
@@ -119,18 +130,24 @@ export function LabGridView({
                         onChange={(event) => update(ref, { value: event.target.value })}
                       />
                       {cell.wantsFormula ? (
-                        <input
-                          aria-label={`Formule ${ref}`}
-                          value={current.formula}
-                          className="lab-formula"
-                          // Deliberately not a worked example: "=B2+B3" is the
-                          // exact answer to the first exercise, so a helpful
-                          // placeholder would have handed it over.
-                          placeholder="=…"
-                          spellCheck={false}
-                          disabled={disabled}
-                          onChange={(event) => update(ref, { formula: event.target.value })}
-                        />
+                        <>
+                          <span id={`${ref}-formula-help`} className="sr-only">
+                            Saisissez la formule utilis&eacute;e pour la cellule {ref}.
+                          </span>
+                          <input
+                            aria-label={`Formule ${ref}`}
+                            aria-describedby={`${ref}-formula-help`}
+                            value={current.formula}
+                            className="lab-formula"
+                            // Deliberately not a worked example: "=B2+B3" is the
+                            // exact answer to the first exercise, so a helpful
+                            // placeholder would have handed it over.
+                            placeholder="=…"
+                            spellCheck={false}
+                            disabled={disabled}
+                            onChange={(event) => update(ref, { formula: event.target.value })}
+                          />
+                        </>
                       ) : null}
                     </td>
                   );

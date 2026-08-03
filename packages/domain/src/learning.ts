@@ -26,7 +26,7 @@ import {
 } from "./compta-v1";
 import { comptaBusinessCase, comptaExamSessions } from "./compta-extra";
 import { comptaGeneraleV1Exercises } from "./compta-generale-v1";
-import { excelLabExercises } from "./excel-lab";
+import { excelLabExercises, excelLabSourcePack } from "./excel-lab";
 
 export const sourcePacks: SourcePack[] = [
   {
@@ -77,7 +77,8 @@ export const sourcePacks: SourcePack[] = [
     documentsCount: 18,
     chunksCount: 202
   },
-  comptaSourcePack
+  comptaSourcePack,
+  excelLabSourcePack
 ];
 
 export const documents: DocumentRecord[] = [

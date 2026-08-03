@@ -1,8 +1,9 @@
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import {
+  EXCEL_LAB_PACK_ID,
   EXCEL_LAB_TRACK,
   InvalidCsvError,
   activeCurriculum,
@@ -23,6 +24,7 @@ import {
   getExcelLabLevel,
   getEvaluator,
   getModuleLevelForExercise,
+  getModuleSourceReferences,
   getTrackLevels,
   gridInputRefs,
   labAssumptions,
@@ -30,7 +32,9 @@ import {
   parseBudgetCsv,
   parseCashForecastCsv,
   parseCsv,
-  parsePnlCsv
+  parsePnlCsv,
+  sourcePacks,
+  excelLabSources
 } from "../src";
 
 /**
@@ -379,5 +383,60 @@ describe("the grids", () => {
     expect(varianceChecks[1].expectedValue).toBe(
       Math.round(((achats.reel - achats.budget) / achats.budget) * 100 * 100) / 100
     );
+  });
+});
+
+describe("sources", () => {
+  it("cites only files that exist in this repository", () => {
+    // An earlier version cited a course at pages 4–27 that exists nowhere in
+    // the checkout. A citation whose provenance is invented is worse than an
+    // absent one, because it looks checkable.
+    expect(excelLabSources.length).toBeGreaterThan(0);
+
+    for (const source of excelLabSources) {
+      const file = source.document.split(" — ")[0];
+
+      expect(file.startsWith("datasets/excel/"), source.document).toBe(true);
+      expect(existsSync(resolve(datasetsDir, "../..", file)), file).toBe(true);
+      // CSV files have no pages; claiming one would be inventing provenance.
+      expect(source.pageStart, source.document).toBeUndefined();
+      expect(source.pageEnd, source.document).toBeUndefined();
+    }
+  });
+
+  it("names a pack the catalogue actually declares", () => {
+    expect(sourcePacks.some((pack) => pack.id === EXCEL_LAB_PACK_ID)).toBe(true);
+
+    for (const source of excelLabSources) {
+      expect(source.pack).toBe(EXCEL_LAB_PACK_ID);
+    }
+  });
+
+  it("reaches a lab correction through the module registry", () => {
+    // `getExerciseSourceReferences` resolves through lessons, and there are no
+    // `finance` lessons, so without this the correction cites nothing.
+    for (const exercise of excelLabExercises) {
+      expect(getModuleSourceReferences(exercise.id), exercise.id).toEqual(excelLabSources);
+    }
+
+    expect(getModuleSourceReferences("ex-provision-litige")).toBeNull();
+  });
+});
+
+describe("the cash totals exercise", () => {
+  it("requires the range form its own correction advocates", () => {
+    const version = excelLabExerciseVersions.find(
+      (candidate) => candidate.exerciseId === "ex-xl-cash-totaux"
+    );
+    const checks = (version?.spec as { checks: Array<{ requiredFormulaPattern?: string }> }).checks;
+
+    for (const check of checks) {
+      const pattern = check.requiredFormulaPattern ?? "";
+
+      expect(pattern).toContain("SUM");
+      // Accepting the three-cell addition would certify the very method the
+      // authored correction calls inadequate.
+      expect(pattern).not.toContain("+");
+    }
   });
 });

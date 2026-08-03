@@ -2,6 +2,8 @@ import { randomUUID } from "node:crypto";
 import {
   MAX_SCORE,
   getModuleLevelForExercise,
+  getModuleSourceReferences,
+  remediationFromResult,
   getEvaluator,
   isSpecEvaluationType,
   toCorrection,
@@ -187,8 +189,20 @@ export async function gradeSubmission(
     correction: toCorrection(result, {
       id: identity.id,
       exerciseId: exercise.id,
-      sourceReferences: identity.sourceReferences,
-      remediationPlan: identity.remediationPlan
+      // A module states its own sources. `identity.sourceReferences` comes from
+      // the lessons linked to an exercise, and a module with no lessons — the
+      // Excel lab has none, since there are no `finance` lessons — would
+      // otherwise produce a correction that cites nothing.
+      sourceReferences: getModuleSourceReferences(exercise.id) ?? identity.sourceReferences,
+      // Built from the structured result, not from `identity`, whose plan comes
+      // from the legacy prose grader run over a rendered submission string. For
+      // a spreadsheet or journal answer that string has none of the connectors
+      // the prose classifier looks for, so a flawless answer came back advised
+      // to "réécrire la réponse en quatre blocs".
+      remediationPlan: remediationFromResult(result, {
+        expectedAnswer: exercise.expectedAnswer,
+        competencyIds: exercise.competencyIds
+      })
     }),
     evaluationType: version.evaluationType,
     exerciseVersionId: version.id
