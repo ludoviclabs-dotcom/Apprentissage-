@@ -126,7 +126,9 @@ export function CorrectionSummary({
 
       <div>
         <span className="section-label">Preuves citees</span>
-        <SourceReference sources={correction.sourceReferences} />
+        {/* Une correction est un verdict sourcé (AGENTS.md) : la preuve reste
+            visible, elle ne se replie pas derrière un clic. */}
+        <SourceReference sources={correction.sourceReferences} defaultOpen />
       </div>
     </section>
   );

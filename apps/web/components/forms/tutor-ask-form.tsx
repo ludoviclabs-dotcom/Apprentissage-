@@ -62,7 +62,9 @@ export function TutorAskForm() {
           {response.reasoningSteps ? <span>{response.reasoningSteps.join(" → ")}</span> : null}
         </div>
       ) : null}
-      {response?.sources ? <SourceReferenceList sources={response.sources} /> : null}
+      {/* La réponse du tuteur est un verdict sourcé (AGENTS.md) : la preuve
+          reste visible, elle ne se replie pas derrière un clic. */}
+      {response?.sources ? <SourceReferenceList sources={response.sources} defaultOpen /> : null}
       {error ? (
         <div className="result-box error">
           <strong>{error}</strong>
