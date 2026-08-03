@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { ExercisePanel } from "@/components/exercise-panel";
 import { DomainBadge } from "@/components/domain-badge";
-import { ExerciseAttemptForm } from "@/components/forms/exercise-attempt-form";
+import { AnyExerciseForm } from "@/components/forms/any-exercise-form";
 import { PageHeader } from "@/components/ui/page-header";
 import { getExercises } from "@finance/db";
 import Link from "next/link";
@@ -48,7 +48,7 @@ export default async function ExercisesPage() {
         ))}
       </div>
 
-      {firstExercise ? <ExerciseAttemptForm exercise={firstExercise} /> : null}
+      {firstExercise ? <AnyExerciseForm exercise={firstExercise} /> : null}
 
       <section className="panel">
         <div className="panel-heading">

@@ -1726,3 +1726,125 @@
   background: var(--surface-subtle);
   color: var(--text-secondary);
 }
+
+/* --- PR-12a : outils du dossier de clôture -------------------------------- */
+
+.ledger-picker {
+  display: grid;
+  gap: var(--space-2);
+  max-width: 420px;
+  margin-bottom: var(--space-4);
+  color: var(--text-secondary);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-black);
+}
+
+.ledger-picker select {
+  min-height: var(--control-height);
+  padding: 0 var(--space-3);
+  border: 1px solid var(--border-strong);
+  background: var(--surface);
+  border-radius: var(--radius);
+  color: var(--text);
+  font: inherit;
+  font-size: var(--font-size-base);
+}
+
+.ledger-table tfoot td {
+  font-weight: var(--font-weight-black);
+}
+
+.reconciliation-items,
+.closing-checklist {
+  display: grid;
+  gap: var(--space-2);
+  margin: 0 0 var(--space-4);
+  padding: 0;
+  border: 0;
+}
+
+.reconciliation-item {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: var(--space-3);
+  align-items: start;
+  padding: var(--space-3);
+  border: 1px solid var(--border);
+  background: var(--surface-raised);
+  border-radius: var(--radius);
+  cursor: pointer;
+}
+
+.reconciliation-item input {
+  margin-top: 3px;
+  width: 18px;
+  height: 18px;
+}
+
+.reconciliation-item small {
+  display: block;
+  margin-top: 2px;
+}
+
+.reconciliation-totals {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  margin-bottom: var(--space-3);
+}
+
+.case-steps {
+  display: grid;
+  gap: var(--space-2);
+  margin: var(--space-4) 0;
+  padding-left: 20px;
+}
+
+.case-steps a {
+  color: var(--text-secondary);
+  font-weight: var(--font-weight-medium);
+}
+
+.case-steps a:hover,
+.case-steps a:focus-visible {
+  color: var(--text);
+}
+
+.control-sheet {
+  display: grid;
+  gap: var(--space-2);
+  margin: var(--space-4) 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.control-sheet-row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: var(--space-3);
+  align-items: start;
+  padding: var(--space-3);
+  border: 1px solid var(--border);
+  background: var(--surface-raised);
+  border-radius: var(--radius);
+}
+
+.control-icon {
+  margin-top: 2px;
+}
+
+.control-icon--pass {
+  color: var(--success);
+}
+
+.control-icon--fail {
+  color: var(--danger);
+}
+
+.control-sheet-row p {
+  margin: 4px 0 0;
+}
+
+.case-export .secondary-action {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+}

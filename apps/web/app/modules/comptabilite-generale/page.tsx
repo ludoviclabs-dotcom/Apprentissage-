@@ -123,6 +123,29 @@ export default async function ComptaGeneraleModulePage() {
         </div>
         <SourceReference sources={comptaGeneraleV1Sources} />
       </section>
+
+      {/* PR-12a : les deux case studies des niveaux 3 et 4 — la clôture
+          mensuelle, puis l'arrêté annuel avec grand livre, balance, feuille de
+          contrôle et export du dossier. */}
+      {model.caseStudies.map((caseStudy) => (
+        <section key={caseStudy.id} className="panel">
+          <div className="panel-heading">
+            <div>
+              <span className="section-label">Case study</span>
+              <h2>{caseStudy.title}</h2>
+              <p>{caseStudy.context}</p>
+            </div>
+            <Link className="primary-action" href={`${COMPTA_MODULE_BASE}/cas/${caseStudy.slug}`}>
+              Ouvrir le cas
+            </Link>
+          </div>
+          <div className="module-meta">
+            <span>{caseStudy.steps.length} étapes</span>
+            <span>{caseStudy.documents.length} pièces</span>
+            <span>Checklist de clôture incluse</span>
+          </div>
+        </section>
+      ))}
     </div>
   );
 }

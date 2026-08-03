@@ -1,18 +1,21 @@
 import {
   COMPTA_GENERALE_V1_TRACK,
   activeCurriculum,
-  authoredExerciseVersions,
+  comptaCaseStudies,
+  comptaGeneraleClotureExercises,
   comptaGeneraleV1Exercises,
   comptaGeneraleV1MiniCase,
-  getComptaGeneraleV1Exercises,
-  getComptaGeneraleV1Level,
+  getComptaCaseStudyBySlug,
+  getModuleLevelForExercise,
   getTrackLevels,
+  type ComptaCaseStudy,
   type Exercise,
   type LevelSnapshot,
   type ModuleLevelDefinition
 } from "@finance/domain";
 import type { ChoiceOption, ModuleExerciseKind } from "@/components/forms/module-exercise-form";
 import { getCanonicalTrackState, type CanonicalLevelState } from "@/lib/learning-progression";
+import { choiceOptions, exerciseKind } from "@/lib/typed-exercise";
 
 /**
  * View model for the comptabilité générale v1 module.
@@ -34,55 +37,24 @@ export interface ModuleExerciseView {
   href: string;
 }
 
-/**
- * Which input an exercise is answered with.
- *
- * Read off the authored specification rather than `Exercise.type`, for the same
- * reason `submitAttempt` selects its evaluator that way: the display type and
- * the graded type disagree across the existing catalogue, and rendering a
- * number field for something graded as prose would guarantee a zero.
- */
-export function exerciseKind(exerciseId: string): ModuleExerciseKind {
-  const authored = authoredExerciseVersions.find((version) => version.exerciseId === exerciseId);
+// Partagés avec les pages génériques depuis PR-12a (lib/typed-exercise.ts).
+export { exerciseKind };
 
-  switch (authored?.evaluationType) {
-    case "journal_entry":
-      return "journal_entry";
-    case "numeric":
-      return "numeric";
-    case "multiple_choice":
-      return "multiple_choice";
-    default:
-      // Includes `legacy_rubric` and an unauthored exercise: prose is the only
-      // input the rubric matcher can read.
-      return "text";
-  }
-}
-
-function choiceOptions(exerciseId: string): ChoiceOption[] {
-  const authored = authoredExerciseVersions.find((version) => version.exerciseId === exerciseId);
-
-  if (authored?.evaluationType !== "multiple_choice") {
-    return [];
-  }
-
-  const spec = authored.spec as { options?: ChoiceOption[] };
-
-  return spec.options ?? [];
-}
+/** Tous les exercices du module : N1/N2 (v1) et N3/N4 (clôture). */
+const moduleExercises: Exercise[] = [...comptaGeneraleV1Exercises, ...comptaGeneraleClotureExercises];
 
 export function toExerciseView(exercise: Exercise): ModuleExerciseView {
   return {
     exercise,
     kind: exerciseKind(exercise.id),
     options: choiceOptions(exercise.id),
-    levelId: getComptaGeneraleV1Level(exercise.id),
+    levelId: getModuleLevelForExercise(exercise.id),
     href: `${COMPTA_MODULE_BASE}/exercices/${exercise.id}`
   };
 }
 
 export function getModuleExercise(exerciseId: string): ModuleExerciseView | null {
-  const exercise = comptaGeneraleV1Exercises.find((candidate) => candidate.id === exerciseId);
+  const exercise = moduleExercises.find((candidate) => candidate.id === exerciseId);
 
   return exercise ? toExerciseView(exercise) : null;
 }
@@ -108,6 +80,7 @@ export interface ComptaModuleModel {
   snapshots: LevelSnapshot[];
   exercisesByLevel: Map<string, ModuleExerciseView[]>;
   miniCase: typeof comptaGeneraleV1MiniCase;
+  caseStudies: ComptaCaseStudy[];
   score: number | null;
   passingScore: number;
   rulesLabel: string;
@@ -124,7 +97,7 @@ export async function getComptaModuleModel(userId?: string | null): Promise<Comp
   for (const level of levels) {
     exercisesByLevel.set(
       level.id,
-      getComptaGeneraleV1Exercises(level.level === 1 ? 1 : 2).map(toExerciseView)
+      moduleExercises.filter((exercise) => exercise.level === level.level).map(toExerciseView)
     );
   }
 
@@ -134,10 +107,73 @@ export async function getComptaModuleModel(userId?: string | null): Promise<Comp
     snapshots,
     exercisesByLevel,
     miniCase: comptaGeneraleV1MiniCase,
+    caseStudies: comptaCaseStudies,
     score: progression.score,
     passingScore: progression.passingScore,
     rulesLabel: progression.sourceLabel,
     progressionTracked: progression.mode === "enrolled"
+  };
+}
+
+// --- Case studies N3/N4 ------------------------------------------------------
+
+export interface CaseStudyStepView {
+  caseStudy: ComptaCaseStudy;
+  index: number;
+  total: number;
+  instruction: string;
+  document: ComptaCaseStudy["documents"][number];
+  exercise: ModuleExerciseView;
+  nextHref: string | null;
+}
+
+export function listCaseStudies(): ComptaCaseStudy[] {
+  return comptaCaseStudies;
+}
+
+export function getCaseStudy(slug: string): ComptaCaseStudy | null {
+  return getComptaCaseStudyBySlug(slug);
+}
+
+export function caseStudyHref(caseStudy: ComptaCaseStudy): string {
+  return `${COMPTA_MODULE_BASE}/cas/${caseStudy.slug}`;
+}
+
+/**
+ * Une étape d'un case study N3/N4, résolue contre son dossier. Même règle que
+ * le mini-cas : un index hors du cas est null, jamais rabattu sur l'étape 1.
+ */
+export function getCaseStudyStep(slug: string, position: number): CaseStudyStepView | null {
+  const caseStudy = getComptaCaseStudyBySlug(slug);
+
+  if (!caseStudy) {
+    return null;
+  }
+
+  const step = caseStudy.steps[position - 1];
+
+  if (!step) {
+    return null;
+  }
+
+  const exercise = getModuleExercise(step.exerciseId);
+  const document = caseStudy.documents.find((item) => item.id === step.documentId);
+
+  if (!exercise || !document) {
+    return null;
+  }
+
+  return {
+    caseStudy,
+    index: position,
+    total: caseStudy.steps.length,
+    instruction: step.instruction,
+    document,
+    exercise,
+    nextHref:
+      position < caseStudy.steps.length
+        ? `${COMPTA_MODULE_BASE}/cas/${caseStudy.slug}/${position + 1}`
+        : null
   };
 }
 
