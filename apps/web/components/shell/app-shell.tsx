@@ -25,8 +25,14 @@ export function AppShell({
   canManageSources: boolean;
   dueReviews: number | null;
 }) {
-  const statusLabel = runtime.databaseActive ? "Base privée active" : "Données locales seedées";
-  const tagline = "Local-first privé";
+  // Démo publique forcée avec un compte connecté : le shell reste l'AppShell
+  // (progression personnelle), mais le branding et le statut disent la vérité.
+  const statusLabel = runtime.publicDemo
+    ? "Démo publique lecture seule"
+    : runtime.databaseActive
+      ? "Base privée active"
+      : "Données locales seedées";
+  const tagline = runtime.publicDemo ? "Démonstration publique" : "Local-first privé";
 
   return (
     <div className="app-shell">
@@ -68,6 +74,15 @@ export function AppShell({
           authEnabled={runtime.features.auth.enabled}
           userEmail={user?.email ?? null}
         />
+        {runtime.publicDemo ? (
+          <section className="demo-banner" aria-label="Statut de la démonstration">
+            <strong>Démo publique</strong>
+            <span>
+              Les imports et uploads sont bloqués en production publique. Rien de ce qui est saisi
+              ici n'est enregistré.
+            </span>
+          </section>
+        ) : null}
         <main id="contenu" className="content">
           {children}
         </main>

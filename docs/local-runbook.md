@@ -69,6 +69,17 @@ business-case attempts, competency progress and flashcard schedules — is owned
 `app.current_user_id` per transaction; policies compare against it, and an unset
 value matches nothing, so the default is deny.
 
+With accounts enabled, the document administration area (Documents, Source
+packs) can be restricted to a comma-separated list of e-mails:
+
+```text
+LEARNING_HUB_ADMIN_EMAILS=vous@exemple.fr
+```
+
+Unset, every account of the private install sees the area — the historic
+behavior. The public demo never shows it, and the routes themselves stay
+reachable by URL either way; only the navigation entry is role-gated.
+
 With a database but **no** accounts, write routes answer `409`: a row would have
 no owner and the policy would reject it. That is deliberate — see
 `docs/adr/001-local-auth-rls.md`.

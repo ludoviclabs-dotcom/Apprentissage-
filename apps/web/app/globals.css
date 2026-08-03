@@ -148,6 +148,12 @@ button {
   list-style: none;
 }
 
+/* `display: grid` ci-dessus écraserait le style UA de l'attribut `hidden` :
+   une section repliée doit réellement disparaître. */
+.nav-sub[hidden] {
+  display: none;
+}
+
 .nav-subitem {
   display: flex;
   align-items: center;
@@ -509,9 +515,7 @@ button {
 .drawer-backdrop {
   position: absolute;
   inset: 0;
-  border: 0;
   background: rgba(15, 23, 42, 0.45);
-  cursor: pointer;
 }
 
 .drawer-panel {

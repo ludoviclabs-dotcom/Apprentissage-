@@ -95,7 +95,8 @@ test.describe("topbar contextuelle", () => {
     await expect(page).toHaveURL(/\/recherche\?q=provision/);
   });
 
-  test("place l'offre dans le menu du compte", async ({ page }) => {
+  test("place l'offre dans le menu du compte", async ({ page }, testInfo) => {
+    test.skip(testInfo.project.name === "public-demo", "le PublicShell n'a pas de menu de compte");
     await page.goto("/");
 
     await page.getByRole("button", { name: "Compte" }).click();
@@ -215,7 +216,7 @@ test.describe("démonstration publique", () => {
     await page.goto("/");
 
     await expect(page.getByText("Niveau global")).toHaveCount(0);
-    await expect(page.getByText("Jeu de démonstration")).toBeVisible();
+    await expect(page.getByText("Jeu de démonstration", { exact: true })).toBeVisible();
     await expect(
       page.getByRole("link", { name: "Découvrir un exercice guidé" })
     ).toBeVisible();

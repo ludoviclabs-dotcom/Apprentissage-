@@ -125,13 +125,9 @@ export function MobileNav({
 
       {open ? (
         <div className="drawer-overlay">
-          <button
-            type="button"
-            className="drawer-backdrop"
-            aria-label="Fermer le menu de navigation"
-            tabIndex={-1}
-            onClick={close}
-          />
+          {/* Simple attrape-clic : les utilisateurs clavier et lecteur d'écran
+              ferment par Échap ou par le bouton dédié du drawer. */}
+          <div className="drawer-backdrop" aria-hidden="true" onClick={close} />
           <div
             ref={dialogRef}
             id="mobile-drawer"
