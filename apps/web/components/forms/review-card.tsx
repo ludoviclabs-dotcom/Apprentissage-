@@ -193,7 +193,9 @@ export function ReviewCard({
         </span>
       ) : null}
 
-      {revealed ? <SourceReference sources={revealed.sourceReferences} /> : null}
+      {/* La réponse révélée est un verdict sourcé (AGENTS.md) : la preuve
+          reste visible, elle ne se replie pas derrière un clic. */}
+      {revealed ? <SourceReference sources={revealed.sourceReferences} defaultOpen /> : null}
     </article>
   );
 }
