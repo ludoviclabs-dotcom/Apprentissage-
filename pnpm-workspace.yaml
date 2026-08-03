@@ -2,6 +2,10 @@ packages:
   - "apps/*"
   - "packages/*"
   - "workers/*"
+onlyBuiltDependencies:
+  - esbuild
+ignoredBuiltDependencies:
+  - sharp
 allowBuilds:
-  esbuild: true
-  sharp: true
+  esbuild: set this to true or false
+  sharp: set this to true or false

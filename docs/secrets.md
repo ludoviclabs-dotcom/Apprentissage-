@@ -1,71 +1,52 @@
-# Secrets And Local Environment
+# Secrets and deployment environment
 
-The app is private-first, but the current Vercel deployment is a demo unless auth is enabled.
+Finance Learning Hub uses local PostgreSQL accounts and opaque server-side
+sessions. There is no shared browser credential: private mode requires
+`LEARNING_HUB_AUTH_ENABLED=true`, PostgreSQL and an account created through
+`/signup` (or by the owner through the application flow).
 
-## Local `.env`
+Never commit a production value, token, password, database URL or webhook
+secret. `NEXT_PUBLIC_*` values are bundled into the browser and must therefore
+contain only public configuration.
 
-Copy `.env.example` to `.env` and update values locally.
+## Environment matrix
 
-```bash
-cp .env.example .env
-```
+| Variable | Local | Preview | Production | Notes |
+| --- | --- | --- | --- | --- |
+| `NEXT_PUBLIC_APP_URL` | optional | preview URL | canonical URL | Public absolute URL for redirects. |
+| `FINANCE_HUB_USE_DATABASE` | `false` or `true` | `true` for private preview | `true` | A true value requires `DATABASE_URL`. |
+| `DATABASE_URL` | local constrained role | preview constrained role | production constrained role | Runtime connection for the web app. |
+| `DATABASE_ADMIN_URL` | migration/seed only | CI or operator only | operator only | Never expose to the web runtime. It owns migrations and creates the constrained role. |
+| `FINANCE_HUB_PUBLIC_DEMO` | optional | normally `false` | `false` for private launch | `true` forces read-only demo safeguards. Production without accounts is also treated as a demo. |
+| `LEARNING_HUB_AUTH_ENABLED` | `false` or `true` | `true` | `true` | Requires PostgreSQL. Sessions and account records are stored there. |
+| `AI_PROVIDER` | `none`, `openai`, or `ollama` | same | same | Only these values are accepted by the environment parser. |
+| `OPENAI_API_KEY` | when `AI_PROVIDER=openai` | when used | when used | Server only. |
+| `OPENAI_MODEL` | optional | optional | optional | Defaults to `gpt-4.1-mini`. |
+| `OLLAMA_BASE_URL`, `OLLAMA_MODEL` | when `AI_PROVIDER=ollama` | only if reachable from Vercel | only if reachable from Vercel | Never use a private local URL in Vercel. |
 
-Important variables:
+## Stripe sandbox and live environments
 
-| Variable | Purpose |
-| --- | --- |
-| `DATABASE_URL` | PostgreSQL + pgvector connection string. |
-| `FINANCE_HUB_USE_DATABASE` | Set to `true` to read/write the DB instead of seeded fallback data. |
-| `FINANCE_HUB_PUBLIC_DEMO` | Set to `true` to force read-only public demo safeguards. Production without auth is treated as public demo automatically. |
-| `LEARNING_HUB_AUTH_ENABLED` | Set to `true` to require basic auth. |
-| `LEARNING_HUB_AUTH_USER` | Basic auth username. |
-| `LEARNING_HUB_AUTH_PASSWORD` | Basic auth password. Never commit a real value. |
-| `AI_PROVIDER` | `none`, `openai`, `anthropic`, or `ollama`. |
-| `OPENAI_API_KEY` | OpenAI key when `AI_PROVIDER=openai`. |
-| `OPENAI_MODEL` | OpenAI model name for tutor/corrector calls. |
-| `OLLAMA_BASE_URL` | Ollama API URL when local AI is used. |
-| `OLLAMA_MODEL` | Ollama model name. |
+Billing is off by default. Enabling it requires database mode and accounts; the
+parser refuses every incomplete combination at boot.
 
-## Stripe (PR-07)
-
-Billing is off by default, and off means every module is open — see
-`docs/local-runbook.md` for the full setup and `docs/adr/007-stripe-billing-entitlements.md`
-for why. Only one of these may ever reach a browser.
-
-| Variable | Scope | Required | Purpose |
+| Variable | Browser? | Required when billing is on | Notes |
 | --- | --- | --- | --- |
-| `FINANCE_HUB_BILLING_ENABLED` | server | no (default `false`) | Master switch and rollback lever. `true` requires accounts, a key, a webhook secret and one price. |
-| `STRIPE_SECRET_KEY` | **server only** | when billing is on | API key. Must start with `sk_`/`rk_`; a live key is refused outside production. |
-| `STRIPE_WEBHOOK_SECRET` | **server only** | when billing is on | `whsec_…` signing secret. Different per endpoint: the `stripe listen` value is not the deployed one. |
-| `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY` | client | no | The only Stripe value allowed in the bundle. Unused by the current hosted-Checkout flow. |
-| `STRIPE_PRICE_FOUNDER_ANNUAL` | **server only** | one of the two | Price id for the annual plan. |
-| `STRIPE_PRICE_PRO_MONTHLY` | **server only** | one of the two | Price id for the monthly plan. |
+| `FINANCE_HUB_BILLING_ENABLED` | no | yes | Master switch and rollback lever. |
+| `STRIPE_SECRET_KEY` | **no** | yes | `sk_test_` for local/Preview; live keys only in Production. |
+| `STRIPE_WEBHOOK_SECRET` | **no** | yes | `whsec_` secret for this exact endpoint and environment. |
+| `STRIPE_PRICE_FOUNDER_ANNUAL` | **no** | one price required | Server-side price configuration. |
+| `STRIPE_PRICE_PRO_MONTHLY` | **no** | one price required | Server-side price configuration. |
+| `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY` | yes | no | Optional with hosted Checkout; it may only contain a `pk_` key. |
 
-Price ids are secrets in the sense that matters here: a client that can name a
-price can name a cheaper one. They must never be prefixed `NEXT_PUBLIC_`.
-`apps/web/lib/billing/plans.ts` imports `server-only`, so a client component that
-reaches for one fails the build rather than shipping it.
+Price IDs remain server-side because Checkout accepts a plan key and resolves the
+price there. A user cannot select a price by changing a browser request.
 
-Use test keys (`sk_test_…`) everywhere except production, and give Preview and
-Production separate Stripe values on Vercel. A test key paired with a live
-webhook secret fails silently: every delivery is rejected and no access is ever
-granted.
+## Vercel handling
 
-## Vercel
+Set secrets in Vercel Project Settings with the narrowest environment scope.
+Use separate Preview and Production database credentials, Stripe test/live
+credentials, and webhook endpoint secrets. `vercel env pull` writes a local
+file: keep that file ignored and never copy it into Git.
 
-The current safe public stance is read-only demo until auth and a private database are configured.
-
-For a private deployment, set these Vercel environment variables:
-
-```text
-FINANCE_HUB_PUBLIC_DEMO=false
-FINANCE_HUB_USE_DATABASE=true
-DATABASE_URL=<private postgres pgvector url>
-LEARNING_HUB_AUTH_ENABLED=true
-LEARNING_HUB_AUTH_USER=<your user>
-LEARNING_HUB_AUTH_PASSWORD=<strong password>
-```
-
-Do not put official course PDFs, private notes, API keys or licensed standard text into public env vars or public assets.
-
-Production without `LEARNING_HUB_AUTH_ENABLED=true` blocks upload and source-pack write routes.
+The detailed owner procedure, validation and rollback steps are in
+[`production-activation-runbook.md`](production-activation-runbook.md).

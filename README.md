@@ -10,12 +10,14 @@ Private local-first learning cockpit for accounting, cost accounting, management
 - Vitest (unit) · Playwright (end-to-end) · ESLint 9 flat config
 - Deployed on Vercel
 
-Node.js `>=22` is required; `.nvmrc` pins the version CI uses.
+Node.js 22 LTS is required exactly (`22.x` in `package.json` and `22` in
+`.nvmrc`); CI and Vercel must use the same runtime. pnpm 10.11.0 is selected
+through Corepack.
 
 ## Run Locally
 
 ```bash
-corepack pnpm install
+corepack pnpm install --frozen-lockfile
 corepack pnpm dev
 ```
 

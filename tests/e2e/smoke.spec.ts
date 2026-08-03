@@ -40,6 +40,15 @@ test("the health endpoint answers", async ({ request }) => {
   expect(response.ok()).toBeTruthy();
 });
 
+test("source-pack ingestion never accepts a server filesystem path over HTTP", async ({ request }) => {
+  const response = await request.post("/api/source-packs", {
+    data: { path: "C:\\private\\course-pack" }
+  });
+
+  expect(response.status()).toBe(403);
+  await expect(response.json()).resolves.toMatchObject({ error: "Import indisponible via HTTP" });
+});
+
 for (const destination of NAV_DESTINATIONS) {
   test(`nav destination ${destination.href} loads with a heading`, async ({ page }) => {
     const response = await page.goto(destination.href);

@@ -26,13 +26,10 @@ export async function getCurrentSession(): Promise<ResolvedSession | null> {
     return null;
   }
 
-  try {
-    return await findSessionByTokenHash(hashSessionToken(token));
-  } catch {
-    // A cookie must never be able to produce a 500. An unreachable database or a
-    // missing table degrades to "not signed in".
-    return null;
-  }
+  // A configured private runtime must not reinterpret a database outage as an
+  // anonymous request. The error boundary and route handlers present a safe
+  // unavailable state; only an absent or expired session resolves to `null`.
+  return findSessionByTokenHash(hashSessionToken(token));
 }
 
 export async function getCurrentUser(): Promise<CurrentUser | null> {

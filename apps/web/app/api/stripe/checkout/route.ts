@@ -151,11 +151,9 @@ export async function POST(request: Request) {
 
     return Response.json({ url: session.url, sessionId: session.id }, { status: 201 });
   } catch (error) {
+    console.error("Unable to create Stripe Checkout session", error);
     return Response.json(
-      {
-        error: "Création de session impossible",
-        details: error instanceof Error ? error.message : "Erreur inconnue"
-      },
+      { error: "Création de session impossible" },
       { status: 502 }
     );
   }

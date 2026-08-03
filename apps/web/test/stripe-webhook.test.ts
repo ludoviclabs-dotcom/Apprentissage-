@@ -142,6 +142,7 @@ describe("signature verification", () => {
     );
 
     expect(result.status).toBe(400);
+    expect(result.body).toEqual({ error: "Signature Stripe absente" });
     expect(store.claimed.size).toBe(0);
     expect(store.intents).toHaveLength(0);
   });
@@ -154,6 +155,7 @@ describe("signature verification", () => {
     );
 
     expect(result.status).toBe(400);
+    expect(result.body).toEqual({ error: "Signature Stripe invalide" });
     expect(store.intents).toHaveLength(0);
   });
 
@@ -345,6 +347,7 @@ describe("delivery semantics", () => {
     const result = await deliver("customer-subscription-created");
 
     expect(result.status).toBe(500);
+    expect(result.body).toEqual({ error: "Traitement impossible" });
     expect(store.released).toEqual(["evt_test_subscription_created"]);
     expect(store.claimed.size).toBe(0);
 
