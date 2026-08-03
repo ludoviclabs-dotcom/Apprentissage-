@@ -96,6 +96,54 @@ inside `submitAttempt`. A second module would have made that a growing chain of
 registry; `submitAttempt` asks it, and adding a module is an entry there rather
 than an edit to the grader.
 
+### Citations name files that exist
+
+The first version of this module cited a "Cours — soldes intermédiaires de
+gestion et analyse d'écarts" at pages 4–27. No such document exists anywhere in
+the checkout: the pack, the document and the page range were all invented to
+fill the fields a `SourceReference` offers.
+
+`AGENTS.md` requires that knowledge come from local files or imported packs, and
+that a sourced answer cite document, page, pack and date *when available*.
+Inventing provenance to populate those fields inverts the rule — a fabricated
+page number is worse than an absent one, because it looks checkable. The module
+now cites one `personal-note` per committed dataset, with no page numbers
+because CSV files have none, and `excelLabSourcePack` is registered in
+`sourcePacks` so the pack resolves to something rather than being a bare label.
+A test asserts every cited file is on disk and that no citation claims a page.
+
+Corrections carry those sources too. `getExerciseSourceReferences` resolves
+through the lessons linked to an exercise, or any lesson in the same domain;
+the lab has neither, since there are no `finance` lessons, so its corrections
+came back citing nothing while the exercise page displayed the module's sources
+immediately below. `modules.ts` now resolves a module's declared sources, and
+`gradeSubmission` prefers them.
+
+### Remediation comes from the evaluation, not from a prose classifier
+
+`submitAttempt` derived the remediation plan from the legacy grader run over a
+*rendered string* of the submission, for every exercise — including one a typed
+evaluator had just graded. For a spreadsheet answer that string is
+`B12=600000 (=B2+B3)`, which contains none of the connectors the prose
+classifier looks for, so a flawless 20/20 was advised to "relier les faits, la
+règle et la conclusion" and to "réécrire la réponse en quatre blocs", rendered
+by `CorrectionSummary` directly under the perfect score.
+
+`remediationFromResult` builds the plan from the structured feedback instead,
+naming the failing criterion. It orders treatment errors before calculation
+ones, because knowing a rule was misapplied changes what to revise whereas an
+arithmetic slip usually does not — and a perfect answer is told there is nothing
+to revise.
+
+### A formula mismatch is classified, not assumed
+
+Every non-matching formula used to be filed as a reasoning error. On the SIG
+items the formula *is* the accounting rule — deducting depreciation before the
+EBE stage is a treatment mistake — so `CellCheck.errorKind` lets an authored
+check route it to `accountingTreatmentErrors`, which is what `AGENTS.md` asks
+corrections to separate. A hard-coded result stays a method error whatever the
+item, because typing the number is not misapplying a rule; it is applying none.
+
 ## Consequences
 
 ### Assumed limits of the MVP grid
@@ -111,6 +159,9 @@ than an edit to the grader.
 - **No charts, no conditional formatting, no pivot.**
 - **Percentages are typed as points** (`37,5` for 37,5 %), because there is no
   cell formatting to distinguish `0,375` from `37,5 %`.
+- **A submission is capped at 40 cells.** The largest authored grid grades two;
+  the cap exists because `renderSubmission` materialises and stores every entry
+  in `attempts.user_answer`, so an uncapped record is an unbounded write.
 
 ### Recommended for a v2
 
