@@ -4,6 +4,7 @@ import { DomainBadge } from "@/components/domain-badge";
 import { FeatureNotice } from "@/components/feature-notice";
 import { LevelTrack } from "@/components/level-track";
 import { ProgressMeter } from "@/components/progress-meter";
+import { PageHeader } from "@/components/ui/page-header";
 import { getCurrentUser } from "@/lib/auth/current-user";
 import { getFeatures } from "@/lib/features";
 import { getLevelTrackModel } from "@/lib/mastery-model";
@@ -30,19 +31,16 @@ export default async function ParcoursPage() {
 
   return (
     <div className="page-stack">
-      <section className="page-header">
-        <div>
-          <span className="section-label">Parcours</span>
-          <h1>Apprendre, s'entraîner, puis passer en conditions réelles</h1>
-          <p>
-            Le hub se lit comme une progression : notions guidées, exercices corrigés, révision active,
-            examens courts puis cas métier avancés.
-          </p>
-        </div>
-        <Link className="primary-action" href="/revisions">
-          Lancer les révisions
-        </Link>
-      </section>
+      <PageHeader
+        label="Parcours"
+        title="Apprendre, s'entraîner, puis passer en conditions réelles"
+        description="Le hub se lit comme une progression : notions guidées, exercices corrigés, révision active, examens courts puis cas métier avancés."
+        aside={
+          <Link className="primary-action" href="/revisions">
+            Lancer les révisions
+          </Link>
+        }
+      />
 
       <section className="tier-grid" aria-label="Paliers pedagogiques">
         {(Object.keys(tierLabels) as Array<keyof typeof tierLabels>).map((tier) => (

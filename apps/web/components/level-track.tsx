@@ -1,6 +1,7 @@
 import type { LevelSnapshot, ModuleLevelDefinition } from "@finance/domain";
 import { ACTIVITY_KINDS, getLevelStatusLabel } from "@finance/domain";
 import { ProgressMeter } from "@/components/progress-meter";
+import { LockedState } from "@/components/ui/locked-state";
 
 /**
  * Renders a gated track. Presentation only: every status, score and blocker is
@@ -66,9 +67,10 @@ export function LevelTrack({
               </div>
 
               {status === "locked" ? (
-                <p className="muted">
-                  Termine le niveau {level.level - 1} pour ouvrir celui-ci.
-                </p>
+                <LockedState
+                  title="Niveau verrouillé"
+                  condition={`Termine le niveau ${level.level - 1} pour ouvrir celui-ci.`}
+                />
               ) : (
                 <>
                   <ProgressMeter value={Math.round(score)} label={`Score niveau ${level.level}`} />

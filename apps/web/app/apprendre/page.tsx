@@ -4,6 +4,7 @@ import { DomainBadge } from "@/components/domain-badge";
 import { DiagnosticForm } from "@/components/forms/diagnostic-form";
 import { SourceSearchForm } from "@/components/forms/source-search-form";
 import { TutorAskForm } from "@/components/forms/tutor-ask-form";
+import { PageHeader } from "@/components/ui/page-header";
 import { getLearningModel } from "@/lib/view-model";
 import { getDomain } from "@finance/domain";
 
@@ -32,13 +33,11 @@ export default async function LearnPage() {
 
   return (
     <div className="page-stack">
-      <section className="page-header">
-        <div>
-          <span className="section-label">Apprendre</span>
-          <h1>Comprendre la logique avant de répondre</h1>
-          <p>Chaque notion est découpée en concept, règle, raisonnement, exemple, erreur fréquente et exercice lié.</p>
-        </div>
-      </section>
+      <PageHeader
+        label="Apprendre"
+        title="Comprendre la logique avant de répondre"
+        description="Chaque notion est découpée en concept, règle, raisonnement, exemple, erreur fréquente et exercice lié."
+      />
 
       <section className="panel focus-panel">
         <div>

@@ -6,6 +6,8 @@ import { DomainBadge } from "@/components/domain-badge";
 import { ExercisePanel } from "@/components/exercise-panel";
 import { LearningCard } from "@/components/learning-card";
 import { ProgressMeter } from "@/components/progress-meter";
+import { NextActionCard } from "@/components/ui/next-action-card";
+import { PageHeader } from "@/components/ui/page-header";
 import { getRuntimeFlags } from "@/lib/runtime-flags";
 import { statusLabel } from "@/lib/status-labels";
 import { getDashboardModel } from "@/lib/view-model";
@@ -54,36 +56,41 @@ export default async function DashboardPage() {
 
   return (
     <div className="page-stack">
-      <section className="page-header">
-        <div>
-          <span className="section-label">{personal ? "Tableau de bord" : "Démonstration"}</span>
-          <h1>{personal ? "Remise à niveau pilotée par compétences" : "Découvre le cockpit d'apprentissage"}</h1>
-          <p>
-            {personal
-              ? `Aujourd'hui : jour ${model.currentDay.day} sur ${model.learningPath.durationDays}, avec une priorité sur la logique avant l'automatisme.`
-              : "Parcours guidé, exercices corrigés et révision active. Les chiffres affichés viennent d'un jeu de démonstration, pas d'une progression personnelle."}
-          </p>
-          <p className="next-action">
-            {personal ? (
-              <Link className="primary-action inline-link" href={`/exercices/${model.currentExercise.id}`}>
-                Continuer — {model.currentExercise.title} · {model.currentDay.minutes} min
-              </Link>
-            ) : (
-              <Link className="primary-action inline-link" href={`/exercices/${model.currentExercise.id}`}>
-                Découvrir un exercice guidé
-              </Link>
-            )}
-          </p>
-        </div>
+      <PageHeader
+        label={personal ? "Tableau de bord" : "Démonstration"}
+        title={personal ? "Remise à niveau pilotée par compétences" : "Découvre le cockpit d'apprentissage"}
+        description={
+          personal
+            ? `Aujourd'hui : jour ${model.currentDay.day} sur ${model.learningPath.durationDays}, avec une priorité sur la logique avant l'automatisme.`
+            : "Parcours guidé, exercices corrigés et révision active. Les chiffres affichés viennent d'un jeu de démonstration, pas d'une progression personnelle."
+        }
+        aside={
+          personal ? (
+            <div className="hero-score">
+              <span>Niveau global</span>
+              <strong>{model.overallAverage}%</strong>
+            </div>
+          ) : (
+            <span className="state-token">Jeu de démonstration</span>
+          )
+        }
+      >
         {personal ? (
-          <div className="hero-score">
-            <span>Niveau global</span>
-            <strong>{model.overallAverage}%</strong>
-          </div>
+          <NextActionCard
+            href={`/exercices/${model.currentExercise.id}`}
+            label="Continuer"
+            title={model.currentExercise.title}
+            meta={`${model.currentDay.minutes} min · jour ${model.currentDay.day} du parcours`}
+          />
         ) : (
-          <span className="state-token">Jeu de démonstration</span>
+          <NextActionCard
+            href={`/exercices/${model.currentExercise.id}`}
+            label="Découvrir"
+            title="Un exercice guidé"
+            meta="Correction structurée et sources citées"
+          />
         )}
-      </section>
+      </PageHeader>
 
       <section className="demo-proof-grid" aria-label="Garanties de la démonstration">
         <article>

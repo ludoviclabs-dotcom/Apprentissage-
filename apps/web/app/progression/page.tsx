@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { CompetencyMap } from "@/components/competency-map";
 import { DomainBadge } from "@/components/domain-badge";
 import { ProgressMeter } from "@/components/progress-meter";
+import { PageHeader } from "@/components/ui/page-header";
 import { statusLabel } from "@/lib/status-labels";
 import { getProgressModel } from "@/lib/view-model";
 import { getDomainAverage, getWeakestCompetencies } from "@finance/domain";
@@ -20,19 +21,17 @@ export default async function ProgressionPage() {
 
   return (
     <div className="page-stack">
-      <section className="page-header">
-        <div>
-          <span className="section-label">Progression</span>
-          <h1>Maîtrise par compétence, pas score global opaque</h1>
-          <p>
-            La progression met en avant les notions fragiles, les erreurs récurrentes et la prochaine action utile.
-          </p>
-        </div>
-        <div className="hero-score">
-          <span>Erreurs</span>
-          <strong>{model.errorJournal.length}</strong>
-        </div>
-      </section>
+      <PageHeader
+        label="Progression"
+        title="Maîtrise par compétence, pas score global opaque"
+        description="La progression met en avant les notions fragiles, les erreurs récurrentes et la prochaine action utile."
+        aside={
+          <div className="hero-score">
+            <span>Erreurs</span>
+            <strong>{model.errorJournal.length}</strong>
+          </div>
+        }
+      />
 
       <section className="domain-overview">
         {model.domains.map((domain) => {
