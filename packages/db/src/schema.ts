@@ -13,7 +13,8 @@ export const migrationFiles = [
   "migrations/0007_review_queue_remediation.sql",
   "migrations/0008_spreadsheet_evaluation_type.sql",
   "migrations/0009_billing_entitlements.sql",
-  "migrations/0010_canonical_learning_progression.sql"
+  "migrations/0010_canonical_learning_progression.sql",
+  "migrations/0011_excel_formula_engine.sql"
 ] as const;
 
 /** Tables protected by row level security, keyed on `user_id`. */
@@ -40,7 +41,9 @@ export const userOwnedTables = [
   // exists, so those two carry no policy — see migration 0009.
   "subscriptions",
   "entitlements",
-  "certificates"
+  "certificates",
+  // PR-12b: the learner's saved grid drafts — the most ordinary owned data.
+  "lab_workbooks"
 ] as const;
 
 export type UserOwnedTable = (typeof userOwnedTables)[number];
@@ -98,7 +101,9 @@ export const tables = [
   "billing_events",
   "subscriptions",
   "entitlements",
-  "certificates"
+  "certificates",
+  // Excel lab drafts (PR-12b): owned, hence also in `userOwnedTables` above.
+  "lab_workbooks"
 ] as const;
 
 export type TableName = (typeof tables)[number];

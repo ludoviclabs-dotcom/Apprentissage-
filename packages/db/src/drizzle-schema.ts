@@ -505,6 +505,24 @@ export const remediationTasksTable = pgTable("remediation_tasks", {
   completedAt: timestamp("completed_at", { mode: "string" })
 });
 
+// --- Excel lab drafts (PR-12b) --------------------------------------------
+//
+// One saved grid per (user, exercise): the raw inputs as typed, formulas
+// included. A draft, never an attempt — grading only ever reads `attempts` —
+// so losing this table costs work in progress, not marks.
+export const labWorkbooksTable = pgTable(
+  "lab_workbooks",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: uuid("user_id").notNull(),
+    exerciseId: text("exercise_id").notNull(),
+    cellsJson: jsonb("cells").notNull().default({}),
+    createdAt: timestamp("created_at", { mode: "string" }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { mode: "string" }).notNull().defaultNow()
+  },
+  (table) => [unique().on(table.userId, table.exerciseId)]
+);
+
 // The author's own expectations for their exercise. Grading is pure, so these
 // rows are executable: a spec change that breaks grading fails a test instead
 // of silently re-marking learners.
