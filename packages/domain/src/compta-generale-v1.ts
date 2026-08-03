@@ -26,9 +26,12 @@ import type { Competency, Exercise, SourceReference } from "./types";
  * month's work.
  */
 
+// PR-12a : les références pointent vers des assets seedés qui existent
+// réellement (`resolveSourceReference` dans learning.ts). Le pack
+// "pack-compta-generale" cité jusqu'ici n'existait dans aucun catalogue.
 const pcgSource: SourceReference = {
-  pack: "pack-compta-generale",
-  document: "Plan comptable général — comptes de tiers et de TVA",
+  pack: "pcg-anc-2026",
+  document: "Plan comptable général — comptes et fonctionnement",
   sourceType: "official-reference",
   pageStart: 41,
   pageEnd: 58,
@@ -36,12 +39,12 @@ const pcgSource: SourceReference = {
 };
 
 const coursSource: SourceReference = {
-  pack: "pack-compta-generale",
+  pack: "cours-master-2025",
   document: "Cours — opérations courantes et TVA",
   sourceType: "course",
   pageStart: 12,
   pageEnd: 34,
-  effectiveDate: "2026-02-01"
+  effectiveDate: "2025-09-01"
 };
 
 export const comptaGeneraleV1Sources: SourceReference[] = [pcgSource, coursSource];

@@ -1,6 +1,7 @@
 import type { Competency, Domain, DomainId } from "./types";
 import { comptaCompetencies } from "./compta-v1";
 import { comptaGeneraleV1Competencies } from "./compta-generale-v1";
+import { comptaGeneraleClotureCompetencies } from "./compta-generale-cloture";
 import { excelLabCompetencies } from "./excel-lab";
 
 export const domains: Domain[] = [
@@ -185,6 +186,7 @@ export const competencies: Competency[] = [
   },
   ...comptaCompetencies,
   ...comptaGeneraleV1Competencies,
+  ...comptaGeneraleClotureCompetencies,
   ...excelLabCompetencies
 ];
 

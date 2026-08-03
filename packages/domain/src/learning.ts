@@ -24,8 +24,10 @@ import {
   comptaModules,
   comptaSourcePack
 } from "./compta-v1";
+import { normalizeForMatching } from "./text";
 import { comptaBusinessCase, comptaExamSessions } from "./compta-extra";
 import { comptaGeneraleV1Exercises } from "./compta-generale-v1";
+import { comptaGeneraleClotureExercises } from "./compta-generale-cloture";
 import { excelLabExercises, excelLabSourcePack } from "./excel-lab";
 
 export const sourcePacks: SourcePack[] = [
@@ -120,8 +122,108 @@ export const documents: DocumentRecord[] = [
     importedAt: "2026-05-28",
     pages: 9,
     status: "ready"
+  },
+  // PR-12a : les assets que les références du module Comptabilité générale
+  // citent. Une SourceReference doit résoudre ici — le test de résolution
+  // refuse toute page ou tout référentiel inventé.
+  {
+    id: "doc-pcg-comptes",
+    sourcePackId: "pcg-anc-2026",
+    filename: "pcg-comptes-fonctionnement.pdf",
+    fileType: "pdf",
+    domainId: "compta-generale",
+    title: "Plan comptable général — comptes et fonctionnement",
+    originalPath: "source-packs/pcg-anc-2026/pcg-comptes-fonctionnement.pdf",
+    checksum: "seed-pcg-comptes-001",
+    importedAt: "2026-05-28",
+    pages: 132,
+    status: "ready"
+  },
+  {
+    id: "doc-pcg-etats",
+    sourcePackId: "pcg-anc-2026",
+    filename: "pcg-etats-de-synthese.pdf",
+    fileType: "pdf",
+    domainId: "compta-generale",
+    title: "Plan comptable général — états de synthèse",
+    originalPath: "source-packs/pcg-anc-2026/pcg-etats-de-synthese.pdf",
+    checksum: "seed-pcg-etats-001",
+    importedAt: "2026-05-28",
+    pages: 84,
+    status: "ready"
+  },
+  {
+    id: "doc-cours-operations-tva",
+    sourcePackId: "cours-master-2025",
+    filename: "operations-courantes-tva.pdf",
+    fileType: "pdf",
+    domainId: "compta-generale",
+    title: "Cours — opérations courantes et TVA",
+    originalPath: "source-packs/cours-master-2025/compta-generale/operations-courantes-tva.pdf",
+    checksum: "seed-cours-op-tva-001",
+    importedAt: "2026-05-28",
+    pages: 46,
+    status: "ready"
+  },
+  {
+    id: "doc-ifrs18-notes",
+    sourcePackId: "ifrs-preparation-2027",
+    filename: "IFRS18-presentation-notes.md",
+    fileType: "md",
+    domainId: "ifrs-ias",
+    title: "IFRS 18 — présentation des états financiers (notes)",
+    originalPath: "source-packs/ifrs-preparation-2027/IFRS18-presentation-notes.md",
+    checksum: "seed-ifrs18-001",
+    importedAt: "2026-05-28",
+    pages: 22,
+    status: "processing"
   }
 ];
+
+/**
+ * Résolution d'une référence de source vers un asset seedé.
+ *
+ * Une {@link SourceReference} nomme un pack et un document en toutes lettres ;
+ * elle résout si un document seedé porte ce titre dans ce pack (comparaison
+ * insensible aux accents et à la casse) et si la plage de pages tient dans la
+ * pagination du document. C'est la garantie « aucune page inventée » que le
+ * test de contenu applique à tout le module Comptabilité générale.
+ */
+export function resolveSourceReference(reference: {
+  pack: string;
+  document: string;
+  pageStart?: number;
+  pageEnd?: number;
+}): DocumentRecord | null {
+  const packIds = new Set(
+    sourcePacks
+      .filter(
+        (pack) =>
+          normalizeForMatching(pack.id) === normalizeForMatching(reference.pack) ||
+          normalizeForMatching(pack.name) === normalizeForMatching(reference.pack)
+      )
+      .map((pack) => pack.id)
+  );
+
+  const match = documents.find(
+    (document) =>
+      packIds.has(document.sourcePackId) &&
+      normalizeForMatching(document.title) === normalizeForMatching(reference.document)
+  );
+
+  if (!match) {
+    return null;
+  }
+
+  const start = reference.pageStart ?? 1;
+  const end = reference.pageEnd ?? start;
+
+  if (start < 1 || end < start || end > match.pages) {
+    return null;
+  }
+
+  return match;
+}
 
 const provisionCourseSource = {
   pack: "cours-master-2025",
@@ -672,6 +774,7 @@ export const exercises: Exercise[] = [
   },
   ...comptaExercises,
   ...comptaGeneraleV1Exercises,
+  ...comptaGeneraleClotureExercises,
   ...excelLabExercises
 ];
 
