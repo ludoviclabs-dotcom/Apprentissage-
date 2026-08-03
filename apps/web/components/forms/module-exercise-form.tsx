@@ -137,6 +137,13 @@ export function ModuleExerciseForm({
   async function submit() {
     setPending(true);
     setError(null);
+    // A retry after a failed submission must not leave the previous score
+    // announced in the sr-only status region while the error alert also
+    // reports a failure — the two would contradict each other.
+    setCorrection(null);
+    setReview(null);
+    setProgress(null);
+    setClosing(null);
 
     const outcome = await postJson<{
       correction?: Correction;
