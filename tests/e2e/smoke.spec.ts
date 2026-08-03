@@ -22,7 +22,9 @@ const NAV_DESTINATIONS = [
   { href: "/corrections", label: "Corrections" },
   { href: "/progression", label: "Progression" },
   { href: "/documents", label: "Documents" },
-  { href: "/source-packs", label: "Source packs" }
+  { href: "/source-packs", label: "Source packs" },
+  { href: "/attestations", label: "Attestations" },
+  { href: "/billing", label: "Offre" }
 ];
 
 test("home page renders the dashboard rather than an empty document", async ({ page }) => {

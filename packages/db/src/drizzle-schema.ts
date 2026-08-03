@@ -511,3 +511,93 @@ export const exerciseTestCasesTable = pgTable("exercise_test_cases", {
   expectedScore: numeric("expected_score", { precision: 5, scale: 2 }).notNull(),
   expectedOutcomesJson: jsonb("expected_outcomes_json").notNull().default({})
 });
+
+// --- Billing --------------------------------------------------------------
+//
+// Mirrors migration 0009. Two of these five tables carry no row level security
+// — `billing_customers` and `billing_events` — because a Stripe webhook must
+// resolve a customer id into a user *before* any user context can be bound. The
+// three that describe a person are owned and policed like everything else.
+
+// The identity bridge. `userId` is the primary key, so one learner has at most
+// one Stripe customer; `stripeCustomerId` is unique, so one Stripe customer
+// cannot be pointed at two learners.
+export const billingCustomersTable = pgTable("billing_customers", {
+  userId: uuid("user_id").primaryKey(),
+  stripeCustomerId: text("stripe_customer_id").notNull().unique(),
+  createdAt: timestamp("created_at", { mode: "string" }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { mode: "string" }).notNull().defaultNow()
+});
+
+// The at-least-once delivery ledger. The handler claims an id here before doing
+// any work, so a Stripe retry cannot re-apply a grant a later event revoked.
+export const billingEventsTable = pgTable("billing_events", {
+  stripeEventId: text("stripe_event_id").primaryKey(),
+  type: text("type").notNull(),
+  outcome: text("outcome").notNull().default("received"),
+  detail: text("detail").notNull().default(""),
+  receivedAt: timestamp("received_at", { mode: "string" }).notNull().defaultNow(),
+  processedAt: timestamp("processed_at", { mode: "string" })
+});
+
+// A local mirror of Stripe, never the source of truth. `status` is unconstrained
+// text: a status the API adds later must land here verbatim rather than be
+// coerced, and which ones grant access is decided in @finance/domain.
+export const subscriptionsTable = pgTable("subscriptions", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  userId: uuid("user_id").notNull(),
+  stripeSubscriptionId: text("stripe_subscription_id").notNull().unique(),
+  stripeCustomerId: text("stripe_customer_id"),
+  status: text("status").notNull(),
+  planKey: text("plan_key"),
+  priceId: text("price_id"),
+  currentPeriodEnd: timestamp("current_period_end", { mode: "string" }),
+  cancelAtPeriodEnd: boolean("cancel_at_period_end").notNull().default(false),
+  // `event.created` of the newest event applied here. Guards against Stripe
+  // redelivering a stale event after a newer one — see migration 0009.
+  lastEventAt: timestamp("last_event_at", { mode: "string" }),
+  createdAt: timestamp("created_at", { mode: "string" }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { mode: "string" }).notNull().defaultNow()
+});
+
+// One row per feature per learner, updated in place. `expiresAt` null means
+// "until revoked", which is what a provisional checkout grant looks like before
+// the subscription event supplies a period end.
+export const entitlementsTable = pgTable(
+  "entitlements",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: uuid("user_id").notNull(),
+    feature: text("feature").notNull(),
+    status: text("status").notNull().default("active"),
+    source: text("source").notNull().default("subscription"),
+    planKey: text("plan_key"),
+    stripeSubscriptionId: text("stripe_subscription_id"),
+    grantedAt: timestamp("granted_at", { mode: "string" }).notNull().defaultNow(),
+    expiresAt: timestamp("expires_at", { mode: "string" }),
+    revokedAt: timestamp("revoked_at", { mode: "string" }),
+    updatedAt: timestamp("updated_at", { mode: "string" }).notNull().defaultNow()
+  },
+  (table) => [unique().on(table.userId, table.feature)]
+);
+
+// Issued once per track per learner. The holder's email is denormalised so a
+// later account change cannot reprint a document under a different name.
+export const certificatesTable = pgTable(
+  "certificates",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: uuid("user_id").notNull(),
+    serial: text("serial").notNull().unique(),
+    trackId: text("track_id").notNull(),
+    trackLabel: text("track_label").notNull(),
+    holderEmail: text("holder_email").notNull(),
+    curriculumVersionId: text("curriculum_version_id").notNull(),
+    levelCount: integer("level_count").notNull(),
+    averageScore: integer("average_score").notNull(),
+    issuedAt: timestamp("issued_at", { mode: "string" }).notNull().defaultNow(),
+    revokedAt: timestamp("revoked_at", { mode: "string" }),
+    revokedReason: text("revoked_reason")
+  },
+  (table) => [unique().on(table.userId, table.trackId)]
+);

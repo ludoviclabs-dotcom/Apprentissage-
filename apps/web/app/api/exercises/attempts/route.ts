@@ -1,5 +1,7 @@
 import { submitAttempt, UnsupportedSubmissionError } from "@finance/db";
+import { getRequiredEntitlement } from "@finance/domain";
 import { resolveWriteUser } from "@/lib/auth/current-user";
+import { guardEntitlement } from "@/lib/billing/entitlements";
 import { z } from "zod";
 
 /**
@@ -83,6 +85,22 @@ export async function POST(request: Request) {
   }
 
   const submission = body.data.submission ?? { kind: "text" as const, text: body.data.userAnswer! };
+
+  // The paywall lives on the submission, not only on the page. Gating the page
+  // alone would leave grading — the part that is actually worth money — one
+  // direct POST away, and the exercise's own module registry is what decides,
+  // so the page and this route cannot drift apart. Free exercises resolve to
+  // `null` here and the check costs nothing.
+  const requiredEntitlement = getRequiredEntitlement(body.data.exerciseId);
+
+  if (requiredEntitlement) {
+    const gate = await guardEntitlement(requiredEntitlement);
+
+    if (gate.response) {
+      return gate.response;
+    }
+  }
+
   const writer = await resolveWriteUser();
 
   if (writer.response) {

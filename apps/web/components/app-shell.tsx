@@ -5,10 +5,12 @@ import { usePathname } from "next/navigation";
 import type { ReactNode } from "react";
 import type { RuntimeFlags } from "@/lib/runtime-flags";
 import {
+  Award,
   BookOpen,
   BriefcaseBusiness,
   Calculator,
   ClipboardCheck,
+  CreditCard,
   FileCheck,
   FlaskConical,
   FolderOpen,
@@ -41,7 +43,9 @@ const navigation = [
   { href: "/corrections", label: "Corrections", icon: FileCheck },
   { href: "/progression", label: "Progression", icon: LineChart },
   { href: "/documents", label: "Documents", icon: FolderOpen },
-  { href: "/source-packs", label: "Source packs", icon: PackageOpen }
+  { href: "/source-packs", label: "Source packs", icon: PackageOpen },
+  { href: "/attestations", label: "Attestations", icon: Award },
+  { href: "/billing", label: "Offre", icon: CreditCard }
 ];
 
 export function AppShell({

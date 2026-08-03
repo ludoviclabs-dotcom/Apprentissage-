@@ -40,6 +40,13 @@ boot with every problem listed at once:
 | A boolean flag set to `1`, `TRUE`, `yes`… | only `true`/`false` are read; anything else silently meant `false` |
 | `LEARNING_HUB_AUTH_ENABLED=true` without database mode | accounts and sessions are rows in PostgreSQL |
 | `LEARNING_HUB_AUTH_USER` / `_PASSWORD` set at all | retired in PR-01; keeping them would look like protection that no longer exists |
+| `FINANCE_HUB_BILLING_ENABLED=true` without accounts | an entitlement is a row owned by a user; there would be nowhere to record a payment |
+| `FINANCE_HUB_BILLING_ENABLED=true` without key or webhook secret | checkout would 500 on click, or every event would fail verification |
+| `FINANCE_HUB_BILLING_ENABLED=true` with no price id | a plan with nothing to charge renders a button that cannot work |
+| `STRIPE_SECRET_KEY` starting with `pk_` | a publishable key in the secret slot cannot authenticate anything |
+| `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY` starting with `sk_` | a secret key in a public variable ships to the browser |
+| `STRIPE_WEBHOOK_SECRET` not starting with `whsec_` | the wrong secret rejects every delivery, silently granting nothing |
+| A live `sk_live_` key outside production | test/live mismatches drop every webhook; the failure is invisible until someone complains |
 
 ## Accounts
 
@@ -137,6 +144,155 @@ LEARNING_HUB_AUTH_PASSWORD=<strong password>
 FINANCE_HUB_USE_DATABASE=true
 DATABASE_URL=<private postgres pgvector url>
 ```
+
+## Stripe Billing
+
+Off by default. With `FINANCE_HUB_BILLING_ENABLED=false` — or with any part of
+the Stripe configuration missing — **every module is open**, including the Excel
+lab and the attestations. The gate exists only where billing exists, so cloning
+this repo never produces a paywall in front of your own content.
+
+### What is sold, and what unlocks it
+
+| Feature | Gated surface |
+|---|---|
+| `excel-finance-lab` | `/modules/excel-finance-lab`, its levels, its exercise pages, and `POST /api/exercises/attempts` for any lab exercise |
+| `completion-certificate` | issuing an attestation through `POST /api/certificates` |
+
+Both plans (`founder-annual`, `pro-monthly`) grant both features; the choice is a
+billing cadence, not a feature matrix. The mapping from an exercise to the
+entitlement it needs lives in `packages/domain/src/modules.ts`, so the page and
+the submission endpoint cannot drift apart.
+
+### Stripe events actually handled
+
+| Event | Effect |
+|---|---|
+| `checkout.session.completed` | links the Stripe customer to the account; grants the plan's features **without an expiry** when `payment_status` is `paid` or `no_payment_required` |
+| `customer.subscription.created` | upserts the subscription; grants with `current_period_end + 24 h` when the status is `active` or `trialing`, revokes otherwise |
+| `customer.subscription.updated` | same rule — this is what re-opens access after a recovered payment and closes it on `past_due` |
+| `customer.subscription.deleted` | revokes every entitlement tied to that subscription, and stores the status as `canceled` |
+| `invoice.paid` | moves the expiry forward for the referenced subscription when the invoice line carries a period end; never touches the subscription row |
+
+Anything else is answered `200` and ignored. Subscribe the endpoint to exactly
+these five in the Stripe dashboard.
+
+Activation and revocation are decided by one pure function,
+`mapBillingEvent` in `packages/domain/src/billing-events.ts`, and applied by
+`applyBillingIntent` in `packages/db/src/billing-repository.ts`. **No other code
+path writes an entitlement**, and in particular `/billing/success` does not:
+it reads what the webhook wrote and reports it.
+
+### First local run
+
+1. Install the Stripe CLI and sign in:
+
+```bash
+stripe login
+```
+
+2. In test mode, create a product and a recurring price, then copy the price id
+   (`price_…`) into `.env`. The dashboard works too; the CLI is faster:
+
+```bash
+stripe prices create --currency=eur --unit-amount=24000 --recurring.interval=year -d "product_data[name]=Finance Learning Hub — Fondateur"
+```
+
+3. Start the forwarder. It prints the `whsec_…` secret **for this session** —
+   it is not the same value as the deployed endpoint's:
+
+```bash
+stripe listen --forward-to localhost:3000/api/stripe/webhook
+```
+
+4. Fill `.env`, then start the app:
+
+```text
+FINANCE_HUB_USE_DATABASE=true
+DATABASE_URL=postgresql://finance_app:finance_app_dev_password@localhost:5432/finance_hub
+LEARNING_HUB_AUTH_ENABLED=true
+FINANCE_HUB_BILLING_ENABLED=true
+STRIPE_SECRET_KEY=sk_test_...
+STRIPE_WEBHOOK_SECRET=whsec_...
+STRIPE_PRICE_FOUNDER_ANNUAL=price_...
+```
+
+5. Apply the billing tables and boot:
+
+```bash
+corepack pnpm db:migrate
+```
+
+### Step-by-step verification
+
+1. **The gate is on, and not only on the page.** Sign in, open
+   `/modules/excel-finance-lab`: the levels are replaced by "réservé aux
+   abonnés". Then post a lab answer directly and confirm the API refuses it with
+   `402`, so the paywall is not a client-side decoration:
+
+```bash
+curl -i -X POST localhost:3000/api/exercises/attempts -H 'Content-Type: application/json' -d '{"exerciseId":"ex-xl-chiffre-affaires","submission":{"kind":"spreadsheet","cells":{"B12":{"value":600000}}}}'
+```
+
+   An unsigned webhook must also be refused under every configuration:
+
+```bash
+curl -i -X POST localhost:3000/api/stripe/webhook -H 'Content-Type: application/json' -d '{"id":"evt_forged","type":"customer.subscription.created"}'
+```
+
+2. **Checkout is created server-side.** Open `/billing`, click *S'abonner*. The
+   browser lands on `checkout.stripe.com`. Pay with `4242 4242 4242 4242`, any
+   future expiry, any CVC.
+
+3. **The webhook grants.** The `stripe listen` window shows
+   `checkout.session.completed` and `customer.subscription.created` answered
+   `200`. `/billing` now lists both features as *ouvert*.
+
+4. **The success page grants nothing.** Sign out, then visit
+   `/billing/success?session_id=cs_test_anything`. Nothing opens. This is the
+   rule the whole design turns on.
+
+5. **Simulate events without paying:**
+
+```bash
+stripe trigger checkout.session.completed
+```
+
+```bash
+stripe trigger customer.subscription.updated
+```
+
+   A triggered event carries Stripe's own fixture data, with no `metadata.userId`
+   and a price this deployment does not know — so it is answered `200` and
+   recorded in `billing_events` with `outcome = 'unresolved'` or `'ignored'`.
+   That is the correct outcome, not a failure: a subscription created outside
+   this app has no learner to grant it to. To exercise a *real* grant, go
+   through checkout as in step 2.
+
+6. **Revocation.** In the dashboard, cancel the subscription immediately.
+   `customer.subscription.deleted` arrives, `/billing` flips both features to
+   *fermé*, and the lab shows the paywall again.
+
+7. **Attestation.** Finish a track, then open `/attestations`. With the
+   entitlement active the button issues one serial; clicking again returns the
+   same one rather than minting a second.
+
+### Inspecting what happened
+
+```bash
+psql "$DATABASE_URL" -c "select stripe_event_id, type, outcome, detail, received_at from billing_events order by received_at desc limit 20"
+```
+
+`outcome` is one of `received`, `granted`, `revoked`, `ignored`, `unresolved`,
+and `detail` carries the reason the mapper returned — which is how "the payment
+went through but nothing opened" gets an answer.
+
+### Rollback
+
+Set `FINANCE_HUB_BILLING_ENABLED=false`. Checkout answers `501`, the webhook
+answers `503` — so Stripe keeps retrying and no event is lost — and every gate
+opens. Stored entitlements are untouched and take effect again when the flag
+comes back.
 
 ## AI Mode
 

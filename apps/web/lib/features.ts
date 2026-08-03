@@ -28,6 +28,15 @@ export interface FeatureSet {
   aiTutor: FeatureState;
   /** Attempts, corrections and revisions survive a restart. */
   persistence: FeatureState;
+  /**
+   * Stripe checkout, webhook-driven entitlements and the premium gate.
+   *
+   * When this is off, premium modules are *open*, not locked. A private
+   * local-first install is the default case and its owner is not a customer;
+   * shipping a paywall that engages before anyone configured a price would lock
+   * people out of their own lab. The gate exists only where billing exists.
+   */
+  billing: FeatureState;
 }
 
 const ON: FeatureState = { enabled: true };
@@ -49,6 +58,24 @@ export function isDatabaseActive(env: Env): boolean {
   return env.FINANCE_HUB_USE_DATABASE && Boolean(env.DATABASE_URL);
 }
 
+/**
+ * Billing needs all four: the flag, a Stripe key, a webhook secret to verify
+ * deliveries with, and somewhere to store what a payment unlocked. `parseEnv`
+ * already refuses the flag without the first three, so in practice this only
+ * re-checks the database — but it is the predicate every gate reads, and it
+ * should not be able to answer "on" for a configuration that cannot record a
+ * grant.
+ */
+export function isBillingActive(env: Env): boolean {
+  return (
+    env.FINANCE_HUB_BILLING_ENABLED &&
+    Boolean(env.STRIPE_SECRET_KEY) &&
+    Boolean(env.STRIPE_WEBHOOK_SECRET) &&
+    isDatabaseActive(env) &&
+    env.LEARNING_HUB_AUTH_ENABLED
+  );
+}
+
 /** Pure resolver, exported for tests. */
 export function resolveFeatures(env: Env): FeatureSet {
   const publicDemo = isPublicDemo(env);
@@ -68,7 +95,12 @@ export function resolveFeatures(env: Env): FeatureSet {
       env.AI_PROVIDER === "none"
         ? off("Tuteur IA désactivé : AI_PROVIDER=none. Les réponses restent issues du corpus seedé.")
         : ON,
-    persistence: databaseActive ? ON : off(NO_DATABASE_REASON)
+    persistence: databaseActive ? ON : off(NO_DATABASE_REASON),
+    billing: isBillingActive(env)
+      ? ON
+      : off(
+          "Paiement désactivé : FINANCE_HUB_BILLING_ENABLED=false ou configuration Stripe incomplète. Tous les modules restent ouverts."
+        )
   };
 }
 

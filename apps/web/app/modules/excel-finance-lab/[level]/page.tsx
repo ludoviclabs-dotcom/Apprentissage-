@@ -1,6 +1,8 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { PaywallNotice } from "@/components/paywall-notice";
 import { getCurrentUser } from "@/lib/auth/current-user";
+import { resolveEntitlement } from "@/lib/billing/entitlements";
 import { EXCEL_LAB_BASE, getExcelLabModel, getLabLevel, parseLevelParam } from "@/lib/excel-lab";
 
 export default async function ExcelLabLevelPage({
@@ -17,6 +19,7 @@ export default async function ExcelLabLevelPage({
   }
 
   const user = await getCurrentUser();
+  const access = await resolveEntitlement("excel-finance-lab");
   const model = await getExcelLabModel(user?.id);
   const exercises = model.exercisesByLevel.get(level.id) ?? [];
   const snapshot = model.snapshots.find((item) => item.levelId === level.id);
@@ -54,8 +57,12 @@ export default async function ExcelLabLevelPage({
         </article>
       </section>
 
+      {access.allowed ? null : (
+        <PaywallNotice reason={access.reason} feature={access.feature} moduleLabel="Excel Finance Lab" />
+      )}
+
       <section className="course-list">
-        {exercises.map((definition) => (
+        {(access.allowed ? exercises : []).map((definition) => (
           <article
             key={definition.exercise.id}
             className="panel"

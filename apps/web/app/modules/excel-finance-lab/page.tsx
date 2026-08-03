@@ -1,7 +1,9 @@
 import Link from "next/link";
 import { LevelTrack } from "@/components/level-track";
+import { PaywallNotice } from "@/components/paywall-notice";
 import { SourceReference } from "@/components/source-reference";
 import { getCurrentUser } from "@/lib/auth/current-user";
+import { resolveEntitlement } from "@/lib/billing/entitlements";
 import {
   EXCEL_LAB_BASE,
   LAB_ASSUMPTIONS_FILE,
@@ -19,6 +21,10 @@ import { excelLabSources } from "@finance/domain";
  */
 export default async function ExcelFinanceLabPage() {
   const user = await getCurrentUser();
+  // The front door stays readable when the lab is locked: what it is, what it is
+  // not, and which datasets it runs on are the things somebody deciding whether
+  // to subscribe needs. Only the levels and the exercises behind them close.
+  const access = await resolveEntitlement("excel-finance-lab");
   const model = await getExcelLabModel(user?.id);
   const totalExercises = [...model.exercisesByLevel.values()].reduce(
     (sum, list) => sum + list.length,
@@ -78,44 +84,52 @@ export default async function ExcelFinanceLabPage() {
         </p>
       </section>
 
-      {model.progressionTracked ? null : (
+      {access.allowed ? null : (
+        <PaywallNotice reason={access.reason} feature={access.feature} moduleLabel="Excel Finance Lab" />
+      )}
+
+      {model.progressionTracked || !access.allowed ? null : (
         <p className="muted">
           Progression non suivie : connecte-toi avec une base active pour que chaque exercice corrigé
           alimente le niveau. Les exercices restent corrigés et notés.
         </p>
       )}
 
-      <LevelTrack
-        levels={model.levels}
-        snapshots={model.snapshots}
-        passingScore={model.passingScore}
-        rulesLabel={model.rulesLabel}
-      />
+      {access.allowed ? (
+        <>
+          <LevelTrack
+            levels={model.levels}
+            snapshots={model.snapshots}
+            passingScore={model.passingScore}
+            rulesLabel={model.rulesLabel}
+          />
 
-      <section className="course-list">
-        {model.levels.map((level) => {
-          const exercises = model.exercisesByLevel.get(level.id) ?? [];
+          <section className="course-list">
+            {model.levels.map((level) => {
+              const exercises = model.exercisesByLevel.get(level.id) ?? [];
 
-          return (
-            <article key={level.id} className="panel">
-              <div className="panel-heading">
-                <div>
-                  <span className="section-label">Niveau {level.level}</span>
-                  <h2>{level.title}</h2>
-                  <p>{level.objective}</p>
-                </div>
-                <Link className="primary-action" href={`${EXCEL_LAB_BASE}/${level.level}`}>
-                  Ouvrir le niveau {level.level}
-                </Link>
-              </div>
-              <div className="module-meta">
-                <span>{exercises.length} exercices</span>
-                <span>{level.estimatedMinutes} min</span>
-              </div>
-            </article>
-          );
-        })}
-      </section>
+              return (
+                <article key={level.id} className="panel">
+                  <div className="panel-heading">
+                    <div>
+                      <span className="section-label">Niveau {level.level}</span>
+                      <h2>{level.title}</h2>
+                      <p>{level.objective}</p>
+                    </div>
+                    <Link className="primary-action" href={`${EXCEL_LAB_BASE}/${level.level}`}>
+                      Ouvrir le niveau {level.level}
+                    </Link>
+                  </div>
+                  <div className="module-meta">
+                    <span>{exercises.length} exercices</span>
+                    <span>{level.estimatedMinutes} min</span>
+                  </div>
+                </article>
+              );
+            })}
+          </section>
+        </>
+      ) : null}
 
       <section className="panel">
         <span className="section-label">Jeux de données</span>

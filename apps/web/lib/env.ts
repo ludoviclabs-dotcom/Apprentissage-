@@ -72,7 +72,39 @@ const envSchema = z
     OPENAI_API_KEY: z.string().min(1).optional(),
     OPENAI_MODEL: z.string().min(1).default("gpt-4.1-mini"),
     OLLAMA_BASE_URL: optionalUrl("OLLAMA_BASE_URL"),
-    OLLAMA_MODEL: z.string().min(1).default("llama3.1")
+    OLLAMA_MODEL: z.string().min(1).default("llama3.1"),
+
+    // --- Stripe billing (PR-07) ---------------------------------------------
+    //
+    // The flag is the rollback lever: turning it off closes checkout and stops
+    // gating premium modules, without removing a single stored entitlement.
+    // Only `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY` is allowed near a browser; the
+    // secret key, the webhook secret and every price id are server-only, which
+    // is what stops a client choosing what it pays.
+    FINANCE_HUB_BILLING_ENABLED: booleanFlag(),
+    STRIPE_SECRET_KEY: z
+      .string()
+      .min(1)
+      .refine((value) => value.startsWith("sk_") || value.startsWith("rk_"), {
+        message: "must be a secret (sk_…) or restricted (rk_…) key, never a publishable pk_ key"
+      })
+      .optional(),
+    STRIPE_WEBHOOK_SECRET: z
+      .string()
+      .min(1)
+      .refine((value) => value.startsWith("whsec_"), {
+        message: "must be the whsec_… signing secret shown by `stripe listen` or the endpoint page"
+      })
+      .optional(),
+    NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY: z
+      .string()
+      .min(1)
+      .refine((value) => value.startsWith("pk_"), {
+        message: "must be a publishable pk_ key — a secret key here would ship to the browser"
+      })
+      .optional(),
+    STRIPE_PRICE_FOUNDER_ANNUAL: z.string().min(1).optional(),
+    STRIPE_PRICE_PRO_MONTHLY: z.string().min(1).optional()
   })
   .superRefine((value, ctx) => {
     if (value.FINANCE_HUB_USE_DATABASE && !value.DATABASE_URL) {
@@ -111,6 +143,57 @@ const envSchema = z
         path: ["OPENAI_API_KEY"],
         message: "AI_PROVIDER=openai requires OPENAI_API_KEY"
       });
+    }
+
+    if (value.FINANCE_HUB_BILLING_ENABLED) {
+      // Entitlements, subscriptions and certificates are owned rows. Selling
+      // access with nowhere to record who bought it would take the money and
+      // grant nothing, so this is a boot failure rather than a runtime surprise.
+      if (!value.LEARNING_HUB_AUTH_ENABLED) {
+        ctx.addIssue({
+          code: "custom",
+          path: ["LEARNING_HUB_AUTH_ENABLED"],
+          message:
+            "FINANCE_HUB_BILLING_ENABLED=true requires LEARNING_HUB_AUTH_ENABLED=true — an entitlement belongs to an account"
+        });
+      }
+
+      for (const required of ["STRIPE_SECRET_KEY", "STRIPE_WEBHOOK_SECRET"] as const) {
+        if (!value[required]) {
+          ctx.addIssue({
+            code: "custom",
+            path: [required],
+            message: `FINANCE_HUB_BILLING_ENABLED=true requires ${required}`
+          });
+        }
+      }
+
+      // Without a price there is nothing to sell, and a checkout button that
+      // 500s on click is worse than one that was never rendered.
+      if (!value.STRIPE_PRICE_FOUNDER_ANNUAL && !value.STRIPE_PRICE_PRO_MONTHLY) {
+        ctx.addIssue({
+          code: "custom",
+          path: ["STRIPE_PRICE_FOUNDER_ANNUAL"],
+          message:
+            "FINANCE_HUB_BILLING_ENABLED=true requires at least one price id (STRIPE_PRICE_FOUNDER_ANNUAL or STRIPE_PRICE_PRO_MONTHLY)"
+        });
+      }
+
+      // Test keys against a live webhook secret, or the reverse, silently drops
+      // every event: the signature never matches and no entitlement is ever
+      // granted. Catching the mismatch here beats debugging it from Stripe's
+      // delivery log.
+      const liveKey = value.STRIPE_SECRET_KEY?.includes("_live_");
+      const liveDeployment = value.VERCEL_ENV === "production";
+
+      if (liveKey && !liveDeployment && value.NODE_ENV !== "production") {
+        ctx.addIssue({
+          code: "custom",
+          path: ["STRIPE_SECRET_KEY"],
+          message:
+            "a live Stripe key is configured outside production — use a test key (sk_test_…) for local and preview work"
+        });
+      }
     }
   });
 

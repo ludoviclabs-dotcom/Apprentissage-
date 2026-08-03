@@ -95,7 +95,8 @@ docker compose run --rm ingestion-worker python worker.py /app/source-packs/cour
 - `docs/architecture.md` — runtime boundaries and data strategy
 - `docs/adr/000-baseline.md` — PR-00 baseline decisions
 - `docs/adr/001-local-auth-rls.md` — PR-01 local auth, ownership and row level security
-- `docs/local-runbook.md` — local modes, environment validation, checks
+- `docs/adr/007-stripe-billing-entitlements.md` — PR-07 Stripe checkout, webhook-driven entitlements, attestations
+- `docs/local-runbook.md` — local modes, environment validation, checks (including the Stripe CLI walkthrough)
 - `docs/roadmap-pr-plan.md` — PR-00 → PR-07 execution plan
 - `docs/source-policy.md`, `docs/secrets.md`, `docs/evals.md`, `docs/learning-design.md`, `docs/deployments.md`
 
