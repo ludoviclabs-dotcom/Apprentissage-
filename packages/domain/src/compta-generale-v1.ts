@@ -98,7 +98,8 @@ export const comptaGeneraleV1Levels: ModuleLevelDefinition[] = [
     objective: "Enregistrer une facture d'achat et de vente, TVA comprise, et encaisser un client.",
     competencyIds: ["cg-operations-courantes", "cg-tva"],
     criticalCompetencyIds: ["cg-operations-courantes"],
-    estimatedMinutes: 120
+    estimatedMinutes: 120,
+    publicationStatus: "published"
   },
   {
     id: "level-compta-generale-v1-2",
@@ -110,7 +111,8 @@ export const comptaGeneraleV1Levels: ModuleLevelDefinition[] = [
     objective: "Suivre la banque, immobiliser un bien, l'amortir et liquider la TVA du mois.",
     competencyIds: ["cg-tva", "cg-immobilisations"],
     criticalCompetencyIds: ["cg-immobilisations"],
-    estimatedMinutes: 150
+    estimatedMinutes: 150,
+    publicationStatus: "published"
   }
 ];
 

@@ -7,6 +7,7 @@ import {
   domains,
   evaluateTrack,
   getTrackLevels,
+  getPublishedTrackLevels,
   shouldRecordUnlock,
   type CurriculumVersion,
   type DomainId,
@@ -105,7 +106,7 @@ const MASTERY_EVENT_KINDS = [...ACTIVITY_KINDS, "finalDiagnostic"] as const;
 const masteryEventKindSchema = z.enum(MASTERY_EVENT_KINDS);
 
 /** Mirrors `LevelStatus`; kept in sync by the `satisfies` clause. */
-const LEVEL_STATUSES = ["locked", "available", "in-progress", "acquired"] as const satisfies readonly LevelStatus[];
+const LEVEL_STATUSES = ["locked", "available", "in_progress", "passed", "planned"] as const satisfies readonly LevelStatus[];
 
 const levelStatusSchema = z.enum(LEVEL_STATUSES);
 
@@ -143,7 +144,11 @@ export const masteryEventInputSchema = z.object({
   levelId: z.string().min(1),
   kind: masteryEventKindSchema,
   scorePercent: z.number().min(0).max(100),
-  sourceRef: z.string().min(1).optional(),
+  sourceRef: z.string().min(1).max(200),
+  sourceEventId: z.string().min(1).max(200),
+  exerciseVersionId: z.string().min(1).max(200),
+  sourceType: z.enum(["graded_attempt", "review", "case_study", "diagnostic"]),
+  correctedAt: z.string().datetime(),
   /** ISO 8601. Omit to let the database stamp `now()`. */
   occurredAt: z.string().min(1).optional()
 });
@@ -228,7 +233,9 @@ async function loadCurriculumVersion(versionId: string): Promise<CurriculumVersi
     objective: row.objective,
     competencyIds: row.competencyIds,
     criticalCompetencyIds: row.criticalCompetencyIds,
-    estimatedMinutes: row.estimatedMinutes
+    estimatedMinutes: row.estimatedMinutes,
+    publicationStatus:
+      row.publicationStatus === "planned" ? "planned" : "published"
   }));
 
   const curriculum: CurriculumVersion = {
@@ -374,9 +381,13 @@ export async function recordMasteryEvent(userId: string, event: MasteryEventInpu
       levelId: input.levelId,
       kind: input.kind,
       scorePercent: input.scorePercent.toFixed(2),
-      sourceRef: input.sourceRef ?? null,
+      sourceRef: input.sourceRef,
+      sourceEventId: input.sourceEventId,
+      exerciseVersionId: input.exerciseVersionId,
+      sourceType: input.sourceType,
+      correctedAt: input.correctedAt,
       ...(input.occurredAt ? { occurredAt: input.occurredAt } : {})
-    });
+    }).onConflictDoNothing();
   });
 
   return level.trackId;
@@ -404,7 +415,12 @@ export async function getMasteryEvents(userId: string, trackId: string): Promise
         levelId: masteryEventsTable.levelId,
         kind: masteryEventsTable.kind,
         scorePercent: masteryEventsTable.scorePercent,
-        occurredAt: masteryEventsTable.occurredAt
+        occurredAt: masteryEventsTable.occurredAt,
+        sourceRef: masteryEventsTable.sourceRef,
+        sourceEventId: masteryEventsTable.sourceEventId,
+        exerciseVersionId: masteryEventsTable.exerciseVersionId,
+        sourceType: masteryEventsTable.sourceType,
+        correctedAt: masteryEventsTable.correctedAt
       })
       .from(masteryEventsTable)
       .innerJoin(moduleLevelsTable, eq(moduleLevelsTable.id, masteryEventsTable.levelId))
@@ -426,7 +442,12 @@ export async function getMasteryEvents(userId: string, trackId: string): Promise
         levelId: row.levelId,
         kind: kind.data,
         scorePercent: Number(row.scorePercent),
-        occurredAt: toIsoTimestamp(row.occurredAt)
+        occurredAt: toIsoTimestamp(row.occurredAt),
+        sourceRef: row.sourceRef,
+        sourceEventId: row.sourceEventId,
+        exerciseVersionId: row.exerciseVersionId,
+        sourceType: row.sourceType,
+        correctedAt: row.correctedAt ? toIsoTimestamp(row.correctedAt) : null
       };
     });
   });
@@ -613,7 +634,7 @@ export async function refreshTrackProgress(userId: string, trackId: string): Pro
     return [];
   }
 
-  const levels = getTrackLevels(version, trackId);
+  const levels = getPublishedTrackLevels(version, trackId);
 
   if (levels.length === 0) {
     return [];

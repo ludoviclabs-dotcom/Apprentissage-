@@ -13,7 +13,7 @@ import {
   type LevelSnapshot,
   type ModuleLevelDefinition
 } from "@finance/domain";
-import { refreshTrackProgress } from "@finance/db";
+import { getCanonicalTrackState, type CanonicalLevelState } from "@/lib/learning-progression";
 
 /**
  * View model for the Excel Finance Lab.
@@ -104,17 +104,20 @@ export function nextLabExercise(exerciseId: string): LabExerciseDefinition | nul
 
 export interface ExcelLabModel {
   levels: ModuleLevelDefinition[];
+  levelStates: CanonicalLevelState[];
   snapshots: LevelSnapshot[];
   exercisesByLevel: Map<string, LabExerciseDefinition[]>;
   datasets: LabDatasetSummary[];
+  score: number | null;
   passingScore: number;
   rulesLabel: string;
   progressionTracked: boolean;
 }
 
 export async function getExcelLabModel(userId?: string | null): Promise<ExcelLabModel> {
-  const levels = getLabLevels();
-  const snapshots = userId ? await refreshTrackProgress(userId, EXCEL_LAB_TRACK) : [];
+  const progression = await getCanonicalTrackState(userId, EXCEL_LAB_TRACK);
+  const levels = progression.publishedLevels.map((level) => level.definition);
+  const snapshots = progression.publishedLevels.map((level) => level.snapshot);
   const exercisesByLevel = new Map<string, LabExerciseDefinition[]>();
 
   for (const level of levels) {
@@ -130,11 +133,13 @@ export async function getExcelLabModel(userId?: string | null): Promise<ExcelLab
 
   return {
     levels,
+    levelStates: progression.publishedLevels,
     snapshots,
     exercisesByLevel,
     datasets: LAB_DATASETS,
-    passingScore: activeCurriculum.rules.passingScore,
-    rulesLabel: activeCurriculum.label,
-    progressionTracked: snapshots.length > 0
+    score: progression.score,
+    passingScore: progression.passingScore,
+    rulesLabel: progression.sourceLabel,
+    progressionTracked: progression.mode === "enrolled"
   };
 }

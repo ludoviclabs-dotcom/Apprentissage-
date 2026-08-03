@@ -42,6 +42,12 @@ export interface MasteryEvent {
   scorePercent: number;
   /** ISO 8601. Used only for ordering, never for "now". */
   occurredAt: string;
+  /** Nullable only for rows created before ADR 008. */
+  sourceRef?: string | null;
+  sourceEventId?: string | null;
+  exerciseVersionId?: string | null;
+  sourceType?: string | null;
+  correctedAt?: string | null;
 }
 
 export interface CriticalCompetencyStrength {
@@ -49,7 +55,7 @@ export interface CriticalCompetencyStrength {
   strength: number;
 }
 
-/** Why a level is not acquired. Shown to the learner verbatim. */
+/** Why a level is not passed. Shown to the learner verbatim. */
 export type UnlockBlockerCode =
   | "previous-level-not-acquired"
   | "score-below-threshold"
@@ -61,7 +67,8 @@ export interface UnlockBlocker {
   detail: string;
 }
 
-export type LevelStatus = "locked" | "available" | "in-progress" | "acquired";
+/** Canonical vocabulary shared by persistence, APIs and pages. */
+export type LevelStatus = "locked" | "available" | "in_progress" | "passed" | "planned";
 
 export interface LevelSnapshot {
   levelId: string;
@@ -275,7 +282,7 @@ function resolveStatus(input: {
   hasActivity: boolean;
 }): LevelStatus {
   if (input.alreadyAcquired) {
-    return "acquired";
+    return "passed";
   }
 
   if (!input.previousLevelAcquired) {
@@ -283,10 +290,10 @@ function resolveStatus(input: {
   }
 
   if (!input.hasBlockers) {
-    return "acquired";
+    return "passed";
   }
 
-  return input.hasActivity ? "in-progress" : "available";
+  return input.hasActivity ? "in_progress" : "available";
 }
 
 /**
@@ -326,7 +333,7 @@ export function evaluateTrack(
     );
 
     snapshots.push(snapshot);
-    previousAcquired = snapshot.status === "acquired";
+    previousAcquired = snapshot.status === "passed";
   }
 
   return snapshots;
@@ -335,8 +342,9 @@ export function evaluateTrack(
 const STATUS_LABELS: Record<LevelStatus, string> = {
   locked: "verrouillé",
   available: "disponible",
-  "in-progress": "en cours",
-  acquired: "acquis"
+  in_progress: "en cours",
+  passed: "acquis",
+  planned: "planifié"
 };
 
 export function getLevelStatusLabel(status: LevelStatus): string {

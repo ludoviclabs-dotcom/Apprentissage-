@@ -12,7 +12,8 @@ export const migrationFiles = [
   "migrations/0006_attempt_evaluation_provenance.sql",
   "migrations/0007_review_queue_remediation.sql",
   "migrations/0008_spreadsheet_evaluation_type.sql",
-  "migrations/0009_billing_entitlements.sql"
+  "migrations/0009_billing_entitlements.sql",
+  "migrations/0010_canonical_learning_progression.sql"
 ] as const;
 
 /** Tables protected by row level security, keyed on `user_id`. */

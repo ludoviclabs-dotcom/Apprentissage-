@@ -371,6 +371,10 @@ export interface RecordReviewResult {
   /** Set only when the remediation was stored. */
   remediationId: string | null;
   persisted: boolean;
+  /** Immutable provenance for a retention event; null when nothing was stored. */
+  reviewAttemptId: string | null;
+  /** True only when this review follows a persisted, corrected exercise attempt. */
+  masteryEligible: boolean;
 }
 
 /**
@@ -414,7 +418,9 @@ export async function recordReviewOutcome(
         exerciseId: content.exerciseId
       }),
       remediationId: null,
-      persisted: false
+      persisted: false,
+      reviewAttemptId: null,
+      masteryEligible: false
     };
   }
 
@@ -423,7 +429,7 @@ export async function recordReviewOutcome(
   return withUserContext(userId as string, async (tx) => {
     await lockReviewItem(tx, userId as string, input.itemType, input.itemRef);
     const existing = await selectQueueRow(tx, userId as string, input.itemType, input.itemRef);
-    const outcome = schedule(existing ?? catalogueItem(content));
+    const outcome = schedule(existing?.item ?? catalogueItem(content));
     const queueItemId = await upsertQueueRow(tx, userId as string, outcome, {
       competencyId: content.competencyId,
       source: existing ? undefined : "catalogue"
@@ -463,7 +469,17 @@ export async function recordReviewOutcome(
         })
       : null;
 
-    return { outcome, remediation, remediationId, persisted: true };
+    return {
+      outcome,
+      remediation,
+      remediationId,
+      persisted: true,
+      reviewAttemptId: attempt?.id ?? null,
+      masteryEligible:
+        outcome.itemType === "exercise" &&
+        outcome.revealed &&
+        existing?.source === "attempt"
+    };
   });
 }
 
@@ -504,7 +520,10 @@ async function selectQueueRow(
   userId: string,
   itemType: ReviewItemType,
   itemRef: string
-): Promise<ReviewQueueItem | null> {
+): Promise<{
+  item: ReviewQueueItem;
+  source: "catalogue" | "attempt" | "remediation";
+} | null> {
   const rows = await tx
     .select()
     .from(reviewQueueTable)
@@ -518,7 +537,18 @@ async function selectQueueRow(
     .limit(1)
     .for("update");
 
-  return rows[0] ? toQueueItem(rows[0]) : null;
+  const row = rows[0];
+  const item = row ? toQueueItem(row) : null;
+
+  if (!row || !item) {
+    return null;
+  }
+
+  return {
+    item,
+    source:
+      row.source === "attempt" || row.source === "remediation" ? row.source : "catalogue"
+  };
 }
 
 /**

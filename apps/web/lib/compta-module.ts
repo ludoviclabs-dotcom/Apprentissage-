@@ -11,8 +11,8 @@ import {
   type LevelSnapshot,
   type ModuleLevelDefinition
 } from "@finance/domain";
-import { refreshTrackProgress } from "@finance/db";
 import type { ChoiceOption, ModuleExerciseKind } from "@/components/forms/module-exercise-form";
+import { getCanonicalTrackState, type CanonicalLevelState } from "@/lib/learning-progression";
 
 /**
  * View model for the comptabilité générale v1 module.
@@ -104,9 +104,11 @@ export function parseLevelParam(raw: string): number | null {
 
 export interface ComptaModuleModel {
   levels: ModuleLevelDefinition[];
+  levelStates: CanonicalLevelState[];
   snapshots: LevelSnapshot[];
   exercisesByLevel: Map<string, ModuleExerciseView[]>;
   miniCase: typeof comptaGeneraleV1MiniCase;
+  score: number | null;
   passingScore: number;
   rulesLabel: string;
   /** False when progression cannot be stored, so the UI can say so. */
@@ -114,11 +116,9 @@ export interface ComptaModuleModel {
 }
 
 export async function getComptaModuleModel(userId?: string | null): Promise<ComptaModuleModel> {
-  const levels = getModuleLevels();
-  // `refreshTrackProgress` returns [] with no database and enrols on first call
-  // otherwise. Both are correct here: an anonymous visitor simply has no
-  // progression to show.
-  const snapshots = userId ? await refreshTrackProgress(userId, COMPTA_GENERALE_V1_TRACK) : [];
+  const progression = await getCanonicalTrackState(userId, COMPTA_GENERALE_V1_TRACK);
+  const levels = progression.publishedLevels.map((level) => level.definition);
+  const snapshots = progression.publishedLevels.map((level) => level.snapshot);
   const exercisesByLevel = new Map<string, ModuleExerciseView[]>();
 
   for (const level of levels) {
@@ -130,12 +130,14 @@ export async function getComptaModuleModel(userId?: string | null): Promise<Comp
 
   return {
     levels,
+    levelStates: progression.publishedLevels,
     snapshots,
     exercisesByLevel,
     miniCase: comptaGeneraleV1MiniCase,
-    passingScore: activeCurriculum.rules.passingScore,
-    rulesLabel: activeCurriculum.label,
-    progressionTracked: snapshots.length > 0
+    score: progression.score,
+    passingScore: progression.passingScore,
+    rulesLabel: progression.sourceLabel,
+    progressionTracked: progression.mode === "enrolled"
   };
 }
 

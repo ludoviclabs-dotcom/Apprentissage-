@@ -45,7 +45,7 @@ export function evaluateCertificateEligibility(
   const totalLevels = input.levels.length;
   const byLevel = new Map(input.snapshots.map((snapshot) => [snapshot.levelId, snapshot]));
 
-  const acquired = input.levels.filter((level) => byLevel.get(level.id)?.status === "acquired");
+  const acquired = input.levels.filter((level) => byLevel.get(level.id)?.status === "passed");
   const scores = input.levels.map((level) => byLevel.get(level.id)?.score ?? 0);
   const averageScore =
     totalLevels === 0 ? 0 : Math.round(scores.reduce((sum, score) => sum + score, 0) / totalLevels);

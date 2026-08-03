@@ -10,6 +10,7 @@ export * from "./modules";
 export * from "./progress";
 export * from "./mastery";
 export * from "./curriculum";
+export * from "./learning-progression";
 export * from "./evaluators";
 export * from "./exercise-specs";
 export * from "./review-scheduler";

@@ -340,7 +340,8 @@ export const excelLabLevels: ModuleLevelDefinition[] = [
     objective: "Lire un compte de resultat, calculer le chiffre d'affaires, le cout d'achat et la marge.",
     competencyIds: ["xl-soldes-gestion", "xl-formules"],
     criticalCompetencyIds: ["xl-soldes-gestion"],
-    estimatedMinutes: 90
+    estimatedMinutes: 90,
+    publicationStatus: "published"
   },
   {
     id: "level-excel-finance-2",
@@ -352,7 +353,8 @@ export const excelLabLevels: ModuleLevelDefinition[] = [
     objective: "Enchainer VA et EBE, projeter la tresorerie et mesurer un ecart budgetaire.",
     competencyIds: ["xl-soldes-gestion", "xl-tresorerie-budget", "xl-formules"],
     criticalCompetencyIds: ["xl-tresorerie-budget"],
-    estimatedMinutes: 120
+    estimatedMinutes: 120,
+    publicationStatus: "published"
   }
 ];
 
