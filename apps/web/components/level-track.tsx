@@ -20,8 +20,9 @@ const ACTIVITY_LABELS: Record<(typeof ACTIVITY_KINDS)[number], string> = {
 const STATUS_TOKEN: Record<LevelSnapshot["status"], string> = {
   locked: "locked",
   available: "processing",
-  "in-progress": "needs-review",
-  acquired: "ready"
+  in_progress: "needs-review",
+  passed: "ready",
+  planned: "processing"
 };
 
 export function LevelTrack({
@@ -66,10 +67,16 @@ export function LevelTrack({
                 <span className={`state-token ${STATUS_TOKEN[status]}`}>{getLevelStatusLabel(status)}</span>
               </div>
 
-              {status === "locked" ? (
+              {status === "locked" || status === "planned" ? (
                 <LockedState
-                  title="Niveau verrouillé"
-                  condition={`Termine le niveau ${level.level - 1} pour ouvrir celui-ci.`}
+                  title={status === "planned" ? "Niveau planifié" : "Niveau verrouillé"}
+                  condition={
+                    status === "planned"
+                      ? "Ce niveau n'est pas encore publié et aucun score ne peut l'ouvrir."
+                      : snapshot?.blockers.find(
+                            (blocker) => blocker.code === "previous-level-not-acquired"
+                          )?.detail ?? "Le niveau précédent doit d'abord être acquis."
+                  }
                 />
               ) : (
                 <>
@@ -90,7 +97,7 @@ export function LevelTrack({
               )}
 
               {/* A learner must never have to guess what is missing. */}
-              {snapshot && snapshot.blockers.length > 0 && status !== "acquired" ? (
+              {snapshot && snapshot.blockers.length > 0 && status !== "passed" ? (
                 <ul className="level-blockers">
                   {snapshot.blockers.map((blocker) => (
                     <li key={blocker.code}>{blocker.detail}</li>
@@ -98,7 +105,7 @@ export function LevelTrack({
                 </ul>
               ) : null}
 
-              {status === "acquired" ? (
+              {status === "passed" ? (
                 <p className="muted">
                   Niveau acquis. Il reste acquis même si un score baisse ensuite.
                 </p>

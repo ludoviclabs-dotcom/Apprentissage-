@@ -1,21 +1,16 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { DomainBadge } from "@/components/domain-badge";
 import { FeatureNotice } from "@/components/feature-notice";
 import { LevelTrack } from "@/components/level-track";
-import { ProgressMeter } from "@/components/progress-meter";
 import { PageHeader } from "@/components/ui/page-header";
 import { getCurrentUser } from "@/lib/auth/current-user";
 import { getFeatures } from "@/lib/features";
-import { getLevelTrackModel } from "@/lib/mastery-model";
-import { statusLabel } from "@/lib/status-labels";
-import { getPathModel } from "@/lib/view-model";
-import { getDomain } from "@finance/domain";
+import { getCanonicalLearningProgression } from "@/lib/learning-progression";
 
 export const metadata: Metadata = {
   title: "Parcours",
   description:
-    "Le parcours de trente jours : paliers pédagogiques, niveaux à débloquer et modules d'apprentissage."
+    "Curricula versionnés, niveaux publiés, maîtrise et prochaines actions d'apprentissage."
 };
 
 const tierLabels = {
@@ -26,7 +21,7 @@ const tierLabels = {
 
 export default async function ParcoursPage() {
   const user = await getCurrentUser();
-  const [model, track] = await Promise.all([getPathModel(user?.id), getLevelTrackModel(user?.id)]);
+  const progression = await getCanonicalLearningProgression(user?.id);
   const features = getFeatures();
 
   return (
@@ -58,14 +53,7 @@ export default async function ParcoursPage() {
         ))}
       </section>
 
-      <LevelTrack
-        levels={track.levels}
-        snapshots={track.snapshots}
-        passingScore={track.passingScore}
-        rulesLabel={track.rulesLabel}
-      />
-
-      {track.persisted ? null : (
+      {progression.mode === "personal" ? null : (
         <FeatureNotice
           feature={{
             enabled: false,
@@ -76,55 +64,33 @@ export default async function ParcoursPage() {
         />
       )}
 
-      <section className="module-grid">
-        {model.modules.map((module) => {
-          const domain = getDomain(module.domainId);
-
-          return (
-            <article key={module.id} className="panel module-card">
-              <div className="panel-heading">
-                <div>
-                  <DomainBadge domainId={module.domainId} />
-                  <h2>{module.title}</h2>
-                </div>
-                <span className={`state-token ${module.status === "mastered" ? "ready" : module.status === "fragile" ? "needs-review" : "processing"}`}>
-                  {statusLabel(module.status)}
-                </span>
-              </div>
-              <p>{module.description}</p>
-              <ProgressMeter value={module.progress} color={domain.accent} label={`Progression ${module.title}`} />
-              <div className="module-meta">
-                <span>{module.estimatedMinutes} min</span>
-                <span>{module.conceptIds.length} notions</span>
-                <span>{module.exerciseIds.length} exercices</span>
-                <span>{module.flashcardIds.length} cartes</span>
-              </div>
-              <strong>Prochain pas</strong>
-              <p>{module.nextAction}</p>
-            </article>
-          );
-        })}
-      </section>
-
-      <section className="panel">
-        <div className="panel-heading">
-          <div>
-            <span className="section-label">30 jours</span>
-            <h2>{model.learningPath.name}</h2>
+      {progression.tracks.map((track) => (
+        <section
+          key={track.track.trackId}
+          className="page-stack"
+          data-canonical-track={track.track.trackId}
+          data-canonical-score={track.score ?? "neutral"}
+        >
+          <div className="panel-heading">
+            <div>
+              <span className="section-label">Curriculum publié</span>
+              <h2>{track.track.title}</h2>
+              <p>{track.track.description}</p>
+            </div>
+            {track.nextAction ? (
+              <Link className="primary-action" href={track.nextAction.href}>
+                {track.nextAction.label}
+              </Link>
+            ) : null}
           </div>
-        </div>
-        <div className="learning-days">
-          {model.learningPath.days.map((day) => (
-            <article key={day.day} className={`learning-day ${day.status}`}>
-              <span>Jour {day.day}</span>
-              <strong>{day.title}</strong>
-              <small>
-                {getDomain(day.domainId).shortName} · {day.minutes} min · {statusLabel(day.status)}
-              </small>
-            </article>
-          ))}
-        </div>
-      </section>
+          <LevelTrack
+            levels={track.levels.map((level) => level.definition)}
+            snapshots={track.levels.map((level) => level.snapshot)}
+            passingScore={track.passingScore}
+            rulesLabel={track.sourceLabel}
+          />
+        </section>
+      ))}
     </div>
   );
 }

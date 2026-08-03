@@ -5,7 +5,6 @@ import { SourceReference } from "@/components/source-reference";
 import { getCurrentUser } from "@/lib/auth/current-user";
 import { resolveEntitlement } from "@/lib/billing/entitlements";
 import {
-  EXCEL_LAB_BASE,
   LAB_ASSUMPTIONS_FILE,
   getExcelLabModel,
   labOpeningCash
@@ -43,9 +42,13 @@ export default async function ExcelFinanceLabPage() {
             et la formule.
           </p>
         </div>
-        <div className="hero-score">
-          <span>Seuil</span>
-          <strong>{model.passingScore}%</strong>
+        <div
+          className="hero-score"
+          data-canonical-track="track-excel-finance-lab"
+          data-canonical-score={model.score ?? "neutral"}
+        >
+          <span>{model.score === null ? "Exemple de parcours" : "Progression"}</span>
+          <strong>{model.score === null ? "État neutre" : `${Math.round(model.score)}%`}</strong>
         </div>
       </section>
 
@@ -63,8 +66,8 @@ export default async function ExcelFinanceLabPage() {
           <strong>{model.datasets.length}</strong>
         </article>
         <article>
-          <span>Correction</span>
-          <strong>Valeur + formule</strong>
+          <span>Seuil</span>
+          <strong>{model.passingScore}%</strong>
         </article>
       </section>
 
@@ -107,6 +110,7 @@ export default async function ExcelFinanceLabPage() {
           <section className="course-list">
             {model.levels.map((level) => {
               const exercises = model.exercisesByLevel.get(level.id) ?? [];
+              const state = model.levelStates.find((candidate) => candidate.definition.id === level.id);
 
               return (
                 <article key={level.id} className="panel">
@@ -116,9 +120,15 @@ export default async function ExcelFinanceLabPage() {
                       <h2>{level.title}</h2>
                       <p>{level.objective}</p>
                     </div>
-                    <Link className="primary-action" href={`${EXCEL_LAB_BASE}/${level.level}`}>
-                      Ouvrir le niveau {level.level}
-                    </Link>
+                    {state?.href ? (
+                      <Link className="primary-action" href={state.href}>
+                        Ouvrir le niveau {level.level}
+                      </Link>
+                    ) : (
+                      <span className="secondary-action" aria-disabled="true">
+                        Niveau verrouillé
+                      </span>
+                    )}
                   </div>
                   <div className="module-meta">
                     <span>{exercises.length} exercices</span>

@@ -5,8 +5,9 @@ import { ProgressMeter } from "@/components/progress-meter";
 import { PageHeader } from "@/components/ui/page-header";
 import { statusLabel } from "@/lib/status-labels";
 import { getProgressModel } from "@/lib/view-model";
-import { getDomainAverage, getWeakestCompetencies } from "@finance/domain";
+import { getWeakestCompetencies } from "@finance/domain";
 import { getCurrentUser } from "@/lib/auth/current-user";
+import { getCanonicalLearningProgression } from "@/lib/learning-progression";
 
 export const metadata: Metadata = {
   title: "Progression — Compétences",
@@ -16,7 +17,10 @@ export const metadata: Metadata = {
 
 export default async function ProgressionPage() {
   const user = await getCurrentUser();
-  const model = await getProgressModel(user?.id);
+  const [model, progression] = await Promise.all([
+    getProgressModel(user?.id),
+    getCanonicalLearningProgression(user?.id)
+  ]);
   const weakest = getWeakestCompetencies(model.competencies, 6);
 
   return (
@@ -27,30 +31,35 @@ export default async function ProgressionPage() {
         description="La progression met en avant les notions fragiles, les erreurs récurrentes et la prochaine action utile."
         aside={
           <div className="hero-score">
-            <span>Erreurs</span>
-            <strong>{model.errorJournal.length}</strong>
+            <span>{user ? "Erreurs" : "Mode"}</span>
+            <strong>{user ? model.errorJournal.length : "Neutre"}</strong>
           </div>
         }
       />
 
       <section className="domain-overview">
-        {model.domains.map((domain) => {
-          const average = getDomainAverage(domain.id, model.competencies);
-
-          return (
-            <article key={domain.id} className="domain-card">
-              <div className="domain-card-title">
-                <span style={{ backgroundColor: domain.softAccent, color: domain.accent }}>{domain.shortName}</span>
-                <strong>{average}%</strong>
-              </div>
-              <p>{domain.description}</p>
-              <ProgressMeter value={average} color={domain.accent} label={`Progression ${domain.name}`} />
-            </article>
-          );
-        })}
+        {progression.tracks.map((track) => (
+          <article
+            key={track.track.trackId}
+            className="domain-card"
+            data-canonical-track={track.track.trackId}
+            data-canonical-score={track.score ?? "neutral"}
+          >
+            <div className="domain-card-title">
+              <span>{track.track.title}</span>
+              <strong>{track.score === null ? "État neutre" : `${Math.round(track.score)}%`}</strong>
+            </div>
+            <p>{track.nextAction?.title ?? "Tous les niveaux publiés sont acquis."}</p>
+            {track.score === null ? (
+              <p className="muted">Aucun score personnel en mode démonstration.</p>
+            ) : (
+              <ProgressMeter value={track.score} label={`Progression ${track.track.title}`} />
+            )}
+          </article>
+        ))}
       </section>
 
-      <div className="two-column align-start">
+      {user ? <div className="two-column align-start">
         <CompetencyMap competencies={weakest} />
         <section className="panel" id="badges">
           <span className="section-label">Badges de maîtrise</span>
@@ -70,9 +79,17 @@ export default async function ProgressionPage() {
               ))}
           </div>
         </section>
-      </div>
+      </div> : (
+        <section className="panel">
+          <span className="section-label">Exemple de parcours</span>
+          <h2>Aucune maîtrise personnelle simulée</h2>
+          <p className="muted">
+            Connecte-toi puis soumets un exercice corrigé pour créer tes propres preuves de progression.
+          </p>
+        </section>
+      )}
 
-      <section className="panel">
+      {user ? <section className="panel">
         <span className="section-label">Analyse des erreurs</span>
         <h2>Actions recommandées</h2>
         <div className="priority-list">
@@ -87,7 +104,7 @@ export default async function ProgressionPage() {
             </article>
           ))}
         </div>
-      </section>
+      </section> : null}
     </div>
   );
 }

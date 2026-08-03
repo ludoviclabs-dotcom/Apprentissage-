@@ -9,10 +9,9 @@ import { ProgressMeter } from "@/components/progress-meter";
 import { NextActionCard } from "@/components/ui/next-action-card";
 import { PageHeader } from "@/components/ui/page-header";
 import { getRuntimeFlags } from "@/lib/runtime-flags";
-import { statusLabel } from "@/lib/status-labels";
 import { getDashboardModel } from "@/lib/view-model";
-import { getDomain } from "@finance/domain";
 import { getCurrentUser } from "@/lib/auth/current-user";
+import { getCanonicalLearningProgression } from "@/lib/learning-progression";
 
 export const metadata: Metadata = {
   title: "Tableau de bord",
@@ -22,14 +21,17 @@ export const metadata: Metadata = {
 
 export default async function DashboardPage() {
   const user = await getCurrentUser();
-  const model = await getDashboardModel(user?.id);
+  const [model, progression] = await Promise.all([
+    getDashboardModel(user?.id),
+    getCanonicalLearningProgression(user?.id)
+  ]);
   const runtime = getRuntimeFlags();
   const totalDocuments = model.sourcePacks.reduce((sum, pack) => sum + pack.documentsCount, 0);
   const totalChunks = model.sourcePacks.reduce((sum, pack) => sum + pack.chunksCount, 0);
 
-  // Un score n'est « le tien » que si un compte le porte. Sans compte, les
-  // moyennes viennent du socle seedé et sont présentées comme démonstration,
-  // jamais comme progression personnelle.
+  // Un score n'est « le tien » que si un compte le porte. Les moyennes et
+  // priorités du socle seedé ne sont même pas rendues sans compte : les appeler
+  // « exemples » laisserait encore croire à un historique personnel.
   const personal = user !== null;
 
   // `latestCorrection` est volontairement exclu de cette porte : un compte qui
@@ -61,35 +63,28 @@ export default async function DashboardPage() {
         title={personal ? "Remise à niveau pilotée par compétences" : "Découvre le cockpit d'apprentissage"}
         description={
           personal
-            ? `Aujourd'hui : jour ${model.currentDay.day} sur ${model.learningPath.durationDays}, avec une priorité sur la logique avant l'automatisme.`
-            : "Parcours guidé, exercices corrigés et révision active. Les chiffres affichés viennent d'un jeu de démonstration, pas d'une progression personnelle."
+            ? "Ton état vient du curriculum versionné, des corrections et des révisions réellement enregistrées."
+            : "Exemple de parcours en lecture neutre : aucun score, statut ou travail seedé n'est présenté comme personnel."
         }
         aside={
           personal ? (
             <div className="hero-score">
               <span>Niveau global</span>
-              <strong>{model.overallAverage}%</strong>
+              <strong>{Math.round(progression.score ?? 0)}%</strong>
             </div>
           ) : (
             <span className="state-token">Jeu de démonstration</span>
           )
         }
       >
-        {personal ? (
+        {progression.nextAction ? (
           <NextActionCard
-            href={`/exercices/${model.currentExercise.id}`}
-            label="Continuer"
-            title={model.currentExercise.title}
-            meta={`${model.currentDay.minutes} min · jour ${model.currentDay.day} du parcours`}
+            href={progression.nextAction.href}
+            label={progression.nextAction.label}
+            title={progression.nextAction.title}
+            meta={personal ? "État canonique du curriculum" : "Correction sans écriture en base"}
           />
-        ) : (
-          <NextActionCard
-            href={`/exercices/${model.currentExercise.id}`}
-            label="Découvrir"
-            title="Un exercice guidé"
-            meta="Correction structurée et sources citées"
-          />
-        )}
+        ) : null}
       </PageHeader>
 
       <section className="demo-proof-grid" aria-label="Garanties de la démonstration">
@@ -106,10 +101,12 @@ export default async function DashboardPage() {
         <article>
           <span>Correction</span>
           <strong>
-            {model.latestCorrection ? `${model.latestCorrection.rubricScores.length} critères` : "À venir"}
+            {personal && model.latestCorrection
+              ? `${model.latestCorrection.rubricScores.length} critères`
+              : "À essayer"}
           </strong>
           <p>
-            {model.latestCorrection
+            {personal && model.latestCorrection
               ? "Le score sépare barème, erreurs, remédiation et preuves citées."
               : "S'affiche dès la première correction : barème, erreurs, remédiation et preuves citées."}
           </p>
@@ -121,9 +118,11 @@ export default async function DashboardPage() {
           <div>
             <span className="section-label">Révision active</span>
             <h2>
-              {model.reviewQueue.dueCount === 0
-                ? "Rien n'est dû aujourd'hui"
-                : `${model.reviewQueue.dueCount} item(s) à revoir`}
+              {personal
+                ? model.reviewQueue.dueCount === 0
+                  ? "Rien n'est dû aujourd'hui"
+                  : `${model.reviewQueue.dueCount} item(s) à revoir`
+                : "Exemple de session, sans historique"}
             </h2>
           </div>
           <Link className="primary-action" href="/revisions">
@@ -131,9 +130,11 @@ export default async function DashboardPage() {
           </Link>
         </div>
         <p className="muted">
-          {model.remediations.length > 0
+          {personal && model.remediations.length > 0
             ? `${model.remediations.length} remédiation(s) ouverte(s) : chaque oubli programme un retest daté.`
-            : "La file remonte les items dus, réponse masquée jusqu'à la révélation."}
+            : personal
+              ? "La file remonte les items dus, réponse masquée jusqu'à la révélation."
+              : "Les cartes illustrent le rappel actif, sans date ni statut attribué au visiteur."}
         </p>
       </section>
 
@@ -156,64 +157,66 @@ export default async function DashboardPage() {
         <p className="muted">Recherche locale sur {totalChunks} extraits dérivés et cités.</p>
       </section>
 
-      <section className="domain-overview" aria-label="Niveau par domaine">
-        {model.domains.map((domain) => (
-          <article key={domain.id} className="domain-card">
-            <div className="domain-card-title">
-              <span style={{ backgroundColor: domain.softAccent, color: domain.accent }}>{domain.shortName}</span>
-              <strong>{domain.average}%</strong>
-            </div>
-            <p>{domain.description}</p>
-            <ProgressMeter value={domain.average} color={domain.accent} label={`Progression ${domain.name}`} />
-          </article>
-        ))}
-      </section>
+      {personal ? (
+        <section className="domain-overview" aria-label="Niveau par domaine">
+          {model.domains.map((domain) => (
+            <article key={domain.id} className="domain-card">
+              <div className="domain-card-title">
+                <span style={{ backgroundColor: domain.softAccent, color: domain.accent }}>{domain.shortName}</span>
+                <strong>{domain.average}%</strong>
+              </div>
+              <p>{domain.description}</p>
+              <ProgressMeter value={domain.average} color={domain.accent} label={`Progression ${domain.name}`} />
+            </article>
+          ))}
+        </section>
+      ) : null}
 
       <section className="dashboard-grid">
-        <section className="panel">
-          <div className="panel-heading">
-            <div>
-              <span className="section-label">Priorités</span>
-              <h2>À traiter cette semaine</h2>
+        {personal ? (
+          <section className="panel">
+            <div className="panel-heading">
+              <div>
+                <span className="section-label">Priorités</span>
+                <h2>À traiter cette semaine</h2>
+              </div>
             </div>
-          </div>
+            <div className="priority-list">
+              {model.priorities.map((priority) => (
+                <article key={priority.id} className="priority-row">
+                  <DomainBadge domainId={priority.domainId} />
+                  <div>
+                    <strong>{priority.title}</strong>
+                    <p>{priority.reason}</p>
+                    <small>{priority.action}</small>
+                  </div>
+                </article>
+              ))}
+            </div>
+          </section>
+        ) : null}
+
+        <section className="panel">
+          <span className="section-label">Curricula publiés</span>
+          <h2>Une progression, deux tracks cohérents</h2>
           <div className="priority-list">
-            {model.priorities.map((priority) => (
-              <article key={priority.id} className="priority-row">
-                <DomainBadge domainId={priority.domainId} />
+            {progression.tracks.map((track) => (
+              <article
+                key={track.track.trackId}
+                className="priority-row"
+                data-canonical-track={track.track.trackId}
+                data-canonical-score={track.score ?? "neutral"}
+              >
+                <span className="state-token processing">
+                  {track.score === null ? "Exemple" : `${Math.round(track.score)} %`}
+                </span>
                 <div>
-                  <strong>{priority.title}</strong>
-                  <p>{priority.reason}</p>
-                  <small>{priority.action}</small>
+                  <strong>{track.track.title}</strong>
+                  <p>{track.nextAction?.title ?? "Parcours terminé"}</p>
+                  <small>{track.sourceLabel}</small>
                 </div>
               </article>
             ))}
-          </div>
-        </section>
-
-        <section className="panel">
-          <div className="panel-heading">
-            <div>
-              <span className="section-label">Parcours 30 jours</span>
-              <h2>{model.learningPath.name}</h2>
-            </div>
-          </div>
-          <div className="timeline-list">
-            {model.learningPath.days.map((day) => {
-              const domain = getDomain(day.domainId);
-
-              return (
-                <article key={day.day} className={`timeline-row ${day.status}`}>
-                  <span style={{ borderColor: domain.accent }}>{day.day}</span>
-                  <div>
-                    <strong>{day.title}</strong>
-                    <small>
-                      {domain.shortName} · {day.minutes} min · {statusLabel(day.status)}
-                    </small>
-                  </div>
-                </article>
-              );
-            })}
           </div>
         </section>
       </section>
@@ -224,7 +227,7 @@ export default async function DashboardPage() {
       </div>
 
       <div className="two-column align-start">
-        {model.latestCorrection ? (
+        {personal && model.latestCorrection ? (
           <CorrectionSummary correction={model.latestCorrection} />
         ) : (
           <section className="panel">
@@ -235,7 +238,17 @@ export default async function DashboardPage() {
             </p>
           </section>
         )}
-        <CompetencyMap competencies={model.weakestCompetencies} />
+        {personal ? (
+          <CompetencyMap competencies={model.weakestCompetencies} />
+        ) : (
+          <section className="panel">
+            <span className="section-label">État neutre</span>
+            <h2>Aucune faiblesse personnelle simulée</h2>
+            <p className="muted">
+              Les priorités et compétences apparaîtront après des réponses corrigées et enregistrées.
+            </p>
+          </section>
+        )}
       </div>
     </div>
   );

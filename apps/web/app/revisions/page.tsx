@@ -26,23 +26,28 @@ export default async function RevisionsPage() {
   const model = await getRevisionModel(user?.id);
   const features = getFeatures();
   const { queue } = model;
+  const personal = user !== null;
   const remaining = Math.max(0, queue.dueCount - queue.entries.length);
 
   return (
     <div className="page-stack">
       <PageHeader
         label="Révisions"
-        title="À revoir aujourd'hui"
-        description="La file remonte les items dus, du plus ancien au plus récent. La réponse reste masquée jusqu'à ce que tu demandes à la voir : c'est le rappel qui ancre, pas la relecture."
+        title={personal ? "À revoir aujourd'hui" : "Exemple de session de révision"}
+        description={
+          personal
+            ? "La file remonte les items dus, du plus ancien au plus récent. La réponse reste masquée jusqu'à ce que tu demandes à la voir : c'est le rappel qui ancre, pas la relecture."
+            : "Ces cartes illustrent le rappel actif. Aucune date, révision ou erreur du catalogue n'est attribuée au visiteur."
+        }
         aside={
           <div className="hero-score">
-            <span>Dus</span>
-            <strong>{queue.dueCount}</strong>
+            <span>{personal ? "Dus" : "Mode"}</span>
+            <strong>{personal ? queue.dueCount : "Neutre"}</strong>
           </div>
         }
       />
 
-      <section className="stat-strip" aria-label="Volumes de la session">
+      {personal ? <section className="stat-strip" aria-label="Volumes de la session">
         <StatCard label="Dans cette session" value={queue.entries.length} tone="accent" />
         <StatCard label="En attente" value={remaining} />
         <StatCard label="Planifiés" value={queue.totalCount} />
@@ -51,13 +56,14 @@ export default async function RevisionsPage() {
           value={model.remediations.length}
           tone={model.remediations.length > 0 ? "warning" : "neutral"}
         />
-      </section>
+      </section> : null}
 
       {queue.persisted ? null : (
         <p className="muted">
           {features.persistence.reason ?? "Les révisions ne sont pas enregistrées dans cette configuration."}
-          {" "}La planification reste calculée et affichée, mais elle repart du socle seedé à chaque
-          rechargement.
+          {" "}{personal
+            ? "La planification reste calculée et affichée, mais elle n'est pas persistée."
+            : "Les cartes restent consultables comme exemples, sans planification personnelle."}
         </p>
       )}
 
@@ -83,6 +89,7 @@ export default async function RevisionsPage() {
               dueAt={entry.dueAt}
               lapseCount={entry.lapseCount}
               reviewCount={entry.reviewCount}
+              personal={personal}
               writes={features.writes}
               persistence={features.persistence}
             />
@@ -117,22 +124,24 @@ export default async function RevisionsPage() {
         )}
       </section>
 
-      <section className="panel" id="carnet-erreurs">
-        <span className="section-label">Carnet d'erreurs</span>
-        <h2>Réviser par erreur, pas seulement par chapitre</h2>
-        <div className="priority-list">
-          {model.errorJournal.map((entry) => (
-            <article key={entry.id} className="priority-row">
-              <span className="state-token needs-review">{entry.category}</span>
-              <div>
-                <strong>{entry.summary}</strong>
-                <p>{entry.nextAction}</p>
-                <small>{entry.competencyIds.join(", ")}</small>
-              </div>
-            </article>
-          ))}
-        </div>
-      </section>
+      {personal ? (
+        <section className="panel" id="carnet-erreurs">
+          <span className="section-label">Carnet d'erreurs</span>
+          <h2>Réviser par erreur, pas seulement par chapitre</h2>
+          <div className="priority-list">
+            {model.errorJournal.map((entry) => (
+              <article key={entry.id} className="priority-row">
+                <span className="state-token needs-review">{entry.category}</span>
+                <div>
+                  <strong>{entry.summary}</strong>
+                  <p>{entry.nextAction}</p>
+                  <small>{entry.competencyIds.join(", ")}</small>
+                </div>
+              </article>
+            ))}
+          </div>
+        </section>
+      ) : null}
     </div>
   );
 }
