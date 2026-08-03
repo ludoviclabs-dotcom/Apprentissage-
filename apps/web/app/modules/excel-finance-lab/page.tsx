@@ -6,17 +6,19 @@ import { getCurrentUser } from "@/lib/auth/current-user";
 import { resolveEntitlement } from "@/lib/billing/entitlements";
 import {
   LAB_ASSUMPTIONS_FILE,
+  excelCaseHref,
   getExcelLabModel,
   labOpeningCash
 } from "@/lib/excel-lab";
-import { excelLabSources } from "@finance/domain";
+import { excelLabAvanceSources, excelLabSources } from "@finance/domain";
 
 /**
  * The lab's front door: what it is, what it is not, and the datasets it runs on.
  *
- * Saying plainly that this is not a spreadsheet is part of the product, not a
- * disclaimer. A learner who expects Excel and finds a grid that will not
- * recalculate would reasonably conclude the thing is broken.
+ * Saying plainly what the grid does — and what it will never do — is part of
+ * the product, not a disclaimer. Since PR-12b the N3/N4 grids really
+ * recalculate, through a bounded engine; the same honesty now applies to the
+ * engine's limits: seven functions, no Power Query, no macro execution.
  */
 export default async function ExcelFinanceLabPage() {
   const user = await getCurrentUser();
@@ -73,17 +75,21 @@ export default async function ExcelFinanceLabPage() {
 
       <section className="panel">
         <span className="section-label">Ce que fait ce lab</span>
-        <h2>Un tableur qui ne calcule pas à votre place</h2>
+        <h2>Un laboratoire de calcul contrôlé</h2>
         <p>
-          La grille affiche les données en lecture seule et vous laisse saisir le résultat, ainsi que la
-          formule que vous écririez dans Excel. Rien n'est recalculé ici : aucune formule n'est
-          interprétée, il n'y a ni moteur de calcul ni dépendances entre cellules.
+          Aux niveaux 1 et 2, la grille affiche les données en lecture seule et vous saisissez le
+          résultat ainsi que la formule que vous écririez dans Excel — rien n'y est recalculé. Aux
+          niveaux 3 et 4, vos formules sont réellement interprétées et recalculées par un moteur
+          borné : opérations, parenthèses, références et plages, SOMME, MOYENNE, MIN, MAX, SI,
+          SOMME.SI et SOMME.SI.ENS, avec graphe de dépendances et détection des références
+          circulaires.
         </p>
         <p className="muted">
-          C'est délibéré. Un tableur à moitié fonctionnel serait pire que pas de tableur du tout : face à
-          un chiffre inattendu, vous ne sauriez pas si l'erreur vient de vous ou de l'outil. Ici, le
-          résultat et la méthode sont vérifiés séparément — saisir 600 000 en dur donne les points du
-          résultat, pas ceux de la formule.
+          Les limites sont assumées et documentées : sept fonctions, pas d'opérateur puissance, pas de
+          Power Query exécuté (il est enseigné par diagnostics guidés), pas de macro exécutée (le VBA
+          est affiché et téléchargeable, jamais lancé). La correction vérifie toujours deux plans —
+          le résultat, et une méthode qui résiste au changement des données : un chiffre saisi en dur
+          échoue sur des données perturbées.
         </p>
       </section>
 
@@ -138,6 +144,29 @@ export default async function ExcelFinanceLabPage() {
               );
             })}
           </section>
+
+          <section className="panel" data-testid="excel-case-studies">
+            <div className="panel-heading">
+              <div>
+                <span className="section-label">Cas pratiques</span>
+                <h2>Deux dossiers complets, un par niveau avancé</h2>
+              </div>
+            </div>
+            <div className="priority-list">
+              {model.caseStudies.map((caseStudy) => (
+                <article key={caseStudy.id} className="priority-row">
+                  <span className="state-token processing">{caseStudy.steps.length} étapes</span>
+                  <div>
+                    <strong>{caseStudy.title}</strong>
+                    <p>{caseStudy.context}</p>
+                    <Link className="inline-link" href={excelCaseHref(caseStudy)}>
+                      Ouvrir le dossier
+                    </Link>
+                  </div>
+                </article>
+              ))}
+            </div>
+          </section>
         </>
       ) : null}
 
@@ -164,7 +193,7 @@ export default async function ExcelFinanceLabPage() {
 
       <section className="panel">
         <span className="section-label">Sources</span>
-        <SourceReference sources={excelLabSources} />
+        <SourceReference sources={[...excelLabSources, ...excelLabAvanceSources]} />
       </section>
     </div>
   );
