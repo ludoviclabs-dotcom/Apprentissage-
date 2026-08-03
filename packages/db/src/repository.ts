@@ -1164,15 +1164,14 @@ export function gradeExercise(exercise: Exercise, userAnswer: string): Correctio
 }
 
 /**
- * Reads a user's strength for a competency, falling back to the seeded catalogue
- * value the first time they touch it. The catalogue is the starting point; it is
- * never written, so one account's progress cannot move another's.
+ * Reads a user's own strength for a competency. Catalogue strengths are editorial
+ * examples, not a learner baseline: a missing owned row therefore means zero
+ * evidence, never a seeded personal score.
  */
 async function currentStrengthFor(
   tx: FinanceDb,
   userId: string,
-  competencyId: string,
-  catalogueStrength: number
+  competencyId: string
 ): Promise<number> {
   const rows = await tx
     .select({ strength: competencyProgressTable.strength })
@@ -1185,7 +1184,7 @@ async function currentStrengthFor(
     )
     .limit(1);
 
-  return rows[0]?.strength ?? catalogueStrength;
+  return rows[0]?.strength ?? 0;
 }
 
 async function upsertCompetencyProgress(
@@ -1303,7 +1302,7 @@ export async function recordAttempt(
     const intervalDays = correction.score >= 14 ? 7 : correction.score >= 10 ? 3 : 1;
 
     for (const competency of competencyRows) {
-      const previous = await currentStrengthFor(tx, userId, competency.id, competency.strength);
+      const previous = await currentStrengthFor(tx, userId, competency.id);
       const nextStrength = clampStrength(previous + delta);
 
       await upsertCompetencyProgress(tx, userId, competency.id, nextStrength);
@@ -1343,7 +1342,7 @@ export async function recordDiagnostic(userId: string, levels: Record<string, nu
       // Averages against the user's own current strength. The previous version
       // averaged against the seeded array value every time, so re-running a
       // diagnostic dragged real progress back toward the seed baseline.
-      const previous = await currentStrengthFor(tx, userId, competency.id, competency.strength);
+      const previous = await currentStrengthFor(tx, userId, competency.id);
 
       await upsertCompetencyProgress(tx, userId, competency.id, clampStrength((previous + domainLevel) / 2));
     }

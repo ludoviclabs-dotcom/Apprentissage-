@@ -161,8 +161,8 @@ test("a signed-in user gets the personal continue CTA and the account menu", asy
   await signUp(page, email);
   await page.goto("/");
 
-  // Le CTA « Continuer » est personnel ; la variante démo disparaît.
-  await expect(page.getByRole("link", { name: /^Continuer/ })).toBeVisible();
+  // Le CTA de prochaine action est personnel ; la variante démo disparaît.
+  await expect(page.getByRole("link", { name: /^Prochaine action/ })).toBeVisible();
   await expect(page.getByRole("link", { name: "Découvrir un exercice guidé" })).toHaveCount(0);
   await expect(page.getByText("Niveau global")).toBeVisible();
 

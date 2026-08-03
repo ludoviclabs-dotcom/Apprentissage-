@@ -82,9 +82,11 @@ async function completeLevelOne(request: APIRequestContext) {
 
 async function levelStatuses(page: Page): Promise<string[]> {
   await page.goto("/parcours");
-  await expect(page.locator("[data-level-status]")).toHaveCount(4);
+  const track = page.locator('[data-canonical-track="track-compta-generale-v1"]');
+  await expect(track).toBeVisible();
+  await expect(track.locator("[data-level-status]")).toHaveCount(2);
 
-  return page
+  return track
     .locator("[data-level-status]")
     .evaluateAll((rows) => rows.map((row) => row.getAttribute("data-level-status") ?? ""));
 }
@@ -153,7 +155,6 @@ test("clearing level one opens level two", async ({ page }, testInfo) => {
   const statuses = await levelStatuses(page);
   expect(statuses[0]).toBe("passed");
   expect(statuses[1]).toBe("available");
-  expect(statuses[2]).toBe("locked");
 });
 
 test("a cleared level stays acquired after a bad later result", async ({ page }, testInfo) => {
@@ -185,8 +186,9 @@ test("level two names the critical competency that still blocks it", async ({ pa
 
   await page.goto("/parcours");
 
-  // cg-provisions is seeded at 45, under the 60 minimum, so level 2 opens but
-  // cannot be cleared until it is raised. The learner must be told which one.
+  // Une réponse correcte ne fait monter cg-operations-courantes qu'à partir du
+  // zéro personnel. La compétence reste sous le minimum de 60 et le blocker
+  // doit donc identifier précisément cette compétence critique.
   await expect(page.getByText(/cg-operations-courantes/).first()).toBeVisible();
 });
 
