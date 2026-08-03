@@ -205,10 +205,13 @@ describe("the module inventory", () => {
     }
   });
 
-  it("gates the lab track on two contiguous levels", () => {
+  it("gates the lab track on four contiguous levels", () => {
+    // PR-12b: the engine levels N3/N4 continue the same track. Contiguity is
+    // what `assertValidCurriculum` enforces; the exact list is pinned here so
+    // adding a level is a visible decision, not a side effect.
     const levels = getTrackLevels(activeCurriculum, EXCEL_LAB_TRACK);
 
-    expect(levels.map((level) => level.level)).toEqual([1, 2]);
+    expect(levels.map((level) => level.level)).toEqual([1, 2, 3, 4]);
 
     for (const level of levels) {
       expect(level.criticalCompetencyIds.length, level.id).toBeGreaterThan(0);

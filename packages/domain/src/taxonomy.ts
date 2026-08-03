@@ -3,6 +3,7 @@ import { comptaCompetencies } from "./compta-v1";
 import { comptaGeneraleV1Competencies } from "./compta-generale-v1";
 import { comptaGeneraleClotureCompetencies } from "./compta-generale-cloture";
 import { excelLabCompetencies } from "./excel-lab";
+import { excelLabAvanceCompetencies } from "./excel-lab-avance";
 
 export const domains: Domain[] = [
   {
@@ -187,7 +188,8 @@ export const competencies: Competency[] = [
   ...comptaCompetencies,
   ...comptaGeneraleV1Competencies,
   ...comptaGeneraleClotureCompetencies,
-  ...excelLabCompetencies
+  ...excelLabCompetencies,
+  ...excelLabAvanceCompetencies
 ];
 
 export function getDomain(domainId: DomainId): Domain {

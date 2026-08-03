@@ -29,6 +29,7 @@ import { comptaBusinessCase, comptaExamSessions } from "./compta-extra";
 import { comptaGeneraleV1Exercises } from "./compta-generale-v1";
 import { comptaGeneraleClotureExercises } from "./compta-generale-cloture";
 import { excelLabExercises, excelLabSourcePack } from "./excel-lab";
+import { excelLabAvanceExercises } from "./excel-lab-avance";
 
 export const sourcePacks: SourcePack[] = [
   {
@@ -775,7 +776,8 @@ export const exercises: Exercise[] = [
   ...comptaExercises,
   ...comptaGeneraleV1Exercises,
   ...comptaGeneraleClotureExercises,
-  ...excelLabExercises
+  ...excelLabExercises,
+  ...excelLabAvanceExercises
 ];
 
 export const corrections: Correction[] = [

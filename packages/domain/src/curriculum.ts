@@ -2,6 +2,7 @@ import { assertValidRules, type MasteryRules } from "./mastery";
 import { comptaGeneraleV1Levels } from "./compta-generale-v1";
 import { comptaGeneraleClotureLevels } from "./compta-generale-cloture";
 import { excelLabLevels } from "./excel-lab";
+import { excelLabAvanceLevels } from "./excel-lab-avance";
 import { competencies } from "./taxonomy";
 import type { DomainId } from "./types";
 
@@ -132,7 +133,10 @@ export const curriculum2026Q3: CurriculumVersion = {
     // statements (N4); enrolments and prior progression are untouched.
     ...comptaGeneraleClotureLevels,
     // Third track: the Excel Finance Lab (PR-06), on the same reasoning.
-    ...excelLabLevels
+    ...excelLabLevels,
+    // PR-12b: the lab track continues into data-cleaning/forecasting (N3) and
+    // financial modelling with the formula engine (N4).
+    ...excelLabAvanceLevels
   ]
 };
 
