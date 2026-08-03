@@ -135,9 +135,12 @@ test.describe("états", () => {
   });
 
   test("locked : un niveau verrouillé énonce sa condition d'ouverture", async ({ page }) => {
-    await page.goto("/modules/comptabilite-generale");
+    // /parcours est le seul écran où la position de départ est connue sans
+    // progression stockée : niveau 1 ouvert, le reste gardé (levels.spec.ts).
+    await page.goto("/parcours");
 
-    const locked = page.locator(".locked-state").first();
+    const rows = page.locator("[data-level-status]");
+    const locked = rows.nth(1).locator(".locked-state");
     await expect(locked).toBeVisible();
     await expect(locked).toContainText("Termine le niveau 1 pour ouvrir celui-ci.");
   });
