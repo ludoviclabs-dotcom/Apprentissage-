@@ -1,0 +1,157 @@
+/* Motion — uniquement des mouvements fonctionnels.
+
+   Règles du système :
+   - durées entre var(--motion-fast) et var(--motion-slow) (150–240 ms) ;
+   - opacity et transform en priorité, jamais de zoom agressif ni de parallax ;
+   - aucun mouvement permanent, hover limité à 1–2 px ;
+   - une animation n'accompagne qu'un changement réel, jamais un simple rendu ;
+   - la politique prefers-reduced-motion en fin de fichier a le dernier mot. */
+
+/* --- Transitions d'état des contrôles ------------------------------------ */
+
+.primary-action,
+.secondary-action,
+.nav-item,
+.nav-subitem,
+.nav-section-toggle,
+.account-menu-toggle,
+.mobile-menu-toggle,
+.search-form button,
+.topbar-search {
+  transition:
+    background-color var(--motion-fast) var(--ease-out),
+    border-color var(--motion-fast) var(--ease-out),
+    color var(--motion-fast) var(--ease-out),
+    box-shadow var(--motion-fast) var(--ease-out),
+    transform var(--motion-fast) var(--ease-out);
+}
+
+/* Hover sobre : 1 px, jamais plus de 2. */
+.primary-action:hover:not(:disabled),
+.secondary-action:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-sm);
+}
+
+.primary-action:active:not(:disabled),
+.secondary-action:active:not(:disabled) {
+  transform: translateY(0);
+}
+
+/* --- Apparition d'un feedback (correction, remédiation, erreur) ----------- */
+/* Appliquée aux blocs de résultat rendus après une action réelle de
+   l'utilisateur : le contenu apparaît, il ne clignote pas au chargement. */
+
+@keyframes feedback-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.feedback-appear {
+  animation: feedback-in var(--motion-base) var(--ease-out) both;
+}
+
+/* --- Révélation d'une réponse de flashcard -------------------------------- */
+
+.reveal-appear {
+  animation: feedback-in var(--motion-slow) var(--ease-out) both;
+}
+
+/* --- Drawer mobile --------------------------------------------------------- */
+
+@keyframes drawer-in {
+  from {
+    opacity: 0.6;
+    transform: translateX(24px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes backdrop-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.drawer-panel {
+  animation: drawer-in var(--motion-base) var(--ease-out) both;
+}
+
+.drawer-backdrop {
+  animation: backdrop-in var(--motion-fast) var(--ease-out) both;
+}
+
+/* --- Sections dépliables de la navigation ---------------------------------- */
+
+.nav-chevron {
+  transition: transform var(--motion-fast) var(--ease-out);
+}
+
+/* --- Barres de progression -------------------------------------------------
+   La transition ne joue que si la largeur change réellement côté client ;
+   un rendu serveur statique n'anime rien. */
+
+.progress-line span {
+  transition: width var(--motion-slow) var(--ease-in-out);
+}
+
+/* --- Recherche en cours ----------------------------------------------------- */
+
+@keyframes search-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.search-pending-icon {
+  animation: search-spin 800ms linear infinite;
+}
+
+/* --- Menu du compte --------------------------------------------------------- */
+
+.account-menu-panel:not([hidden]) {
+  animation: feedback-in var(--motion-fast) var(--ease-out) both;
+}
+
+/* --- Détails repliables (sources, réponse attendue) ------------------------ */
+
+details.source-panel[open] .source-panel-body,
+details.expected-answer[open] > *:not(summary) {
+  animation: feedback-in var(--motion-fast) var(--ease-out) both;
+}
+
+/* --- prefers-reduced-motion -------------------------------------------------
+   Les translations disparaissent, les changements d'état restent
+   compréhensibles (l'information ne dépend jamais du mouvement). */
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+
+  .primary-action:hover:not(:disabled),
+  .secondary-action:hover:not(:disabled) {
+    transform: none;
+  }
+
+  .skip-link {
+    transition: none;
+  }
+}
