@@ -1,24 +1,26 @@
 import { expect, test } from "@playwright/test";
 
 /**
- * Smoke coverage for PR-00: the home page renders, every nav destination is
- * reachable, and no visible control is a silent no-op.
+ * Smoke coverage for PR-00: the home page renders, every historic route stays
+ * reachable after the PR-09 information-architecture redesign, and no visible
+ * control is a silent no-op.
  */
 
-const NAV_DESTINATIONS = [
+const ROUTES = [
   { href: "/", label: "Accueil" },
   { href: "/parcours", label: "Parcours" },
   { href: "/cours", label: "Cours" },
+  { href: "/modules", label: "Modules" },
   { href: "/modules/comptabilite-generale", label: "Compta générale" },
   { href: "/modules/excel-finance-lab", label: "Excel Finance Lab" },
   { href: "/apprendre", label: "Apprendre" },
   { href: "/connaissances", label: "Connaissances" },
   { href: "/recherche", label: "Recherche" },
   { href: "/exercices", label: "Exercices" },
-  { href: "/annales-concours", label: "Annales & Concours" },
-  { href: "/business-cases", label: "Business Cases" },
+  { href: "/annales-concours", label: "Annales & concours" },
+  { href: "/business-cases", label: "Business cases" },
   { href: "/simulations", label: "Simulations" },
-  { href: "/revisions", label: "Revisions" },
+  { href: "/revisions", label: "Révisions" },
   { href: "/corrections", label: "Corrections" },
   { href: "/progression", label: "Progression" },
   { href: "/documents", label: "Documents" },
@@ -49,8 +51,8 @@ test("source-pack ingestion never accepts a server filesystem path over HTTP", a
   await expect(response.json()).resolves.toMatchObject({ error: "Import indisponible via HTTP" });
 });
 
-for (const destination of NAV_DESTINATIONS) {
-  test(`nav destination ${destination.href} loads with a heading`, async ({ page }) => {
+for (const destination of ROUTES) {
+  test(`route ${destination.href} loads with a heading`, async ({ page }) => {
     const response = await page.goto(destination.href);
 
     expect(response?.status(), `${destination.href} should not error`).toBeLessThan(400);
@@ -58,16 +60,19 @@ for (const destination of NAV_DESTINATIONS) {
   });
 }
 
-test("every nav link points at a route that exists", async ({ page, request }) => {
+test("every sidebar link points at a route that exists", async ({ page, request }) => {
   await page.goto("/");
 
-  const hrefs = await page.locator("nav.nav-list a").evaluateAll((links) =>
+  const hrefs = await page.locator("aside.sidebar a[href]").evaluateAll((links) =>
     links.map((link) => link.getAttribute("href") ?? "")
   );
 
-  expect(hrefs.length).toBe(NAV_DESTINATIONS.length);
+  expect(hrefs.length).toBeGreaterThan(0);
 
-  for (const href of hrefs) {
+  // Les liens d'ancre pointent dans une page ; seule la route se vérifie ici.
+  const paths = [...new Set(hrefs.map((href) => href.split("#")[0]).filter(Boolean))];
+
+  for (const href of paths) {
     const response = await request.get(href);
     expect(response.status(), `${href} is linked but does not resolve`).toBeLessThan(400);
   }
