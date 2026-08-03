@@ -30,7 +30,11 @@ export default async function DashboardPage() {
   // jamais comme progression personnelle.
   const personal = user !== null;
 
-  if (!model.currentDay || !model.currentLesson || !model.currentExercise || !model.latestCorrection) {
+  // `latestCorrection` est volontairement exclu de cette porte : un compte qui
+  // vient d'être créé n'a encore soumis aucune correction, et ce n'est pas une
+  // absence de catalogue. Le CTA « Continuer » doit rester visible dès la
+  // première connexion, pas seulement après une première soumission.
+  if (!model.currentDay || !model.currentLesson || !model.currentExercise) {
     return (
       <div className="page-stack">
         <section className="page-header">
@@ -94,8 +98,14 @@ export default async function DashboardPage() {
         </article>
         <article>
           <span>Correction</span>
-          <strong>{model.latestCorrection.rubricScores.length} critères</strong>
-          <p>Le score sépare barème, erreurs, remédiation et preuves citées.</p>
+          <strong>
+            {model.latestCorrection ? `${model.latestCorrection.rubricScores.length} critères` : "À venir"}
+          </strong>
+          <p>
+            {model.latestCorrection
+              ? "Le score sépare barème, erreurs, remédiation et preuves citées."
+              : "S'affiche dès la première correction : barème, erreurs, remédiation et preuves citées."}
+          </p>
         </article>
       </section>
 
@@ -207,7 +217,17 @@ export default async function DashboardPage() {
       </div>
 
       <div className="two-column align-start">
-        <CorrectionSummary correction={model.latestCorrection} />
+        {model.latestCorrection ? (
+          <CorrectionSummary correction={model.latestCorrection} />
+        ) : (
+          <section className="panel">
+            <span className="section-label">Dernière correction</span>
+            <h2>Aucune correction pour l'instant</h2>
+            <p className="muted">
+              Réponds à un exercice pour voir apparaître ici le barème, les erreurs et la remédiation.
+            </p>
+          </section>
+        )}
         <CompetencyMap competencies={model.weakestCompetencies} />
       </div>
     </div>
