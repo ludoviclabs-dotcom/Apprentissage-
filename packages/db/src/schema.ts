@@ -11,7 +11,8 @@ export const migrationFiles = [
   "migrations/0005_exercise_versions.sql",
   "migrations/0006_attempt_evaluation_provenance.sql",
   "migrations/0007_review_queue_remediation.sql",
-  "migrations/0008_spreadsheet_evaluation_type.sql"
+  "migrations/0008_spreadsheet_evaluation_type.sql",
+  "migrations/0009_billing_entitlements.sql"
 ] as const;
 
 /** Tables protected by row level security, keyed on `user_id`. */
@@ -32,7 +33,13 @@ export const userOwnedTables = [
   "unlock_events",
   "review_queue",
   "review_attempts",
-  "remediation_tasks"
+  "remediation_tasks",
+  // Billing. `billing_customers` and `billing_events` are deliberately absent:
+  // a webhook resolves a Stripe customer id into a user before any user context
+  // exists, so those two carry no policy — see migration 0009.
+  "subscriptions",
+  "entitlements",
+  "certificates"
 ] as const;
 
 export type UserOwnedTable = (typeof userOwnedTables)[number];
@@ -83,7 +90,14 @@ export const tables = [
   // owned, hence also present in `userOwnedTables` above.
   "review_queue",
   "review_attempts",
-  "remediation_tasks"
+  "remediation_tasks",
+  // Billing: the Stripe identity map and the webhook ledger, then the three
+  // owned tables that describe what a learner bought, may open, and earned.
+  "billing_customers",
+  "billing_events",
+  "subscriptions",
+  "entitlements",
+  "certificates"
 ] as const;
 
 export type TableName = (typeof tables)[number];

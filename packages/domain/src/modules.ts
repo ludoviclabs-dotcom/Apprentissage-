@@ -1,3 +1,4 @@
+import type { EntitlementFeature } from "./billing";
 import { comptaGeneraleV1Sources, getComptaGeneraleV1Level } from "./compta-generale-v1";
 import { excelLabSources, getExcelLabLevel } from "./excel-lab";
 import type { SourceReference } from "./types";
@@ -18,11 +19,20 @@ import type { SourceReference } from "./types";
 interface ModuleRegistration {
   level: (exerciseId: string) => string | null;
   sources: SourceReference[];
+  /**
+   * The entitlement a learner must hold to work on this module, or null when it
+   * is part of the free core. Declared here rather than checked at each call
+   * site so the paywall cannot disagree with itself: the page, the level route
+   * and the submission endpoint all ask the same registry.
+   */
+  premiumFeature: EntitlementFeature | null;
 }
 
 const MODULES: ModuleRegistration[] = [
-  { level: getComptaGeneraleV1Level, sources: comptaGeneraleV1Sources },
-  { level: getExcelLabLevel, sources: excelLabSources }
+  // The accounting core stays free: it is the track that has to be finishable
+  // before anybody is asked to pay for anything.
+  { level: getComptaGeneraleV1Level, sources: comptaGeneraleV1Sources, premiumFeature: null },
+  { level: getExcelLabLevel, sources: excelLabSources, premiumFeature: "excel-finance-lab" }
 ];
 
 export function getModuleLevelForExercise(exerciseId: string): string | null {
@@ -51,6 +61,22 @@ export function getModuleSourceReferences(exerciseId: string): SourceReference[]
   for (const module of MODULES) {
     if (module.level(exerciseId)) {
       return module.sources;
+    }
+  }
+
+  return null;
+}
+
+/**
+ * The entitlement required to attempt an exercise, or null when it is free.
+ *
+ * Exercises outside every module — the seeded catalogue — are free, which is why
+ * "belongs to no module" and "needs nothing" give the same answer here.
+ */
+export function getRequiredEntitlement(exerciseId: string): EntitlementFeature | null {
+  for (const module of MODULES) {
+    if (module.level(exerciseId)) {
+      return module.premiumFeature;
     }
   }
 

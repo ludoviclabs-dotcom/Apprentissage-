@@ -1,0 +1,30 @@
+{
+  "id": "evt_test_checkout_unpaid",
+  "object": "event",
+  "api_version": "2026-07-29.dahlia",
+  "created": 1785110400,
+  "livemode": false,
+  "pending_webhooks": 1,
+  "request": { "id": "req_checkout_2", "idempotency_key": null },
+  "type": "checkout.session.completed",
+  "data": {
+    "object": {
+      "id": "cs_test_founder_2",
+      "object": "checkout.session",
+      "mode": "subscription",
+      "status": "complete",
+      "payment_status": "unpaid",
+      "client_reference_id": "11111111-1111-4111-8111-111111111111",
+      "customer": "cus_TESTFOUNDER",
+      "customer_email": null,
+      "subscription": "sub_TESTUNPAID",
+      "currency": "eur",
+      "amount_total": 24000,
+      "livemode": false,
+      "metadata": {
+        "userId": "11111111-1111-4111-8111-111111111111",
+        "planKey": "founder-annual"
+      }
+    }
+  }
+}

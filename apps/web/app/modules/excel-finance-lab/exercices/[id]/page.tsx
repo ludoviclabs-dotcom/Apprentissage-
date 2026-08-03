@@ -1,7 +1,9 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { PaywallNotice } from "@/components/paywall-notice";
 import { SourceReference } from "@/components/source-reference";
 import { LabExerciseForm } from "@/components/forms/lab-exercise-form";
+import { resolveEntitlement } from "@/lib/billing/entitlements";
 import { getFeatures } from "@/lib/features";
 import { EXCEL_LAB_BASE, getLabExercise, nextLabExercise } from "@/lib/excel-lab";
 import { excelLabSources } from "@finance/domain";
@@ -27,8 +29,34 @@ export default async function ExcelLabExercisePage({
   }
 
   const features = getFeatures();
+  const access = await resolveEntitlement("excel-finance-lab");
   const { exercise } = definition;
   const next = nextLabExercise(exercise.id);
+
+  // The statement itself is withheld, not just the answer form. A locked
+  // exercise that still prints its énoncé and its grid has given away the
+  // thing being sold and only taken back the marking.
+  if (!access.allowed) {
+    return (
+      <div className="page-stack">
+        <section className="page-header">
+          <div>
+            <span className="section-label">Excel Finance Lab · niveau {exercise.level}</span>
+            <h1>{exercise.title}</h1>
+            <p>{exercise.estimatedMinutes} minutes</p>
+          </div>
+          <Link className="secondary-action" href={EXCEL_LAB_BASE}>
+            Retour au lab
+          </Link>
+        </section>
+        <PaywallNotice
+          reason={access.reason}
+          feature={access.feature}
+          moduleLabel="Excel Finance Lab"
+        />
+      </div>
+    );
+  }
 
   return (
     <div className="page-stack">

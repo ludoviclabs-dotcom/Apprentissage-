@@ -1,0 +1,22 @@
+{
+  "id": "evt_test_payment_intent",
+  "object": "event",
+  "api_version": "2026-07-29.dahlia",
+  "created": 1785110400,
+  "livemode": false,
+  "pending_webhooks": 1,
+  "request": { "id": null, "idempotency_key": null },
+  "type": "payment_intent.succeeded",
+  "data": {
+    "object": {
+      "id": "pi_TESTNOISE",
+      "object": "payment_intent",
+      "amount": 24000,
+      "currency": "eur",
+      "status": "succeeded",
+      "customer": "cus_TESTFOUNDER",
+      "livemode": false,
+      "metadata": {}
+    }
+  }
+}

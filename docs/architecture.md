@@ -70,6 +70,34 @@ Value and method are separate criteria (60/40), so a right figure hard-coded sco
 
 Module progression is resolved through `packages/domain/src/modules.ts` — one registry mapping an exercise to its curriculum level — so adding a module does not add a branch to the grading path. See `docs/adr/006-excel-finance-lab.md` for the assumed limits and the v2 plan.
 
+## Billing and Entitlements
+
+Payment is off by default, and off means *ungated*: with no Stripe configuration
+every module is open, because a private local-first install has no customer and a
+paywall in front of your own lab would be absurd. `FINANCE_HUB_BILLING_ENABLED`
+is both the switch and the rollback lever.
+
+When it is on, access is a row in `entitlements`, and the only writer is
+`POST /api/stripe/webhook` after `Stripe.webhooks.constructEvent` has verified
+the signature. `/billing/success` reads that state and reports it; it never
+grants, and it never reads its own `session_id`. The decision itself is one pure
+function — `mapBillingEvent` in `packages/domain/src/billing-events.ts` — so
+"which event grants what, and until when" is unit-testable without a network,
+and `apps/web/lib/billing/webhook.ts` is the single place that knows where
+Stripe puts a field in the pinned API version.
+
+Grants expire on their own at `current_period_end` plus a day, so a webhook that
+never arrives costs one period of access rather than costing it permanently. The
+gate itself hangs off `packages/domain/src/modules.ts`: the registry that maps an
+exercise to its level also names the entitlement it needs, so the module page,
+the level page and the submission endpoint cannot disagree about what is locked.
+
+Attestations are the other half. A completion certificate is issued once per
+track, from the same PR-02 snapshots the level track renders, and only while the
+entitlement is active — but once issued it stays valid, because it records
+something that happened rather than granting access to anything. See
+`docs/adr/007-stripe-billing-entitlements.md`.
+
 ## Public Demo Safeguard
 
 Production without auth is read-only by default. The app shows a demo banner and blocks write routes for uploads and source-pack imports. Private mode requires auth plus a private database.

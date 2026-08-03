@@ -14,3 +14,6 @@ export * from "./evaluators";
 export * from "./exercise-specs";
 export * from "./review-scheduler";
 export * from "./active-learning";
+export * from "./billing";
+export * from "./billing-events";
+export * from "./certificates";

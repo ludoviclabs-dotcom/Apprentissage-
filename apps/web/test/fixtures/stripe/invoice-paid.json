@@ -1,0 +1,54 @@
+{
+  "id": "evt_test_invoice_paid",
+  "object": "event",
+  "api_version": "2026-07-29.dahlia",
+  "created": 1816646400,
+  "livemode": false,
+  "pending_webhooks": 1,
+  "request": { "id": null, "idempotency_key": null },
+  "type": "invoice.paid",
+  "data": {
+    "object": {
+      "id": "in_TESTRENEWAL",
+      "object": "invoice",
+      "status": "paid",
+      "billing_reason": "subscription_cycle",
+      "customer": "cus_TESTFOUNDER",
+      "currency": "eur",
+      "amount_paid": 24000,
+      "livemode": false,
+      "parent": {
+        "type": "subscription_details",
+        "subscription_details": {
+          "subscription": "sub_TESTFOUNDER",
+          "metadata": {
+            "userId": "11111111-1111-4111-8111-111111111111",
+            "planKey": "founder-annual"
+          }
+        }
+      },
+      "lines": {
+        "object": "list",
+        "has_more": false,
+        "url": "/v1/invoices/in_TESTRENEWAL/lines",
+        "data": [
+          {
+            "id": "il_TESTRENEWAL",
+            "object": "line_item",
+            "amount": 24000,
+            "currency": "eur",
+            "period": { "start": 1816646400, "end": 1848182400 },
+            "pricing": {
+              "type": "price_details",
+              "unit_amount_decimal": "24000",
+              "price_details": {
+                "price": "price_founder_annual_test",
+                "product": "prod_TESTPREMIUM"
+              }
+            }
+          }
+        ]
+      }
+    }
+  }
+}

@@ -26,6 +26,31 @@ Important variables:
 | `OLLAMA_BASE_URL` | Ollama API URL when local AI is used. |
 | `OLLAMA_MODEL` | Ollama model name. |
 
+## Stripe (PR-07)
+
+Billing is off by default, and off means every module is open — see
+`docs/local-runbook.md` for the full setup and `docs/adr/007-stripe-billing-entitlements.md`
+for why. Only one of these may ever reach a browser.
+
+| Variable | Scope | Required | Purpose |
+| --- | --- | --- | --- |
+| `FINANCE_HUB_BILLING_ENABLED` | server | no (default `false`) | Master switch and rollback lever. `true` requires accounts, a key, a webhook secret and one price. |
+| `STRIPE_SECRET_KEY` | **server only** | when billing is on | API key. Must start with `sk_`/`rk_`; a live key is refused outside production. |
+| `STRIPE_WEBHOOK_SECRET` | **server only** | when billing is on | `whsec_…` signing secret. Different per endpoint: the `stripe listen` value is not the deployed one. |
+| `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY` | client | no | The only Stripe value allowed in the bundle. Unused by the current hosted-Checkout flow. |
+| `STRIPE_PRICE_FOUNDER_ANNUAL` | **server only** | one of the two | Price id for the annual plan. |
+| `STRIPE_PRICE_PRO_MONTHLY` | **server only** | one of the two | Price id for the monthly plan. |
+
+Price ids are secrets in the sense that matters here: a client that can name a
+price can name a cheaper one. They must never be prefixed `NEXT_PUBLIC_`.
+`apps/web/lib/billing/plans.ts` imports `server-only`, so a client component that
+reaches for one fails the build rather than shipping it.
+
+Use test keys (`sk_test_…`) everywhere except production, and give Preview and
+Production separate Stripe values on Vercel. A test key paired with a live
+webhook secret fails silently: every delivery is rejected and no access is ever
+granted.
+
 ## Vercel
 
 The current safe public stance is read-only demo until auth and a private database are configured.
