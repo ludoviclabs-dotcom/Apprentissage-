@@ -40,16 +40,13 @@ export async function POST(request: Request) {
     // 503 rather than 404: the endpoint exists, it is switched off. Stripe will
     // retry, which is the behaviour wanted if billing was disabled by accident
     // — the events are not lost, they arrive once it is switched back on.
-    return Response.json(
-      { error: "Webhook Stripe désactivé", details: features.billing.reason },
-      { status: 503 }
-    );
+    return Response.json({ error: "Webhook Stripe désactivé" }, { status: 503 });
   }
 
   const webhookSecret = getEnv().STRIPE_WEBHOOK_SECRET;
 
   if (!webhookSecret) {
-    return Response.json({ error: "STRIPE_WEBHOOK_SECRET absent" }, { status: 503 });
+    return Response.json({ error: "Webhook Stripe indisponible" }, { status: 503 });
   }
 
   const result = await handleStripeWebhook(

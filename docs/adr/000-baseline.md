@@ -12,9 +12,9 @@ did not keep:
    packages had never been linted and failed 17 rules once included.
 2. Environment configuration degraded silently. `FINANCE_HUB_USE_DATABASE=true`
    without `DATABASE_URL` fell back to seeded data with no signal;
-   `LEARNING_HUB_AUTH_ENABLED=true` without credentials locked every request out
-   with a permanent 401; `AI_PROVIDER=anthropic` disabled the tutor without
-   saying so.
+   account authentication without database mode locked every request out with a
+   permanent 401; selecting an unimplemented AI provider disabled the tutor
+   without saying so.
 3. Several visible controls did nothing. One button had no handler at all, three
    write forms stayed enabled in public demo and only revealed the 403 after the
    click, and any network failure left a form's buttons permanently disabled
@@ -54,7 +54,7 @@ seeded fallback mode — and fix the baseline instead:
 - A misconfigured deployment now fails fast at boot instead of serving a
   degraded product that looks healthy. This is deliberate: preview and production
   environments must carry a coherent set of variables.
-- `AI_PROVIDER=anthropic` is rejected until `packages/ai` implements it.
+- An unimplemented AI provider is rejected until `packages/ai` implements it.
 - Five pages that existed but had no inbound link (`/apprendre`, `/documents`,
   `/source-packs`, `/corrections`, `/simulations`) are now in the navigation. The
   whole tutor and librarian UI lived on `/apprendre` and was unreachable.

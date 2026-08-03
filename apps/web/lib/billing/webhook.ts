@@ -237,15 +237,12 @@ export async function handleStripeWebhook(
 
   try {
     event = Stripe.webhooks.constructEvent(request.rawBody, request.signature, deps.webhookSecret);
-  } catch (error) {
+  } catch {
     // Deliberately terse: the caller of a failed verification is not entitled to
-    // know why it failed. The reason is logged by the route instead.
+    // know why it failed.
     return {
       status: 400,
-      body: {
-        error: "Signature Stripe invalide",
-        details: error instanceof Error ? error.message : "Erreur inconnue"
-      }
+      body: { error: "Signature Stripe invalide" }
     };
   }
 
@@ -270,17 +267,14 @@ export async function handleStripeWebhook(
 
   try {
     result = await deps.store.applyIntent(intent);
-  } catch (error) {
+  } catch {
     // Give the id back before answering, or Stripe's retry — the one mechanism
     // that can still fix this — would be swallowed as a duplicate.
     await deps.store.releaseEvent(event.id);
 
     return {
       status: 500,
-      body: {
-        error: "Traitement impossible",
-        details: error instanceof Error ? error.message : "Erreur inconnue"
-      }
+      body: { error: "Traitement impossible" }
     };
   }
 

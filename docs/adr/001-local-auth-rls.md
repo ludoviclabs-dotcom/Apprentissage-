@@ -86,13 +86,12 @@ RLS `permission denied` would have looked like success.
 stays empty. Without one — the anonymous public demo — the seeded fallback is
 unchanged.
 
-### Basic auth is retired
+### Shared browser credentials are retired
 
-`LEARNING_HUB_AUTH_ENABLED` used to gate a single shared HTTP basic credential; it
-now means account-based auth and requires `FINANCE_HUB_USE_DATABASE=true`.
-`LEARNING_HUB_AUTH_USER` and `LEARNING_HUB_AUTH_PASSWORD` are **rejected** at boot
-rather than ignored, so a stale `.env` cannot leave someone believing the app is
-gated when it is not.
+`LEARNING_HUB_AUTH_ENABLED` now means account-based authentication and requires
+`FINANCE_HUB_USE_DATABASE=true`. Retired shared-credential settings are rejected
+at boot rather than ignored, so a stale `.env` cannot leave someone believing the
+app is gated when it is not.
 
 ### Verification
 

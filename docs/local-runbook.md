@@ -2,7 +2,8 @@
 
 ## Prerequisites
 
-- Node.js `>=22` (`.nvmrc` pins 22, the version CI uses).
+- Node.js 22 LTS exactly (`.nvmrc` is `22`, `package.json` is `22.x`, and CI
+  reads the same file).
 - pnpm via Corepack — `corepack enable`.
 - Docker only for database mode.
 
@@ -14,6 +15,10 @@ The app can run without Docker, without PostgreSQL and without a `.env` file:
 corepack pnpm install
 corepack pnpm dev
 ```
+
+pnpm allows only the native build script needed by the toolchain (`esbuild`);
+`sharp` stays explicitly ignored because this application does not use image
+optimisation. Do not replace this targeted policy with a blanket approval.
 
 `.env` is optional. When present, keep:
 
@@ -34,12 +39,10 @@ boot with every problem listed at once:
 | Rejected combination | Reason |
 |---|---|
 | `FINANCE_HUB_USE_DATABASE=true` without `DATABASE_URL` | used to fall back to seeds silently |
-| `LEARNING_HUB_AUTH_ENABLED=true` without user/password | used to lock everyone out with a permanent 401 |
 | `AI_PROVIDER=openai` without `OPENAI_API_KEY` | used to silently disable the tutor |
 | `AI_PROVIDER` set to anything but `none`/`openai`/`ollama` | not implemented in `packages/ai` |
 | A boolean flag set to `1`, `TRUE`, `yes`… | only `true`/`false` are read; anything else silently meant `false` |
 | `LEARNING_HUB_AUTH_ENABLED=true` without database mode | accounts and sessions are rows in PostgreSQL |
-| `LEARNING_HUB_AUTH_USER` / `_PASSWORD` set at all | retired in PR-01; keeping them would look like protection that no longer exists |
 | `FINANCE_HUB_BILLING_ENABLED=true` without accounts | an entitlement is a row owned by a user; there would be nowhere to record a payment |
 | `FINANCE_HUB_BILLING_ENABLED=true` without key or webhook secret | checkout would 500 on click, or every event would fail verification |
 | `FINANCE_HUB_BILLING_ENABLED=true` with no price id | a plan with nothing to charge renders a button that cannot work |
@@ -139,8 +142,6 @@ To turn production private:
 ```text
 FINANCE_HUB_PUBLIC_DEMO=false
 LEARNING_HUB_AUTH_ENABLED=true
-LEARNING_HUB_AUTH_USER=<user>
-LEARNING_HUB_AUTH_PASSWORD=<strong password>
 FINANCE_HUB_USE_DATABASE=true
 DATABASE_URL=<private postgres pgvector url>
 ```

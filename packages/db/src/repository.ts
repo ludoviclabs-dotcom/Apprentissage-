@@ -191,8 +191,12 @@ function toLearningDay(row: typeof learningDaysTable.$inferSelect): LearningDay 
   };
 }
 
-function parseJsonObject<T>(value: unknown, fallback: T): T {
-  return typeof value === "object" && value !== null ? (value as T) : fallback;
+function parseJsonObject<T>(value: unknown, label: string): T {
+  if (typeof value === "object" && value !== null) {
+    return value as T;
+  }
+
+  throw new Error(`${label} payload is invalid`);
 }
 
 function parseJsonArray<T>(value: unknown): T[] {
@@ -200,7 +204,7 @@ function parseJsonArray<T>(value: unknown): T[] {
 }
 
 function toLearningModule(row: typeof modulesTable.$inferSelect): LearningModule {
-  return parseJsonObject(row.payloadJson, seedLearningModules.find((module) => module.id === row.id) ?? seedLearningModules[0]);
+  return parseJsonObject(row.payloadJson, `Learning module ${row.id}`);
 }
 
 function toFlashcard(row: typeof flashcardsTable.$inferSelect): Flashcard {
@@ -248,7 +252,7 @@ function toExamSession(row: typeof examSessionsTable.$inferSelect): ExamSession 
 }
 
 function toBusinessCase(row: typeof businessCasesTable.$inferSelect): BusinessCase {
-  return parseJsonObject(row.payloadJson, seedBusinessCases.find((businessCase) => businessCase.id === row.id) ?? seedBusinessCases[0]);
+  return parseJsonObject(row.payloadJson, `Business case ${row.id}`);
 }
 
 function toAttempt(row: typeof attemptsTable.$inferSelect): Attempt {
@@ -346,13 +350,9 @@ export async function getSourcePacks(): Promise<SourcePack[]> {
     return seedSourcePacks;
   }
 
-  try {
-    const db = createDb();
-    const rows = await db.select().from(sourcePacksTable).orderBy(desc(sourcePacksTable.importedAt));
-    return rows.map(toSourcePack);
-  } catch {
-    return seedSourcePacks;
-  }
+  const db = createDb();
+  const rows = await db.select().from(sourcePacksTable).orderBy(desc(sourcePacksTable.importedAt));
+  return rows.map(toSourcePack);
 }
 
 export async function getDocuments(): Promise<DocumentRecord[]> {
@@ -360,13 +360,9 @@ export async function getDocuments(): Promise<DocumentRecord[]> {
     return seedDocuments;
   }
 
-  try {
-    const db = createDb();
-    const rows = await db.select().from(documentsTable).orderBy(desc(documentsTable.importedAt));
-    return rows.map(toDocument);
-  } catch {
-    return seedDocuments;
-  }
+  const db = createDb();
+  const rows = await db.select().from(documentsTable).orderBy(desc(documentsTable.importedAt));
+  return rows.map(toDocument);
 }
 
 export async function getExercises(): Promise<Exercise[]> {
@@ -374,13 +370,9 @@ export async function getExercises(): Promise<Exercise[]> {
     return exercises;
   }
 
-  try {
-    const db = createDb();
-    const rows = await db.select().from(exercisesTable).orderBy(desc(exercisesTable.level));
-    return rows.map(toExercise);
-  } catch {
-    return exercises;
-  }
+  const db = createDb();
+  const rows = await db.select().from(exercisesTable).orderBy(desc(exercisesTable.level));
+  return rows.map(toExercise);
 }
 
 /**
@@ -394,41 +386,37 @@ export async function getCompetencies(userId?: string | null): Promise<Competenc
     return competencies;
   }
 
-  try {
-    const db = createDb();
-    const rows = await db.select().from(competenciesTable);
-    const catalogue = rows.length > 0 ? rows.map(toCompetency) : competencies;
+  const db = createDb();
+  const rows = await db.select().from(competenciesTable);
+  const catalogue = rows.map(toCompetency);
 
-    if (!userId) {
-      return catalogue;
-    }
-
-    const progress = await withUserContext(userId, (tx) =>
-      tx
-        .select({
-          competencyId: competencyProgressTable.competencyId,
-          strength: competencyProgressTable.strength,
-          status: competencyProgressTable.status
-        })
-        .from(competencyProgressTable)
-    );
-
-    if (progress.length === 0) {
-      return catalogue;
-    }
-
-    const byId = new Map(progress.map((row) => [row.competencyId, row]));
-
-    return catalogue.map((competency) => {
-      const own = byId.get(competency.id);
-
-      return own
-        ? { ...competency, strength: own.strength, status: own.status as CompetencyStatus }
-        : competency;
-    });
-  } catch {
-    return competencies;
+  if (!userId) {
+    return catalogue;
   }
+
+  const progress = await withUserContext(userId, (tx) =>
+    tx
+      .select({
+        competencyId: competencyProgressTable.competencyId,
+        strength: competencyProgressTable.strength,
+        status: competencyProgressTable.status
+      })
+      .from(competencyProgressTable)
+  );
+
+  if (progress.length === 0) {
+    return catalogue;
+  }
+
+  const byId = new Map(progress.map((row) => [row.competencyId, row]));
+
+  return catalogue.map((competency) => {
+    const own = byId.get(competency.id);
+
+    return own
+      ? { ...competency, strength: own.strength, status: own.status as CompetencyStatus }
+      : competency;
+  });
 }
 
 export async function getLessons(): Promise<Lesson[]> {
@@ -436,31 +424,25 @@ export async function getLessons(): Promise<Lesson[]> {
     return lessons;
   }
 
-  try {
-    const db = createDb();
-    const lessonRows = await db.select().from(lessonsTable).orderBy(asc(lessonsTable.title));
+  const db = createDb();
+  const lessonRows = await db.select().from(lessonsTable).orderBy(asc(lessonsTable.title));
+  const sourceRows =
+    lessonRows.length === 0
+      ? []
+      : await db
+          .select()
+          .from(lessonSourcesTable)
+          .where(inArray(lessonSourcesTable.lessonId, lessonRows.map((lesson) => lesson.id)));
 
-    if (lessonRows.length === 0) {
-      return lessons;
-    }
+  const sourcesByLesson = new Map<string, SourceReference[]>();
 
-    const sourceRows = await db
-      .select()
-      .from(lessonSourcesTable)
-      .where(inArray(lessonSourcesTable.lessonId, lessonRows.map((lesson) => lesson.id)));
-
-    const sourcesByLesson = new Map<string, SourceReference[]>();
-
-    for (const source of sourceRows) {
-      const existing = sourcesByLesson.get(source.lessonId) ?? [];
-      existing.push(toSourceReference(source));
-      sourcesByLesson.set(source.lessonId, existing);
-    }
-
-    return lessonRows.map((lesson) => toLesson(lesson, sourcesByLesson.get(lesson.id) ?? []));
-  } catch {
-    return lessons;
+  for (const source of sourceRows) {
+    const existing = sourcesByLesson.get(source.lessonId) ?? [];
+    existing.push(toSourceReference(source));
+    sourcesByLesson.set(source.lessonId, existing);
   }
+
+  return lessonRows.map((lesson) => toLesson(lesson, sourcesByLesson.get(lesson.id) ?? []));
 }
 
 export async function getLearningPath(): Promise<LearningPath> {
@@ -468,32 +450,28 @@ export async function getLearningPath(): Promise<LearningPath> {
     return learningPath;
   }
 
-  try {
-    const db = createDb();
-    const pathRows = await db.select().from(learningPathsTable).limit(1);
-    const path = pathRows[0];
+  const db = createDb();
+  const pathRows = await db.select().from(learningPathsTable).limit(1);
+  const path = pathRows[0];
 
-    if (!path) {
-      return learningPath;
-    }
-
-    const dayRows = await db
-      .select()
-      .from(learningDaysTable)
-      .where(eq(learningDaysTable.learningPathId, path.id))
-      .orderBy(asc(learningDaysTable.dayNumber));
-
-    return {
-      id: path.id,
-      name: path.name,
-      durationDays: path.durationDays,
-      currentDay: path.currentDay,
-      goal: path.goal,
-      days: dayRows.length > 0 ? dayRows.map(toLearningDay) : learningPath.days
-    };
-  } catch {
-    return learningPath;
+  if (!path) {
+    throw new Error("Learning path catalogue is not initialized");
   }
+
+  const dayRows = await db
+    .select()
+    .from(learningDaysTable)
+    .where(eq(learningDaysTable.learningPathId, path.id))
+    .orderBy(asc(learningDaysTable.dayNumber));
+
+  return {
+    id: path.id,
+    name: path.name,
+    durationDays: path.durationDays,
+    currentDay: path.currentDay,
+    goal: path.goal,
+    days: dayRows.map(toLearningDay)
+  };
 }
 
 export async function recordManifest(manifest: SourcePackManifest): Promise<SourcePack> {
@@ -631,13 +609,9 @@ export async function getLearningModules(): Promise<LearningModule[]> {
     return seedLearningModules;
   }
 
-  try {
-    const db = createDb();
-    const rows = await db.select().from(modulesTable).orderBy(asc(modulesTable.title));
-    return rows.length > 0 ? rows.map(toLearningModule) : seedLearningModules;
-  } catch {
-    return seedLearningModules;
-  }
+  const db = createDb();
+  const rows = await db.select().from(modulesTable).orderBy(asc(modulesTable.title));
+  return rows.map(toLearningModule);
 }
 
 export async function getConcepts(): Promise<Concept[]> {
@@ -655,49 +629,45 @@ export async function getFlashcards(userId?: string | null): Promise<Flashcard[]
     return seedFlashcards;
   }
 
-  try {
-    const db = createDb();
-    const rows = await db.select().from(flashcardsTable).orderBy(asc(flashcardsTable.dueAt));
-    const catalogue = rows.length > 0 ? rows.map(toFlashcard) : seedFlashcards;
+  const db = createDb();
+  const rows = await db.select().from(flashcardsTable).orderBy(asc(flashcardsTable.dueAt));
+  const catalogue = rows.map(toFlashcard);
 
-    if (!userId) {
-      return catalogue;
-    }
-
-    const states = await withUserContext(userId, (tx) =>
-      tx
-        .select({
-          flashcardId: flashcardStatesTable.flashcardId,
-          status: flashcardStatesTable.status,
-          dueAt: flashcardStatesTable.dueAt,
-          intervalDays: flashcardStatesTable.intervalDays
-        })
-        .from(flashcardStatesTable)
-    );
-
-    if (states.length === 0) {
-      return catalogue;
-    }
-
-    const byId = new Map(states.map((state) => [state.flashcardId, state]));
-
-    return catalogue
-      .map((card) => {
-        const state = byId.get(card.id);
-
-        return state
-          ? {
-              ...card,
-              status: state.status as Flashcard["status"],
-              dueAt: state.dueAt,
-              intervalDays: state.intervalDays
-            }
-          : card;
-      })
-      .sort((left, right) => left.dueAt.localeCompare(right.dueAt));
-  } catch {
-    return seedFlashcards;
+  if (!userId) {
+    return catalogue;
   }
+
+  const states = await withUserContext(userId, (tx) =>
+    tx
+      .select({
+        flashcardId: flashcardStatesTable.flashcardId,
+        status: flashcardStatesTable.status,
+        dueAt: flashcardStatesTable.dueAt,
+        intervalDays: flashcardStatesTable.intervalDays
+      })
+      .from(flashcardStatesTable)
+  );
+
+  if (states.length === 0) {
+    return catalogue;
+  }
+
+  const byId = new Map(states.map((state) => [state.flashcardId, state]));
+
+  return catalogue
+    .map((card) => {
+      const state = byId.get(card.id);
+
+      return state
+        ? {
+            ...card,
+            status: state.status as Flashcard["status"],
+            dueAt: state.dueAt,
+            intervalDays: state.intervalDays
+          }
+        : card;
+    })
+    .sort((left, right) => left.dueAt.localeCompare(right.dueAt));
 }
 
 export async function getRevisionSession(userId?: string | null, now = new Date()) {
@@ -737,13 +707,9 @@ export async function getErrorJournal(userId?: string | null): Promise<ErrorJour
     });
   }
 
-  try {
-    const db = createDb();
-    const rows = await db.select().from(errorJournalTable).orderBy(desc(errorJournalTable.createdAt));
-    return rows.length > 0 ? rows.map(toErrorJournalEntry) : seedErrorJournalEntries;
-  } catch {
-    return seedErrorJournalEntries;
-  }
+  const db = createDb();
+  const rows = await db.select().from(errorJournalTable).orderBy(desc(errorJournalTable.createdAt));
+  return rows.map(toErrorJournalEntry);
 }
 
 export async function getExamSessions(): Promise<ExamSession[]> {
@@ -751,17 +717,17 @@ export async function getExamSessions(): Promise<ExamSession[]> {
     return seedExamSessions;
   }
 
-  try {
-    const db = createDb();
-    const rows = await db.select().from(examSessionsTable).orderBy(asc(examSessionsTable.title));
-    return rows.length > 0 ? rows.map(toExamSession) : seedExamSessions;
-  } catch {
-    return seedExamSessions;
-  }
+  const db = createDb();
+  const rows = await db.select().from(examSessionsTable).orderBy(asc(examSessionsTable.title));
+  return rows.map(toExamSession);
 }
 
 export async function startExam(userId: string, examId: string) {
-  const template = (await getExamSessions()).find((exam) => exam.id === examId) ?? seedExamSessions[0];
+  const template = (await getExamSessions()).find((exam) => exam.id === examId);
+
+  if (!template) {
+    throw new Error("Exam session is unavailable");
+  }
   const session = startExamSession(template);
 
   if (!canUseDatabase()) {
@@ -822,13 +788,9 @@ export async function getBusinessCases(): Promise<BusinessCase[]> {
     return seedBusinessCases;
   }
 
-  try {
-    const db = createDb();
-    const rows = await db.select().from(businessCasesTable).orderBy(desc(businessCasesTable.level));
-    return rows.length > 0 ? rows.map(toBusinessCase) : seedBusinessCases;
-  } catch {
-    return seedBusinessCases;
-  }
+  const db = createDb();
+  const rows = await db.select().from(businessCasesTable).orderBy(desc(businessCasesTable.level));
+  return rows.map(toBusinessCase);
 }
 
 export async function submitBusinessCaseAttempt(
@@ -1430,20 +1392,13 @@ export async function getCorrectionHistory(userId?: string | null): Promise<{
     });
   }
 
-  try {
-    const db = createDb();
-    const rows = await db.select().from(attemptsTable).orderBy(desc(attemptsTable.createdAt));
+  const db = createDb();
+  const rows = await db.select().from(attemptsTable).orderBy(desc(attemptsTable.createdAt));
 
-    return {
-      attempts: rows.map(toAttempt),
-      corrections: rows.map(toCorrection).filter((correction): correction is Correction => correction !== null)
-    };
-  } catch {
-    return {
-      attempts: seedAttempts,
-      corrections: seedCorrections
-    };
-  }
+  return {
+    attempts: rows.map(toAttempt),
+    corrections: rows.map(toCorrection).filter((correction): correction is Correction => correction !== null)
+  };
 }
 
 function normalizeSearch(value: string): string {
@@ -1535,72 +1490,58 @@ export async function searchKnowledge(query: string, limit = 5): Promise<Knowled
     return searchSeedKnowledge(query, limit);
   }
 
-  try {
-    const db = createDb();
-    const rows = await db
-      .select({
-        content: chunksTable.content,
-        pageStart: chunksTable.pageStart,
-        pageEnd: chunksTable.pageEnd,
-        sourceType: chunksTable.sourceType,
-        effectiveDate: chunksTable.effectiveDate,
-        documentTitle: documentsTable.title,
-        packName: sourcePacksTable.name
-      })
-      .from(chunksTable)
-      .innerJoin(documentsTable, eq(chunksTable.documentId, documentsTable.id))
-      .innerJoin(sourcePacksTable, eq(documentsTable.sourcePackId, sourcePacksTable.id))
-      .where(ilike(chunksTable.content, `%${query.trim()}%`))
-      .limit(limit);
+  const db = createDb();
+  const rows = await db
+    .select({
+      content: chunksTable.content,
+      pageStart: chunksTable.pageStart,
+      pageEnd: chunksTable.pageEnd,
+      sourceType: chunksTable.sourceType,
+      effectiveDate: chunksTable.effectiveDate,
+      documentTitle: documentsTable.title,
+      packName: sourcePacksTable.name
+    })
+    .from(chunksTable)
+    .innerJoin(documentsTable, eq(chunksTable.documentId, documentsTable.id))
+    .innerJoin(sourcePacksTable, eq(documentsTable.sourcePackId, sourcePacksTable.id))
+    .where(ilike(chunksTable.content, `%${query.trim()}%`))
+    .limit(limit);
 
-    return rows.map((row, index) => ({
-      content: row.content,
-      confidence: Math.max(0.45, 0.9 - index * 0.08),
-      source: {
-        pack: row.packName,
-        document: row.documentTitle,
-        sourceType: row.sourceType as KnowledgeHit["source"]["sourceType"],
-        pageStart: row.pageStart,
-        pageEnd: row.pageEnd,
-        effectiveDate: row.effectiveDate?.slice(0, 10)
-      }
-    }));
-  } catch {
-    return [];
-  }
+  return rows.map((row, index) => ({
+    content: row.content,
+    confidence: Math.max(0.45, 0.9 - index * 0.08),
+    source: {
+      pack: row.packName,
+      document: row.documentTitle,
+      sourceType: row.sourceType as KnowledgeHit["source"]["sourceType"],
+      pageStart: row.pageStart,
+      pageEnd: row.pageEnd,
+      effectiveDate: row.effectiveDate?.slice(0, 10)
+    }
+  }));
 }
 
 /**
  * Whether an exercise is an actual row in `exercises`, not merely resolvable.
  *
- * `getExerciseById` falls back to the in-memory catalogue whenever a database
- * lookup misses, which is the right call for a read: the public demo, and any
- * database that has been migrated but not re-seeded since new content landed in
- * `@finance/domain`, must still be able to show and grade the exercise. It is
- * the wrong call for a write. `attempts.exercise_id` carries a foreign key to
- * this table, so persisting an attempt against an id that exists only in memory
- * does not fail gracefully — it raises a foreign key violation from inside a
- * transaction that also holds the review schedule and remediation for the same
- * submission, discarding a correction the learner has already been shown.
- * `recordAttempt` calls this first so that case degrades exactly like seeded
- * mode — graded, nothing stored — instead of surfacing a raw database error.
+ * In database mode, an id must resolve to a persisted exercise before an
+ * attempt can be recorded. `attempts.exercise_id` carries a foreign key to
+ * this table, so writing an attempt against an id absent from the catalogue
+ * would fail the whole review transaction. Public-demo mode stays explicitly
+ * in-memory; configured database mode never substitutes seed content.
  */
 export async function isExercisePersisted(exerciseId: string): Promise<boolean> {
   if (!canUseDatabase()) {
     return false;
   }
 
-  try {
-    const rows = await createDb()
-      .select({ id: exercisesTable.id })
-      .from(exercisesTable)
-      .where(eq(exercisesTable.id, exerciseId))
-      .limit(1);
+  const rows = await createDb()
+    .select({ id: exercisesTable.id })
+    .from(exercisesTable)
+    .where(eq(exercisesTable.id, exerciseId))
+    .limit(1);
 
-    return rows.length > 0;
-  } catch {
-    return false;
-  }
+  return rows.length > 0;
 }
 
 export async function getExerciseById(exerciseId: string) {
@@ -1608,11 +1549,7 @@ export async function getExerciseById(exerciseId: string) {
     return exercises.find((exercise) => exercise.id === exerciseId);
   }
 
-  try {
-    const db = createDb();
-    const rows = await db.select().from(exercisesTable).where(eq(exercisesTable.id, exerciseId)).limit(1);
-    return rows[0] ? toExercise(rows[0]) : exercises.find((exercise) => exercise.id === exerciseId);
-  } catch {
-    return exercises.find((exercise) => exercise.id === exerciseId);
-  }
+  const db = createDb();
+  const rows = await db.select().from(exercisesTable).where(eq(exercisesTable.id, exerciseId)).limit(1);
+  return rows[0] ? toExercise(rows[0]) : undefined;
 }

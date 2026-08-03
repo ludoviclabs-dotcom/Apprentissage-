@@ -4,21 +4,22 @@
   "private": true,
   "packageManager": "pnpm@10.11.0",
   "engines": {
-    "node": ">=22"
+    "node": "22.x"
   },
   "scripts": {
-    "dev": "pnpm --filter @finance/web dev",
-    "build": "pnpm --filter @finance/web build",
+    "dev": "corepack pnpm --filter @finance/web dev",
+    "build": "corepack pnpm --filter @finance/web build",
     "lint": "eslint . --max-warnings=0",
-    "typecheck": "pnpm -r --if-present typecheck",
+    "typecheck": "corepack pnpm -r --if-present typecheck && tsc --noEmit -p scripts/tsconfig.json",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:e2e": "playwright test",
-    "check": "pnpm lint && pnpm typecheck && pnpm test && pnpm build",
-    "db:migrate": "pnpm --filter @finance/db migrate",
-    "db:configure-app-role": "pnpm --filter @finance/db configure-app-role",
-    "db:seed": "pnpm --filter @finance/db seed",
-    "ingest": "pnpm --filter @finance/ingest ingest"
+    "verify:deployment": "tsx scripts/verify-deployment.ts",
+    "check": "corepack pnpm lint && corepack pnpm typecheck && corepack pnpm test && corepack pnpm build",
+    "db:migrate": "corepack pnpm --filter @finance/db migrate",
+    "db:configure-app-role": "corepack pnpm --filter @finance/db configure-app-role",
+    "db:seed": "corepack pnpm --filter @finance/db seed",
+    "ingest": "corepack pnpm --filter @finance/ingest ingest"
   },
   "dependencies": {
     "lucide-react": "^0.468.0",
