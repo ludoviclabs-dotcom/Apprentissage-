@@ -3,6 +3,7 @@ import { multipleChoiceEvaluator } from "./multiple-choice";
 import { numericEvaluator } from "./numeric";
 import { shortTextRubricEvaluator } from "./short-text-rubric";
 import { spreadsheetEvaluator } from "./spreadsheet";
+import { spreadsheetFormulaEvaluator } from "./spreadsheet-formula";
 import { InvalidEvaluationSpecError, type EvaluationType, type Evaluator } from "./types";
 
 export * from "./types";
@@ -11,6 +12,7 @@ export * from "./multiple-choice";
 export * from "./journal-entry";
 export * from "./short-text-rubric";
 export * from "./spreadsheet";
+export * from "./spreadsheet-formula";
 export * from "./to-correction";
 
 /**
@@ -27,7 +29,8 @@ const REGISTRY = {
   multiple_choice: multipleChoiceEvaluator,
   journal_entry: journalEntryEvaluator,
   short_text_rubric: shortTextRubricEvaluator,
-  spreadsheet: spreadsheetEvaluator
+  spreadsheet: spreadsheetEvaluator,
+  spreadsheet_formula: spreadsheetFormulaEvaluator
 } as const satisfies Partial<Record<EvaluationType, Evaluator<never, never>>>;
 
 export type SpecEvaluationType = keyof typeof REGISTRY;

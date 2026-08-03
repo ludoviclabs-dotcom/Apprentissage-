@@ -20,6 +20,7 @@ export const EVALUATION_TYPES = [
   "journal_entry",
   "short_text_rubric",
   "spreadsheet",
+  "spreadsheet_formula",
   "legacy_rubric"
 ] as const;
 
