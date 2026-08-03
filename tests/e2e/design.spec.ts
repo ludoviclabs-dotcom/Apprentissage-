@@ -142,7 +142,7 @@ test.describe("états", () => {
     const rows = page.locator("[data-level-status]");
     const locked = rows.nth(1).locator(".locked-state");
     await expect(locked).toBeVisible();
-    await expect(locked).toContainText("Termine le niveau 1 pour ouvrir celui-ci.");
+    await expect(locked).toContainText("Le niveau précédent n'est pas encore acquis.");
   });
 
   test("error : une réponse trop courte laisse le bouton désactivé avant l'envoi", async ({ page }) => {

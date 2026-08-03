@@ -195,7 +195,7 @@ describe("passing threshold boundary", () => {
     );
 
     expect(snapshot.score).toBe(75);
-    expect(snapshot.status).toBe("acquired");
+    expect(snapshot.status).toBe("passed");
   });
 });
 
@@ -268,7 +268,7 @@ describe("evaluateLevel", () => {
       RULES
     );
 
-    expect(snapshot.status).toBe("acquired");
+    expect(snapshot.status).toBe("passed");
     expect(snapshot.blockers).toEqual([]);
     // 90*0.4 + 80*0.25 + 80*0.2 + 80*0.15 = 36 + 20 + 16 + 12
     expect(snapshot.score).toBe(84);
@@ -301,7 +301,7 @@ describe("evaluateLevel", () => {
     expect(evaluateLevel({ ...base, events: [] }, RULES).status).toBe("available");
     expect(
       evaluateLevel({ ...base, events: [event("direct", 30, "2026-07-01T00:00:00.000Z")] }, RULES).status
-    ).toBe("in-progress");
+    ).toBe("in_progress");
   });
 
   it("locks a level whose predecessor is not acquired", () => {
@@ -337,7 +337,7 @@ describe("evaluateLevel", () => {
     );
 
     expect(snapshot.score).toBeGreaterThanOrEqual(RULES.passingScore);
-    expect(snapshot.status).toBe("in-progress");
+    expect(snapshot.status).toBe("in_progress");
     const blocker = snapshot.blockers.find((item) => item.code === "critical-competency-too-weak");
     expect(blocker?.detail).toContain("weak");
   });
@@ -370,7 +370,7 @@ describe("evaluateLevel", () => {
     );
 
     expect(snapshot.blockers.map((blocker) => blocker.code)).toEqual(["final-diagnostic-missing"]);
-    expect(snapshot.status).toBe("in-progress");
+    expect(snapshot.status).toBe("in_progress");
   });
 
   it("does not require the diagnostic when the rules say so", () => {
@@ -385,7 +385,7 @@ describe("evaluateLevel", () => {
       { ...RULES, requireFinalDiagnostic: false }
     );
 
-    expect(snapshot.status).toBe("acquired");
+    expect(snapshot.status).toBe("passed");
   });
 
   it("stays acquired once recorded, even if scores later drop", () => {
@@ -401,7 +401,7 @@ describe("evaluateLevel", () => {
       RULES
     );
 
-    expect(snapshot.status).toBe("acquired");
+    expect(snapshot.status).toBe("passed");
     expect(snapshot.score).toBe(2);
     // The blockers still describe the current state honestly.
     expect(snapshot.blockers.length).toBeGreaterThan(0);
@@ -489,13 +489,13 @@ describe("evaluateTrack", () => {
   it("cascades availability as levels are cleared", () => {
     const snapshots = evaluateTrack(levels, { events: passingEvents("L1"), acquiredLevelIds: [] }, RULES);
 
-    expect(snapshots.map((snapshot) => snapshot.status)).toEqual(["acquired", "available", "locked"]);
+    expect(snapshots.map((snapshot) => snapshot.status)).toEqual(["passed", "available", "locked"]);
   });
 
   it("keeps later levels locked when an intermediate one regresses but was acquired", () => {
     const snapshots = evaluateTrack(levels, { events: [], acquiredLevelIds: ["L1", "L2"] }, RULES);
 
-    expect(snapshots.map((snapshot) => snapshot.status)).toEqual(["acquired", "acquired", "available"]);
+    expect(snapshots.map((snapshot) => snapshot.status)).toEqual(["passed", "passed", "available"]);
   });
 
   it("does not let a later level be cleared while an earlier one is not", () => {
@@ -516,8 +516,9 @@ describe("labels", () => {
   it("names every status in French", () => {
     expect(getLevelStatusLabel("locked")).toBe("verrouillé");
     expect(getLevelStatusLabel("available")).toBe("disponible");
-    expect(getLevelStatusLabel("in-progress")).toBe("en cours");
-    expect(getLevelStatusLabel("acquired")).toBe("acquis");
+    expect(getLevelStatusLabel("in_progress")).toBe("en cours");
+    expect(getLevelStatusLabel("passed")).toBe("acquis");
+    expect(getLevelStatusLabel("planned")).toBe("planifié");
   });
 
   it("maps a score onto the competency vocabulary", () => {

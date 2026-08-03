@@ -393,7 +393,7 @@ describeWithDb("billing entitlements", () => {
 
     const tooEarly = await billing.issueCertificate({
       ...input,
-      snapshots: [snapshot("in-progress", 40)]
+      snapshots: [snapshot("in_progress", 40)]
     });
 
     expect(tooEarly.status).toBe("refused");
@@ -401,7 +401,7 @@ describeWithDb("billing entitlements", () => {
       "levels-incomplete"
     );
 
-    const first = await billing.issueCertificate({ ...input, snapshots: [snapshot("acquired", 88)] });
+    const first = await billing.issueCertificate({ ...input, snapshots: [snapshot("passed", 88)] });
 
     expect(first.status).toBe("issued");
     expect(first.status !== "refused" && first.certificate.serial).toMatch(/^FLH-\d{4}-[0-9A-F]{10}$/);
@@ -409,7 +409,7 @@ describeWithDb("billing entitlements", () => {
 
     // Asking again returns the same document rather than minting a second
     // serial for the same work.
-    const second = await billing.issueCertificate({ ...input, snapshots: [snapshot("acquired", 88)] });
+    const second = await billing.issueCertificate({ ...input, snapshots: [snapshot("passed", 88)] });
 
     expect(second.status).toBe("existing");
     expect(second.status !== "refused" && second.certificate.serial).toBe(
