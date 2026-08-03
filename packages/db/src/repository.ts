@@ -10,7 +10,6 @@ import {
   corrections as seedCorrections,
   createErrorJournalEntries,
   documents as seedDocuments,
-  errorJournalEntries as seedErrorJournalEntries,
   examSessions as seedExamSessions,
   exercises,
   flashcards as seedFlashcards,
@@ -376,10 +375,9 @@ export async function getExercises(): Promise<Exercise[]> {
 }
 
 /**
- * Competencies are a shared catalogue whose `strength` is the seeded starting
- * point. A signed-in user's own `competency_progress` overlays it, so the
- * progression screen shows their level rather than a value every account was
- * previously overwriting in place.
+ * Competencies are a shared catalogue, but their seeded strengths are examples,
+ * never a learner baseline. A signed-in user starts at zero for every missing
+ * owned row; only corrected work may create personal strength.
  */
 export async function getCompetencies(userId?: string | null): Promise<Competency[]> {
   if (!canUseDatabase()) {
@@ -404,10 +402,6 @@ export async function getCompetencies(userId?: string | null): Promise<Competenc
       .from(competencyProgressTable)
   );
 
-  if (progress.length === 0) {
-    return catalogue;
-  }
-
   const byId = new Map(progress.map((row) => [row.competencyId, row]));
 
   return catalogue.map((competency) => {
@@ -415,7 +409,7 @@ export async function getCompetencies(userId?: string | null): Promise<Competenc
 
     return own
       ? { ...competency, strength: own.strength, status: own.status as CompetencyStatus }
-      : competency;
+      : { ...competency, strength: 0, status: "not-started" };
   });
 }
 
@@ -686,30 +680,23 @@ export async function getRevisionSession(userId?: string | null, now = new Date(
 /**
  * The error journal is personal data.
  *
- * Seed fallback applies only when nobody is signed in — that is the public demo.
- * For a signed-in user an empty result means "you have made no mistakes yet" and
- * must stay empty: falling back would present the seeded corpus as their own
- * history, which is exactly what an ownership model has to prevent.
+ * There is deliberately no seed fallback. Without an identified owner, an
+ * error row would look like that visitor's mistake even if the UI called it an
+ * example. An empty result is the only neutral state.
  */
 export async function getErrorJournal(userId?: string | null): Promise<ErrorJournalEntry[]> {
-  if (!canUseDatabase()) {
-    return seedErrorJournalEntries;
+  if (!userId || !canUseDatabase()) {
+    return [];
   }
 
-  if (userId) {
-    return withUserContext(userId, async (tx) => {
-      const rows = await tx
-        .select()
-        .from(errorJournalTable)
-        .orderBy(desc(errorJournalTable.createdAt));
+  return withUserContext(userId, async (tx) => {
+    const rows = await tx
+      .select()
+      .from(errorJournalTable)
+      .orderBy(desc(errorJournalTable.createdAt));
 
-      return rows.map(toErrorJournalEntry);
-    });
-  }
-
-  const db = createDb();
-  const rows = await db.select().from(errorJournalTable).orderBy(desc(errorJournalTable.createdAt));
-  return rows.map(toErrorJournalEntry);
+    return rows.map(toErrorJournalEntry);
+  });
 }
 
 export async function getExamSessions(): Promise<ExamSession[]> {
@@ -1177,15 +1164,14 @@ export function gradeExercise(exercise: Exercise, userAnswer: string): Correctio
 }
 
 /**
- * Reads a user's strength for a competency, falling back to the seeded catalogue
- * value the first time they touch it. The catalogue is the starting point; it is
- * never written, so one account's progress cannot move another's.
+ * Reads a user's own strength for a competency. Catalogue strengths are editorial
+ * examples, not a learner baseline: a missing owned row therefore means zero
+ * evidence, never a seeded personal score.
  */
 async function currentStrengthFor(
   tx: FinanceDb,
   userId: string,
-  competencyId: string,
-  catalogueStrength: number
+  competencyId: string
 ): Promise<number> {
   const rows = await tx
     .select({ strength: competencyProgressTable.strength })
@@ -1198,7 +1184,7 @@ async function currentStrengthFor(
     )
     .limit(1);
 
-  return rows[0]?.strength ?? catalogueStrength;
+  return rows[0]?.strength ?? 0;
 }
 
 async function upsertCompetencyProgress(
@@ -1316,7 +1302,7 @@ export async function recordAttempt(
     const intervalDays = correction.score >= 14 ? 7 : correction.score >= 10 ? 3 : 1;
 
     for (const competency of competencyRows) {
-      const previous = await currentStrengthFor(tx, userId, competency.id, competency.strength);
+      const previous = await currentStrengthFor(tx, userId, competency.id);
       const nextStrength = clampStrength(previous + delta);
 
       await upsertCompetencyProgress(tx, userId, competency.id, nextStrength);
@@ -1356,7 +1342,7 @@ export async function recordDiagnostic(userId: string, levels: Record<string, nu
       // Averages against the user's own current strength. The previous version
       // averaged against the seeded array value every time, so re-running a
       // diagnostic dragged real progress back toward the seed baseline.
-      const previous = await currentStrengthFor(tx, userId, competency.id, competency.strength);
+      const previous = await currentStrengthFor(tx, userId, competency.id);
 
       await upsertCompetencyProgress(tx, userId, competency.id, clampStrength((previous + domainLevel) / 2));
     }

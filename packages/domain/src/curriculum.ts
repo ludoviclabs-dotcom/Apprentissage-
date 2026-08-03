@@ -32,6 +32,8 @@ export interface ModuleLevelDefinition {
    */
   criticalCompetencyIds: string[];
   estimatedMinutes: number;
+  /** Published levels participate in scoring; planned levels never unlock. */
+  publicationStatus: "published" | "planned";
 }
 
 export interface CurriculumVersion {
@@ -79,7 +81,8 @@ export const curriculum2026Q3: CurriculumVersion = {
       objective: "Enregistrer une opération simple et rattacher la charge au bon exercice.",
       competencyIds: ["cg-cutoff"],
       criticalCompetencyIds: ["cg-cutoff"],
-      estimatedMinutes: 120
+      estimatedMinutes: 120,
+      publicationStatus: "published"
     },
     {
       id: "level-compta-generale-2",
@@ -91,7 +94,8 @@ export const curriculum2026Q3: CurriculumVersion = {
       objective: "Distinguer provision, charge à payer et passif éventuel, et le justifier.",
       competencyIds: ["cg-cutoff", "cg-provisions"],
       criticalCompetencyIds: ["cg-provisions"],
-      estimatedMinutes: 180
+      estimatedMinutes: 180,
+      publicationStatus: "published"
     },
     {
       id: "level-compta-generale-3",
@@ -103,7 +107,8 @@ export const curriculum2026Q3: CurriculumVersion = {
       objective: "Confronter le traitement français au référentiel IFRS et citer la source.",
       competencyIds: ["cg-provisions", "ifrs-ias37"],
       criticalCompetencyIds: ["ifrs-ias37"],
-      estimatedMinutes: 180
+      estimatedMinutes: 180,
+      publicationStatus: "published"
     },
     {
       id: "level-compta-generale-4",
@@ -115,7 +120,8 @@ export const curriculum2026Q3: CurriculumVersion = {
       objective: "Mener une clôture simple et défendre chaque écriture par une pièce.",
       competencyIds: ["cg-cutoff", "cg-provisions", "ifrs-ias37", "fisc-retraitements"],
       criticalCompetencyIds: ["cg-cutoff", "cg-provisions", "ifrs-ias37"],
-      estimatedMinutes: 240
+      estimatedMinutes: 240,
+      publicationStatus: "published"
     },
     // A second track in the same version. Enrolment is per (user, track), so
     // adding one leaves everybody progressing through the provisions track
@@ -207,6 +213,16 @@ export function getTrackLevels(version: CurriculumVersion, trackId: string): Mod
   return version.levels
     .filter((level) => level.trackId === trackId)
     .sort((left, right) => left.level - right.level);
+}
+
+/** Levels that may participate in scoring and access control. */
+export function getPublishedTrackLevels(
+  version: CurriculumVersion,
+  trackId: string
+): ModuleLevelDefinition[] {
+  return getTrackLevels(version, trackId).filter(
+    (level) => level.publicationStatus === "published"
+  );
 }
 
 export function getTrackIds(version: CurriculumVersion): string[] {

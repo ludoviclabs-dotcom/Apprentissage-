@@ -41,7 +41,8 @@ test("the lab lists both levels, its datasets, and says what it is not", async (
 
   await expect(page.getByRole("heading", { level: 1 })).toContainText("Excel Finance Lab");
   await expect(page.getByRole("link", { name: "Ouvrir le niveau 1" })).toBeVisible();
-  await expect(page.getByRole("link", { name: "Ouvrir le niveau 2" })).toBeVisible();
+  await expect(page.getByRole("link", { name: "Ouvrir le niveau 2" })).toHaveCount(0);
+  await expect(page.getByText("Niveau verrouillé").first()).toBeVisible();
 
   // A learner expecting Excel and finding a grid that will not recalculate would
   // reasonably conclude the thing is broken, so the page has to say so.
@@ -160,31 +161,14 @@ test.describe("value and formula are graded separately", () => {
 test("an EBE with depreciation deducted is marked zero, which is the point of the item", async ({
   page
 }) => {
-  await page.goto(`${BASE}/exercices/${EBE}`);
-
-  // 204 000 + 9 000 - 14 000 - 132 000 - 21 000: the misconception this
-  // exercise exists to catch, since EBE is measured before amortisation.
-  await fillCell(page, "B13", "46000", "=B12+B9-B7-B8-B10");
-
-  const response = await submitAndWait(page);
-
-  expect(((await response.json()) as { correction: { score: number } }).correction.score).toBe(0);
+  expect((await page.goto(`${BASE}/exercices/${EBE}`))?.status()).toBe(404);
 });
 
 test("a two-cell exercise awards partial credit for one correct column", async ({ page }) => {
-  await page.goto(`${BASE}/exercices/${CASH}`);
-
-  await expect(page.getByLabel("Cellule B5")).toBeVisible();
-  await expect(page.getByLabel("Cellule C5")).toBeVisible();
-
-  await fillCell(page, "B5", "464000", "=SUM(B2:B4)");
-
-  const response = await submitAndWait(page);
-
-  expect(((await response.json()) as { correction: { score: number } }).correction.score).toBe(10);
+  expect((await page.goto(`${BASE}/exercices/${CASH}`))?.status()).toBe(404);
 });
 
-test("every lab exercise is graded by the spreadsheet evaluator", async ({ request }) => {
+test("only the declared lab demonstration exercise is publicly gradable", async ({ request }) => {
   const ids = [
     CA,
     "ex-xl-cout-achat-vendues",
@@ -198,12 +182,16 @@ test("every lab exercise is graded by the spreadsheet evaluator", async ({ reque
     "ex-xl-budget-ecart"
   ];
 
-  for (const exerciseId of ids) {
+  for (const [index, exerciseId] of ids.entries()) {
     const response = await request.post("/api/exercises/attempts", {
       data: { exerciseId, submission: { kind: "spreadsheet", cells: { B12: { value: 1 } } } }
     });
 
-    expect(response.status(), exerciseId).toBe(200);
+    expect(response.status(), exerciseId).toBe(index === 0 ? 200 : 403);
+
+    if (index > 0) {
+      continue;
+    }
 
     const body = (await response.json()) as { evaluationType: string; exerciseVersionId: string };
 
@@ -234,8 +222,8 @@ test("a malformed spreadsheet payload is a 400", async ({ request }) => {
 test("submitting a lab exercise schedules it for review and names its level", async ({ request }) => {
   const response = await request.post("/api/exercises/attempts", {
     data: {
-      exerciseId: EBE,
-      submission: { kind: "spreadsheet", cells: { B13: { value: 67000, formula: "=B12+B9-B7-B8" } } }
+      exerciseId: CA,
+      submission: { kind: "spreadsheet", cells: { B12: { value: 600000, formula: "=B2+B3" } } }
     }
   });
 
@@ -251,7 +239,7 @@ test("submitting a lab exercise schedules it for review and names its level", as
   // 20/20 reads as `mastered` on the PR-04 ladder: J+14, no remediation.
   expect(body.review.intervalDays).toBe(14);
   expect(body.review.remediation).toBeNull();
-  expect(body.progress.levelId).toBe("level-excel-finance-2");
+  expect(body.progress.levelId).toBe("level-excel-finance-1");
 });
 
 test("a perfect answer is not advised to rewrite an essay", async ({ request }) => {
@@ -296,12 +284,7 @@ test("a wrong SIG formula is reported as a treatment error, not a reasoning slip
     }
   });
 
-  const body = (await response.json()) as {
-    correction: { accountingTreatmentErrors: string[]; reasoningErrors: string[] };
-  };
-
-  expect(body.correction.accountingTreatmentErrors.length).toBeGreaterThan(0);
-  expect(body.correction.reasoningErrors).toHaveLength(0);
+  expect(response.status()).toBe(403);
 });
 
 test("too many cells is a 400 rather than an unbounded write", async ({ request }) => {
@@ -320,7 +303,7 @@ test("too many cells is a 400 rather than an unbounded write", async ({ request 
 
 test("a failed lab exercise opens a remediation", async ({ request }) => {
   const response = await request.post("/api/exercises/attempts", {
-    data: { exerciseId: EBE, submission: { kind: "spreadsheet", cells: { B13: { value: 1 } } } }
+    data: { exerciseId: CA, submission: { kind: "spreadsheet", cells: { B12: { value: 1 } } } }
   });
 
   const body = (await response.json()) as {
@@ -333,12 +316,12 @@ test("a failed lab exercise opens a remediation", async ({ request }) => {
   expect(body.review.remediation?.reason).toBe("failed-attempt");
 });
 
-test("the learner can walk from one exercise to the next", async ({ page }) => {
+test("the public learner cannot bypass the next locked exercise", async ({ page }) => {
   await page.goto(`${BASE}/exercices/${CA}`);
 
   await fillCell(page, "B12", "600000", "=B2+B3");
   await submitAndWait(page);
 
-  await page.getByRole("link", { name: "Exercice suivant" }).click();
-  await expect(page).toHaveURL(new RegExp(`${BASE}/exercices/ex-xl-cout-achat-vendues$`));
+  await expect(page.getByRole("link", { name: "Exercice suivant" })).toHaveCount(0);
+  expect((await page.goto(`${BASE}/exercices/ex-xl-cout-achat-vendues`))?.status()).toBe(404);
 });

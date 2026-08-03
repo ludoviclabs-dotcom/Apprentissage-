@@ -344,7 +344,8 @@ export const moduleLevelsTable = pgTable("module_levels", {
   objective: text("objective").notNull(),
   competencyIds: text("competency_ids").array().notNull().default([]),
   criticalCompetencyIds: text("critical_competency_ids").array().notNull().default([]),
-  estimatedMinutes: integer("estimated_minutes").notNull().default(0)
+  estimatedMinutes: integer("estimated_minutes").notNull().default(0),
+  publicationStatus: text("publication_status").notNull().default("published")
 });
 
 // --- Mastery and unlocking ------------------------------------------------
@@ -368,7 +369,11 @@ export const masteryEventsTable = pgTable("mastery_events", {
   kind: text("kind").notNull(),
   scorePercent: numeric("score_percent", { precision: 5, scale: 2 }).notNull(),
   occurredAt: timestamp("occurred_at", { mode: "string" }).notNull().defaultNow(),
-  sourceRef: text("source_ref")
+  sourceRef: text("source_ref"),
+  exerciseVersionId: text("exercise_version_id"),
+  sourceType: text("source_type"),
+  sourceEventId: text("source_event_id"),
+  correctedAt: timestamp("corrected_at", { mode: "string" })
 });
 
 // A cache of a pure function, hence keyed on (user_id, level_id) and always

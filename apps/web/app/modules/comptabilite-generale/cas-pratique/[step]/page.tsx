@@ -4,6 +4,8 @@ import { ModuleExerciseForm } from "@/components/forms/module-exercise-form";
 import { getFeatures } from "@/lib/features";
 import { COMPTA_MODULE_BASE, getMiniCaseStep, parseLevelParam } from "@/lib/compta-module";
 import { comptaGeneraleV1MiniCase } from "@finance/domain";
+import { getCurrentUser } from "@/lib/auth/current-user";
+import { getExerciseAccess } from "@/lib/learning-progression";
 
 /**
  * One step of the mini-case: the piece on the left, the entry it justifies on
@@ -26,6 +28,24 @@ export default async function ComptaGeneraleMiniCaseStepPage({
   if (!step) {
     notFound();
   }
+
+  const user = await getCurrentUser();
+  const levelAccess = await getExerciseAccess({
+    userId: user?.id,
+    exerciseId: step.exercise.exercise.id
+  });
+
+  if (!levelAccess.allowed) {
+    notFound();
+  }
+
+  const following = getMiniCaseStep(step.index + 1);
+  const followingAccess = following
+    ? await getExerciseAccess({
+        userId: user?.id,
+        exerciseId: following.exercise.exercise.id
+      })
+    : null;
 
   const features = getFeatures();
   const isLast = step.nextHref === null;
@@ -63,7 +83,13 @@ export default async function ComptaGeneraleMiniCaseStepPage({
         kind={step.exercise.kind}
         options={step.exercise.options}
         persistence={features.persistence}
-        nextHref={step.nextHref ?? `${COMPTA_MODULE_BASE}/cas-pratique`}
+        nextHref={
+          step.nextHref && followingAccess?.allowed
+            ? step.nextHref
+            : isLast
+              ? `${COMPTA_MODULE_BASE}/cas-pratique`
+              : undefined
+        }
         nextLabel={isLast ? "Terminer le cas" : "Étape suivante"}
         // The closing figures are the exact expected answer to this exercise,
         // so they cannot be passed as a prop here: whatever this Server
@@ -71,6 +97,7 @@ export default async function ComptaGeneraleMiniCaseStepPage({
         // of any client-side gate placed around it. `ModuleExerciseForm` fetches
         // them itself, only after grading this exercise perfectly.
         revealMiniCaseClosing={isLast}
+        activityContext="case_study"
       />
     </div>
   );

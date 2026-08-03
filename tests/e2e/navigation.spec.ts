@@ -217,9 +217,10 @@ test.describe("démonstration publique", () => {
 
     await expect(page.getByText("Niveau global")).toHaveCount(0);
     await expect(page.getByText("Jeu de démonstration", { exact: true })).toBeVisible();
-    await expect(
-      page.getByRole("link", { name: "Découvrir un exercice guidé" })
-    ).toBeVisible();
+    await expect(page.getByRole("link", { name: /Essayer la démonstration/ })).toBeVisible();
+    await expect(page.getByLabel("Niveau par domaine")).toHaveCount(0);
+    await expect(page.getByText("À traiter cette semaine")).toHaveCount(0);
+    await expect(page.getByText("Rien n'est dû aujourd'hui")).toHaveCount(0);
   });
 
   test("garde les routes documentaires accessibles en accès direct", async ({ page }, testInfo) => {

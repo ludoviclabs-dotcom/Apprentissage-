@@ -9,7 +9,17 @@ import { expect, test, type APIRequestContext, type Page } from "@playwright/tes
  */
 
 const STRONG_PASSWORD = "correct horse battery staple";
-const LEVEL_1 = "level-compta-generale-1";
+const LEVEL_1 = "level-compta-generale-v1-1";
+const DIRECT_EXERCISE = "ex-cgv1-achat-marchandises";
+const DIAGNOSTIC_EXERCISE = "ex-cgv1-tva-deductible-qcm";
+const correctJournal = {
+  kind: "journal",
+  lines: [
+    { account: "607", debit: 1200 },
+    { account: "44566", debit: 240 },
+    { account: "401", credit: 1440 }
+  ]
+};
 
 async function signUp(page: Page, email: string) {
   await page.goto("/signup");
@@ -25,95 +35,161 @@ async function signUp(page: Page, email: string) {
   await page.waitForURL((url) => !url.pathname.startsWith("/signup"));
 }
 
-async function recordEvent(
+async function submitCorrected(
   request: APIRequestContext,
-  event: { levelId: string; kind: string; scorePercent: number }
+  activityContext: "exercise" | "case_study" = "exercise"
 ) {
-  const response = await request.post("/api/mastery/events", { data: event });
+  const response = await request.post("/api/exercises/attempts", {
+    data: { exerciseId: DIRECT_EXERCISE, submission: correctJournal, activityContext }
+  });
+  expect(response.status()).toBe(200);
+}
 
-  expect(response.status(), `${event.kind} @ ${event.scorePercent}`).toBe(201);
+async function recordRetention(request: APIRequestContext) {
+  const response = await request.post("/api/revisions/review", {
+    data: {
+      itemType: "exercise",
+      itemRef: DIRECT_EXERCISE,
+      rating: "mastered",
+      revealed: true
+    }
+  });
+  expect(response.status()).toBe(200);
+}
+
+async function recordDiagnostic(request: APIRequestContext) {
+  const response = await request.post("/api/exercises/attempts", {
+    data: {
+      exerciseId: DIAGNOSTIC_EXERCISE,
+      submission: { kind: "choice", selectedOptionIds: ["marchandises", "informatique"] }
+    }
+  });
+  expect(response.status()).toBe(200);
+}
+
+async function strengthenCriticalCompetency(request: APIRequestContext) {
+  for (let index = 0; index < 8; index += 1) {
+    await submitCorrected(request);
+  }
+}
+
+async function completeLevelOne(request: APIRequestContext) {
+  await strengthenCriticalCompetency(request);
+  await submitCorrected(request, "case_study");
+  await recordRetention(request);
+  await recordDiagnostic(request);
 }
 
 async function levelStatuses(page: Page): Promise<string[]> {
   await page.goto("/parcours");
-  await expect(page.locator("[data-level-status]")).toHaveCount(4);
+  const track = page.locator('[data-canonical-track="track-compta-generale-v1"]');
+  await expect(track).toBeVisible();
+  await expect(track.locator("[data-level-status]")).toHaveCount(2);
 
-  return page
+  return track
     .locator("[data-level-status]")
     .evaluateAll((rows) => rows.map((row) => row.getAttribute("data-level-status") ?? ""));
 }
 
-test("recording an event requires a session", async ({ request }) => {
+async function canonicalScore(page: Page, path: string): Promise<string | null> {
+  await page.goto(path);
+  const track = page.locator('[data-canonical-track="track-compta-generale-v1"]').first();
+  await expect(track).toBeVisible();
+  return track.getAttribute("data-canonical-score");
+}
+
+test("a browser cannot declare a mastery score", async ({ request }) => {
   const response = await request.post("/api/mastery/events", {
     data: { levelId: LEVEL_1, kind: "direct", scorePercent: 90 }
   });
 
-  expect(response.status()).toBe(401);
+  expect(response.status()).toBe(410);
+});
+
+test("home, path, progression and module expose the same canonical score", async ({ page }, testInfo) => {
+  await signUp(page, `levels-consistency-${testInfo.workerIndex}@example.test`);
+  await submitCorrected(page.request);
+
+  const scores: Array<string | null> = [];
+
+  for (const path of ["/", "/parcours", "/progression", "/modules/comptabilite-generale"]) {
+    scores.push(await canonicalScore(page, path));
+  }
+
+  expect(new Set(scores).size).toBe(1);
+  expect(scores[0]).not.toBe("neutral");
 });
 
 test("an insufficient score leaves the next level gated", async ({ page }, testInfo) => {
   await signUp(page, `levels-low-${testInfo.workerIndex}@example.test`);
 
   // 50 on the heaviest component alone is 20/100 — well below the 75 threshold.
-  await recordEvent(page.request, { levelId: LEVEL_1, kind: "direct", scorePercent: 50 });
+  await page.request.post("/api/exercises/attempts", {
+    data: {
+      exerciseId: DIRECT_EXERCISE,
+      submission: { kind: "journal", lines: [{ account: "607", debit: 1 }] }
+    }
+  });
 
   const statuses = await levelStatuses(page);
 
-  expect(statuses[0]).toBe("in-progress");
+  expect(statuses[0]).toBe("in_progress");
   expect(statuses[1]).toBe("locked");
 });
 
 test("clearing level one opens level two", async ({ page }, testInfo) => {
   await signUp(page, `levels-pass-${testInfo.workerIndex}@example.test`);
 
-  for (const kind of ["direct", "retention", "caseStudy", "explanation"]) {
-    await recordEvent(page.request, { levelId: LEVEL_1, kind, scorePercent: 90 });
-  }
+  await strengthenCriticalCompetency(page.request);
+  await submitCorrected(page.request, "case_study");
+  await recordRetention(page.request);
 
   // The diagnostic is a gate, not a weighted component: without it the level
   // stays in progress no matter how high the score is.
   const beforeDiagnostic = await levelStatuses(page);
-  expect(beforeDiagnostic[0]).toBe("in-progress");
+  expect(beforeDiagnostic[0]).toBe("in_progress");
   expect(beforeDiagnostic[1]).toBe("locked");
 
-  await recordEvent(page.request, { levelId: LEVEL_1, kind: "finalDiagnostic", scorePercent: 100 });
+  await recordDiagnostic(page.request);
 
   const statuses = await levelStatuses(page);
-  expect(statuses[0]).toBe("acquired");
+  expect(statuses[0]).toBe("passed");
   expect(statuses[1]).toBe("available");
-  expect(statuses[2]).toBe("locked");
 });
 
 test("a cleared level stays acquired after a bad later result", async ({ page }, testInfo) => {
   await signUp(page, `levels-monotonic-${testInfo.workerIndex}@example.test`);
 
-  for (const kind of ["direct", "retention", "caseStudy", "explanation"]) {
-    await recordEvent(page.request, { levelId: LEVEL_1, kind, scorePercent: 90 });
-  }
-  await recordEvent(page.request, { levelId: LEVEL_1, kind: "finalDiagnostic", scorePercent: 100 });
-  expect((await levelStatuses(page))[0]).toBe("acquired");
+  await completeLevelOne(page.request);
+  expect((await levelStatuses(page))[0]).toBe("passed");
 
   // Latest-wins scoring drops the score, but acquisition is monotonic.
-  await recordEvent(page.request, { levelId: LEVEL_1, kind: "direct", scorePercent: 5 });
+  await page.request.post("/api/exercises/attempts", {
+    data: {
+      exerciseId: DIRECT_EXERCISE,
+      submission: { kind: "journal", lines: [{ account: "607", debit: 1 }] }
+    }
+  });
 
   const statuses = await levelStatuses(page);
-  expect(statuses[0]).toBe("acquired");
+  expect(statuses[0]).toBe("passed");
   expect(statuses[1]).toBe("available");
 });
 
 test("level two names the critical competency that still blocks it", async ({ page }, testInfo) => {
   await signUp(page, `levels-critical-${testInfo.workerIndex}@example.test`);
 
-  for (const kind of ["direct", "retention", "caseStudy", "explanation"]) {
-    await recordEvent(page.request, { levelId: LEVEL_1, kind, scorePercent: 90 });
-  }
-  await recordEvent(page.request, { levelId: LEVEL_1, kind: "finalDiagnostic", scorePercent: 100 });
+  await submitCorrected(page.request);
+  await submitCorrected(page.request, "case_study");
+  await recordRetention(page.request);
+  await recordDiagnostic(page.request);
 
   await page.goto("/parcours");
 
-  // cg-provisions is seeded at 45, under the 60 minimum, so level 2 opens but
-  // cannot be cleared until it is raised. The learner must be told which one.
-  await expect(page.getByText(/cg-provisions/).first()).toBeVisible();
+  // Une réponse correcte ne fait monter cg-operations-courantes qu'à partir du
+  // zéro personnel. La compétence reste sous le minimum de 60 et le blocker
+  // doit donc identifier précisément cette compétence critique.
+  await expect(page.getByText(/cg-operations-courantes/).first()).toBeVisible();
 });
 
 test("progression is private to its owner", async ({ browser }, testInfo) => {
@@ -124,12 +200,9 @@ test("progression is private to its owner", async ({ browser }, testInfo) => {
     await signUp(pageA, `levels-owner-a-${testInfo.workerIndex}@example.test`);
     await signUp(pageB, `levels-owner-b-${testInfo.workerIndex}@example.test`);
 
-    for (const kind of ["direct", "retention", "caseStudy", "explanation"]) {
-      await recordEvent(pageA.request, { levelId: LEVEL_1, kind, scorePercent: 90 });
-    }
-    await recordEvent(pageA.request, { levelId: LEVEL_1, kind: "finalDiagnostic", scorePercent: 100 });
+    await completeLevelOne(pageA.request);
 
-    expect((await levelStatuses(pageA))[0]).toBe("acquired");
+    expect((await levelStatuses(pageA))[0]).toBe("passed");
     // B did nothing, so B's track must be untouched by A's progress.
     expect((await levelStatuses(pageB))[0]).toBe("available");
   } finally {

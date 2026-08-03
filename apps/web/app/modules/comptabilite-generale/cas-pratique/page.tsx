@@ -2,6 +2,8 @@ import Link from "next/link";
 import { SourceReference } from "@/components/source-reference";
 import { COMPTA_MODULE_BASE } from "@/lib/compta-module";
 import { comptaGeneraleV1MiniCase } from "@finance/domain";
+import { getCurrentUser } from "@/lib/auth/current-user";
+import { getExerciseAccess } from "@/lib/learning-progression";
 
 /**
  * The dossier: every document of the month, then the steps that use them.
@@ -10,8 +12,17 @@ import { comptaGeneraleV1MiniCase } from "@finance/domain";
  * work happens in — a month's accounting starts by reading the pieces, not by
  * being told which account to debit.
  */
-export default function ComptaGeneraleMiniCasePage() {
+export default async function ComptaGeneraleMiniCasePage() {
   const miniCase = comptaGeneraleV1MiniCase;
+  const user = await getCurrentUser();
+  const accessByExercise = new Map(
+    await Promise.all(
+      miniCase.steps.map(async (step) => [
+        step.exerciseId,
+        await getExerciseAccess({ userId: user?.id, exerciseId: step.exerciseId })
+      ] as const)
+    )
+  );
 
   return (
     <div className="page-stack">
@@ -72,12 +83,18 @@ export default function ComptaGeneraleMiniCasePage() {
                     <strong>{step.instruction}</strong>
                     <small>{document?.reference}</small>
                   </div>
-                  <Link
-                    className="secondary-action"
-                    href={`${COMPTA_MODULE_BASE}/cas-pratique/${index + 1}`}
-                  >
-                    Étape {index + 1}
-                  </Link>
+                  {accessByExercise.get(step.exerciseId)?.allowed ? (
+                    <Link
+                      className="secondary-action"
+                      href={`${COMPTA_MODULE_BASE}/cas-pratique/${index + 1}`}
+                    >
+                      Étape {index + 1}
+                    </Link>
+                  ) : (
+                    <span className="secondary-action" aria-disabled="true">
+                      Étape verrouillée
+                    </span>
+                  )}
                 </div>
               </li>
             );

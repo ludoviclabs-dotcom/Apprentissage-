@@ -50,6 +50,7 @@ export interface ReviewCardProps {
   dueAt: string;
   lapseCount: number;
   reviewCount: number;
+  personal: boolean;
   writes: FeatureState;
   persistence: FeatureState;
 }
@@ -66,6 +67,7 @@ export function ReviewCard({
   dueAt,
   lapseCount,
   reviewCount,
+  personal,
   writes,
   persistence
 }: ReviewCardProps) {
@@ -132,13 +134,15 @@ export function ReviewCard({
           <span className="section-label">{kindLabel}</span>
           <h2>{prompt}</h2>
         </div>
-        <span className={`state-token ${lapseCount > 0 ? "needs-review" : "processing"}`}>
-          {lapseCount > 0 ? `${lapseCount} oubli(s)` : "à réviser"}
+        <span className={`state-token ${personal && lapseCount > 0 ? "needs-review" : "processing"}`}>
+          {personal ? (lapseCount > 0 ? `${lapseCount} oubli(s)` : "à réviser") : "Exemple"}
         </span>
       </div>
 
       <p className="muted">
-        Dû le {formatDay(dueAt)} · {reviewCount} révision(s) enregistrée(s)
+        {personal
+          ? `Dû le ${formatDay(dueAt)} · ${reviewCount} révision(s) enregistrée(s)`
+          : "Carte de démonstration · aucun historique personnel"}
       </p>
 
       {revealed ? (

@@ -3,7 +3,7 @@ import { notFound } from "next/navigation";
 import { PaywallNotice } from "@/components/paywall-notice";
 import { getCurrentUser } from "@/lib/auth/current-user";
 import { resolveEntitlement } from "@/lib/billing/entitlements";
-import { EXCEL_LAB_BASE, getExcelLabModel, getLabLevel, parseLevelParam } from "@/lib/excel-lab";
+import { EXCEL_LAB_BASE, getExcelLabModel, parseLevelParam } from "@/lib/excel-lab";
 
 export default async function ExcelLabLevelPage({
   params
@@ -12,17 +12,21 @@ export default async function ExcelLabLevelPage({
 }) {
   const { level: rawLevel } = await params;
   const position = parseLevelParam(rawLevel);
-  const level = position === null ? null : getLabLevel(position);
-
-  if (!level) {
-    notFound();
-  }
-
   const user = await getCurrentUser();
   const access = await resolveEntitlement("excel-finance-lab");
   const model = await getExcelLabModel(user?.id);
+  const levelState =
+    position === null
+      ? null
+      : model.levelStates.find((candidate) => candidate.definition.level === position) ?? null;
+
+  if (!levelState?.canOpen) {
+    notFound();
+  }
+
+  const level = levelState.definition;
   const exercises = model.exercisesByLevel.get(level.id) ?? [];
-  const snapshot = model.snapshots.find((item) => item.levelId === level.id);
+  const snapshot = levelState.snapshot;
 
   return (
     <div className="page-stack">
@@ -34,7 +38,7 @@ export default async function ExcelLabLevelPage({
         </div>
         <div className="hero-score">
           <span>Score</span>
-          <strong>{Math.round(snapshot?.score ?? 0)}%</strong>
+          <strong>{user ? `${Math.round(snapshot.score)}%` : "Exemple"}</strong>
         </div>
       </section>
 
@@ -49,7 +53,7 @@ export default async function ExcelLabLevelPage({
         </article>
         <article>
           <span>État</span>
-          <strong>{snapshot?.status ?? "à commencer"}</strong>
+          <strong>{snapshot.status}</strong>
         </article>
         <article>
           <span>Seuil</span>
@@ -74,12 +78,18 @@ export default async function ExcelLabLevelPage({
                 <h2>{definition.exercise.title}</h2>
                 <p>{definition.exercise.estimatedMinutes} minutes</p>
               </div>
-              <Link
-                className="primary-action"
-                href={`${EXCEL_LAB_BASE}/exercices/${definition.exercise.id}`}
-              >
-                Ouvrir l'exercice
-              </Link>
+              {!user && definition.exercise.id !== "ex-xl-chiffre-affaires" ? (
+                <span className="secondary-action" aria-disabled="true">
+                  Réservé après inscription
+                </span>
+              ) : (
+                <Link
+                  className="primary-action"
+                  href={`${EXCEL_LAB_BASE}/exercices/${definition.exercise.id}`}
+                >
+                  Ouvrir l'exercice
+                </Link>
+              )}
             </div>
             <div className="module-meta">
               {definition.exercise.competencyIds.map((competencyId) => (

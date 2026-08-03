@@ -13,6 +13,14 @@ import { expect, test, type Page } from "@playwright/test";
 const BASE = "/modules/comptabilite-generale";
 const ACHAT = "ex-cgv1-achat-marchandises";
 const TVA = "ex-cgv1-tva-a-decaisser";
+const CORRECT_ACHAT = {
+  kind: "journal",
+  lines: [
+    { account: "607", debit: 1200 },
+    { account: "44566", debit: 240 },
+    { account: "401", credit: 1440 }
+  ]
+};
 
 /** Fills one line of the interactive journal. */
 async function fillLine(
@@ -47,7 +55,8 @@ test("the module lists both levels and its exercises", async ({ page }) => {
 
   await expect(page.getByRole("heading", { level: 1 })).toContainText("Comptabilité générale");
   await expect(page.getByRole("link", { name: "Ouvrir le niveau 1" })).toBeVisible();
-  await expect(page.getByRole("link", { name: "Ouvrir le niveau 2" })).toBeVisible();
+  await expect(page.getByRole("link", { name: "Ouvrir le niveau 2" })).toHaveCount(0);
+  await expect(page.getByText("Niveau verrouillé").first()).toBeVisible();
 
   await page.getByRole("link", { name: "Ouvrir le niveau 1" }).click();
   await expect(page).toHaveURL(new RegExp(`${BASE}/1$`));
@@ -157,55 +166,30 @@ test.describe("the interactive journal", () => {
   });
 });
 
-test("a numeric exercise is answered with a number and graded by the numeric evaluator", async ({
-  page
-}) => {
-  await page.goto(`${BASE}/exercices/${TVA}`);
-
-  await expect(page.locator("[data-exercise-kind='numeric']")).toBeVisible();
-
-  await page.getByLabel("Réponse numérique").fill("1300");
-
-  const response = await submitAndWait(page);
-  expect(response.status()).toBe(200);
-
-  const body = (await response.json()) as { evaluationType: string; correction: { score: number } };
-
-  expect(body.evaluationType).toBe("numeric");
-  expect(body.correction.score).toBe(20);
+test("a non-demo exercise cannot be opened before its level is available", async ({ page }) => {
+  expect((await page.goto(`${BASE}/exercices/${TVA}`))?.status()).toBe(404);
 });
 
-test("a wrong number is marked zero rather than rewarded for looking numeric", async ({ page }) => {
-  await page.goto(`${BASE}/exercices/${TVA}`);
+test("the grading endpoint refuses a locked exercise", async ({ request }) => {
+  const response = await request.post("/api/exercises/attempts", {
+    data: { exerciseId: TVA, submission: { kind: "numeric", value: 1900 } }
+  });
 
-  await page.getByLabel("Réponse numérique").fill("1900");
-
-  const response = await submitAndWait(page);
-  expect((await response.json()).correction.score).toBe(0);
+  expect(response.status()).toBe(403);
 });
 
-test("a QCM is answered with checkboxes and penalises ticking everything", async ({ page }) => {
-  await page.goto(`${BASE}/exercices/ex-cgv1-comptes-tiers-qcm`);
+test("the level page exposes only the declared public demo exercise", async ({ page }) => {
+  await page.goto(`${BASE}/1`);
 
-  const boxes = page.locator("input[type='checkbox']");
-  const count = await boxes.count();
-  expect(count).toBe(5);
-
-  for (let index = 0; index < count; index += 1) {
-    await boxes.nth(index).check();
-  }
-
-  const response = await submitAndWait(page);
-  expect((await response.json()).correction.score).toBe(0);
+  await expect(page.getByRole("link", { name: "Faire l'exercice" })).toHaveCount(1);
+  await expect(page.getByText("Réservé après inscription")).toHaveCount(6);
 });
 
-test("every module exercise is graded by a typed evaluator, never the rubric matcher", async ({
+test("the demo grades only its declared exercise and rejects the rest server-side", async ({
   request
 }) => {
-  // One submission per exercise, in its own shape. If any exercise fell back to
-  // `legacy_rubric` this fails, which is the guarantee the module is built on.
   const submissions: Array<[string, unknown]> = [
-    [ACHAT, { kind: "journal", lines: [{ account: "607", debit: 1200 }] }],
+    [ACHAT, CORRECT_ACHAT],
     [TVA, { kind: "numeric", value: 1300 }],
     ["ex-cgv1-comptes-tiers-qcm", { kind: "choice", selectedOptionIds: ["401"] }],
     ["ex-cgv1-immo-acquisition", { kind: "journal", lines: [{ account: "2183", debit: 3000 }] }],
@@ -217,20 +201,21 @@ test("every module exercise is graded by a typed evaluator, never the rubric mat
       data: { exerciseId, submission }
     });
 
-    expect(response.status(), exerciseId).toBe(200);
+    expect(response.status(), exerciseId).toBe(exerciseId === ACHAT ? 200 : 403);
 
-    const body = (await response.json()) as { evaluationType: string; exerciseVersionId: string };
-
-    expect(body.evaluationType, exerciseId).not.toBe("legacy_rubric");
-    expect(body.exerciseVersionId, exerciseId).toBeTruthy();
+    if (exerciseId === ACHAT) {
+      const body = (await response.json()) as { evaluationType: string; exerciseVersionId: string };
+      expect(body.evaluationType).toBe("journal_entry");
+      expect(body.exerciseVersionId).toBeTruthy();
+    }
   }
 });
 
 test("submitting a module exercise schedules it for review", async ({ request }) => {
   const response = await request.post("/api/exercises/attempts", {
     data: {
-      exerciseId: TVA,
-      submission: { kind: "numeric", value: 1300 }
+      exerciseId: ACHAT,
+      submission: CORRECT_ACHAT
     }
   });
 
@@ -245,12 +230,15 @@ test("submitting a module exercise schedules it for review", async ({ request })
   expect(body.review.intervalDays).toBe(14);
   expect(body.review.remediation).toBeNull();
   // The exercise knows which level it feeds, even where nothing is persisted.
-  expect(body.progress.levelId).toBe("level-compta-generale-v1-2");
+  expect(body.progress.levelId).toBe("level-compta-generale-v1-1");
 });
 
 test("a failed module exercise opens a remediation", async ({ request }) => {
   const response = await request.post("/api/exercises/attempts", {
-    data: { exerciseId: TVA, submission: { kind: "numeric", value: 1 } }
+    data: {
+      exerciseId: ACHAT,
+      submission: { kind: "journal", lines: [{ account: "999", debit: 1 }] }
+    }
   });
 
   const body = (await response.json()) as {
@@ -274,7 +262,7 @@ test.describe("the mini-case", () => {
     await expect(page.getByRole("link", { name: "Commencer le cas" })).toBeVisible();
   });
 
-  test("walks the month step by step and closes on the VAT it implies", async ({ page }) => {
+  test("the demo completes its first case step without bypassing later locks", async ({ page }) => {
     await page.goto(`${BASE}/cas-pratique/1`);
 
     // Step 1 is the purchase invoice, with its piece alongside.
@@ -287,26 +275,10 @@ test.describe("the mini-case", () => {
     expect((await submitAndWait(page)).status()).toBe(200);
     await expect(page.getByText(/Score 20([.,]00)?\/20/)).toBeVisible();
 
-    await page.getByRole("link", { name: "Étape suivante" }).click();
-    await expect(page).toHaveURL(new RegExp(`${BASE}/cas-pratique/2$`));
+    await expect(page.getByRole("link", { name: "Étape suivante" })).toHaveCount(0);
+    expect((await page.goto(`${BASE}/cas-pratique/2`))?.status()).toBe(404);
 
-    // The last step is the VAT liquidation, and it is a graded exercise.
-    const response = await page.goto(`${BASE}/cas-pratique/6`);
-    await expect(page.getByText("Récapitulatif TVA de mars").first()).toBeVisible();
-
-    // The closing figure is the exact expected answer to the field below it.
-    // It must be absent from the server's own bytes, not merely out of view —
-    // the same guarantee PR-04 gave a flashcard's answer before its reveal.
-    const html = (await response?.text()) ?? "";
-    expect(html).not.toContain("Déclaration de TVA de mars N");
-    await expect(page.getByText("Déclaration de TVA de mars N")).toHaveCount(0);
-
-    await page.getByLabel("Réponse numérique").fill("1300");
-    expect((await submitAndWait(page)).status()).toBe(200);
-
-    await expect(page.getByText(/Score 20([.,]00)?\/20/)).toBeVisible();
-    await expect(page.getByRole("link", { name: "Terminer le cas" })).toBeVisible();
-    await expect(page.getByText("Déclaration de TVA de mars N")).toBeVisible();
+    expect((await page.goto(`${BASE}/cas-pratique/6`))?.status()).toBe(404);
   });
 
   test("a step beyond the case is a 404", async ({ page }) => {

@@ -30,6 +30,10 @@ export const dynamic = "force-dynamic";
  * erreur de layout qui masquerait toutes les pages.
  */
 async function getDueReviews(userId: string | undefined): Promise<number | null> {
+  if (!userId) {
+    return null;
+  }
+
   try {
     const queue = await getReviewQueue(userId);
     return queue.dueCount;

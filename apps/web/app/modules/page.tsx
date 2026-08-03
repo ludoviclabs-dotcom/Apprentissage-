@@ -2,6 +2,8 @@ import type { Metadata } from "next";
 import { ModuleCard } from "@/components/ui/module-card";
 import { PageHeader } from "@/components/ui/page-header";
 import { getFeatures } from "@/lib/features";
+import { getCurrentUser } from "@/lib/auth/current-user";
+import { getCanonicalLearningProgression } from "@/lib/learning-progression";
 
 export const metadata: Metadata = {
   title: "Modules",
@@ -16,25 +18,10 @@ export const metadata: Metadata = {
  * son atterrissage et liste les tracks disponibles. Le contenu de chaque track
  * (niveaux, gating, exercices) reste rendu par sa propre page.
  */
-const MODULE_TRACKS = [
-  {
-    href: "/modules/comptabilite-generale",
-    title: "Comptabilité générale — parcours v1",
-    description:
-      "Le cycle complet d'une facture, de l'achat au règlement : journal interactif, TVA, banque, immobilisation et mini-cas de clôture.",
-    premium: false
-  },
-  {
-    href: "/modules/excel-finance-lab",
-    title: "Excel Finance Lab",
-    description:
-      "Raisonnement tableur sur données réelles : compte de résultat, prévision de trésorerie et écarts budgétaires, corrigés sur le résultat et la formule.",
-    premium: true
-  }
-] as const;
-
-export default function ModulesIndexPage() {
+export default async function ModulesIndexPage() {
   const billing = getFeatures().billing;
+  const user = await getCurrentUser();
+  const progression = await getCanonicalLearningProgression(user?.id);
 
   return (
     <div className="page-stack">
@@ -45,9 +32,9 @@ export default function ModulesIndexPage() {
       />
 
       <section className="module-grid">
-        {MODULE_TRACKS.map((track) => (
+        {progression.tracks.map(({ track }) => (
           <ModuleCard
-            key={track.href}
+            key={track.trackId}
             href={track.href}
             title={track.title}
             description={track.description}

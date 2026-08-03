@@ -171,6 +171,35 @@ describeWithDb("review queue persistence", () => {
     expect(bobEntry?.lastRating).toBeNull();
   });
 
+  it("accepts retention evidence only after a corrected exercise attempt", async () => {
+    const catalogueOnly = await db.recordReviewOutcome(bob, {
+      itemType: "exercise",
+      itemRef: EXERCISE_ID,
+      rating: "mastered",
+      revealed: true
+    });
+
+    expect(catalogueOnly?.masteryEligible).toBe(false);
+
+    await db.enqueueAttemptReview({
+      userId: bob,
+      exercise: FIXTURE_EXERCISE,
+      score: 20,
+      microLesson: "Rien à reprendre.",
+      nextAction: "Revoir plus tard."
+    });
+
+    const correctedAttemptReview = await db.recordReviewOutcome(bob, {
+      itemType: "exercise",
+      itemRef: EXERCISE_ID,
+      rating: "mastered",
+      revealed: true
+    });
+
+    expect(correctedAttemptReview?.masteryEligible).toBe(true);
+    expect(correctedAttemptReview?.reviewAttemptId).toBeTruthy();
+  });
+
   it("moves the existing row on a second review instead of enqueueing a duplicate", async () => {
     await db.recordReviewOutcome(alice, {
       itemType: "flashcard",

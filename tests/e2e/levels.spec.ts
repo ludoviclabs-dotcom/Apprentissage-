@@ -8,29 +8,28 @@ import { expect, test } from "@playwright/test";
  * where a learner stands.
  */
 
-test("the track shows level one open and the rest gated", async ({ page }) => {
+test("each published track starts with N1 available and N2 locked", async ({ page }) => {
   await page.goto("/parcours");
 
   const rows = page.locator("[data-level-status]");
   await expect(rows).toHaveCount(4);
 
   await expect(rows.nth(0)).toHaveAttribute("data-level-status", "available");
-
-  for (const index of [1, 2, 3]) {
-    await expect(rows.nth(index)).toHaveAttribute("data-level-status", "locked");
-  }
+  await expect(rows.nth(1)).toHaveAttribute("data-level-status", "locked");
+  await expect(rows.nth(2)).toHaveAttribute("data-level-status", "available");
+  await expect(rows.nth(3)).toHaveAttribute("data-level-status", "locked");
 });
 
 test("a gated level explains what opens it", async ({ page }) => {
   await page.goto("/parcours");
 
-  await expect(page.getByText(/Termine le niveau 1 pour ouvrir celui-ci/).first()).toBeVisible();
+  await expect(page.getByText(/niveau précédent n'est pas encore acquis/i).first()).toBeVisible();
 });
 
 test("the passing threshold is stated, not implied", async ({ page }) => {
   await page.goto("/parcours");
 
-  await expect(page.getByRole("heading", { name: /Déblocage au score de 75/ })).toBeVisible();
+  await expect(page.getByRole("heading", { name: /Déblocage au score de 75/ }).first()).toBeVisible();
 });
 
 test("an activity with no result yet is marked as not started rather than as zero", async ({ page }) => {
@@ -45,4 +44,25 @@ test("the page says progression is not being stored", async ({ page }) => {
   await page.goto("/parcours");
 
   await expect(page.getByText(/parcours vierge/).first()).toBeVisible();
+});
+
+test("the public starting state has no level zero and opens the declared demo exercise", async ({
+  page
+}) => {
+  await page.goto("/parcours");
+  await expect(page.getByText(/niveau 0/i)).toHaveCount(0);
+
+  expect((await page.goto("/modules/comptabilite-generale/1"))?.status()).toBe(200);
+  expect(
+    (await page.goto("/modules/comptabilite-generale/exercices/ex-cgv1-achat-marchandises"))
+      ?.status()
+  ).toBe(200);
+});
+
+test("a direct URL cannot bypass a locked level", async ({ page }) => {
+  expect((await page.goto("/modules/comptabilite-generale/2"))?.status()).toBe(404);
+  expect(
+    (await page.goto("/modules/comptabilite-generale/exercices/ex-cgv1-tva-a-decaisser"))
+      ?.status()
+  ).toBe(404);
 });

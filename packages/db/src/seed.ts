@@ -213,12 +213,12 @@ try {
       await sql`
         INSERT INTO module_levels (
           id, curriculum_version_id, track_id, module_id, domain, level, title, objective,
-          competency_ids, critical_competency_ids, estimated_minutes
+          competency_ids, critical_competency_ids, estimated_minutes, publication_status
         )
         VALUES (
           ${level.id}, ${version.id}, ${level.trackId}, ${level.moduleId}, ${level.domainId},
           ${level.level}, ${level.title}, ${level.objective}, ${level.competencyIds},
-          ${level.criticalCompetencyIds}, ${level.estimatedMinutes}
+          ${level.criticalCompetencyIds}, ${level.estimatedMinutes}, ${level.publicationStatus}
         )
         ON CONFLICT (id) DO UPDATE SET
           curriculum_version_id = EXCLUDED.curriculum_version_id,
@@ -230,7 +230,8 @@ try {
           objective = EXCLUDED.objective,
           competency_ids = EXCLUDED.competency_ids,
           critical_competency_ids = EXCLUDED.critical_competency_ids,
-          estimated_minutes = EXCLUDED.estimated_minutes
+          estimated_minutes = EXCLUDED.estimated_minutes,
+          publication_status = EXCLUDED.publication_status
       `;
     }
   }

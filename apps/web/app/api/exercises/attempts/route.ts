@@ -1,7 +1,8 @@
 import { submitAttempt, UnsupportedSubmissionError } from "@finance/db";
 import { getRequiredEntitlement } from "@finance/domain";
-import { resolveWriteUser } from "@/lib/auth/current-user";
+import { getCurrentUser, resolveWriteUser } from "@/lib/auth/current-user";
 import { guardEntitlement } from "@/lib/billing/entitlements";
+import { getExerciseAccess } from "@/lib/learning-progression";
 import { z } from "zod";
 
 /**
@@ -61,6 +62,7 @@ const submissionSchema = z.discriminatedUnion("kind", [
 const attemptSchema = z
   .object({
     exerciseId: z.string().min(1),
+    activityContext: z.enum(["exercise", "case_study"]).default("exercise"),
     // Legacy shape. Kept so the current exercise form is unaffected.
     userAnswer: z.string().min(12).optional(),
     submission: submissionSchema.optional()
@@ -85,6 +87,21 @@ export async function POST(request: Request) {
   }
 
   const submission = body.data.submission ?? { kind: "text" as const, text: body.data.userAnswer! };
+  const currentUser = await getCurrentUser();
+  const levelAccess = await getExerciseAccess({
+    userId: currentUser?.id,
+    exerciseId: body.data.exerciseId
+  });
+
+  if (!levelAccess.allowed) {
+    return Response.json(
+      {
+        error: "Niveau verrouillé",
+        details: "Cette correction n'est pas accessible dans l'état actuel du parcours."
+      },
+      { status: 403 }
+    );
+  }
 
   // The paywall lives on the submission, not only on the page. Gating the page
   // alone would leave grading — the part that is actually worth money — one
@@ -113,7 +130,8 @@ export async function POST(request: Request) {
     const graded = await submitAttempt({
       userId: writer.userId ?? "",
       exerciseId: body.data.exerciseId,
-      payload: submission
+      payload: submission,
+      activityContext: body.data.activityContext
     });
 
     if (!graded) {

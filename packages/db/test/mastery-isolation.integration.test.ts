@@ -32,6 +32,20 @@ const LEVEL_1 = "level-compta-generale-1";
 const TRACK = "track-compta-generale";
 const LEGACY_VERSION = "curriculum-legacy-fixture";
 const LEGACY_LEVEL = "level-compta-generale-legacy-fixture";
+const EXERCISE_ID = "exercise-mastery-fixture";
+const EXERCISE_VERSION_ID = "exercise-version-mastery-fixture";
+
+function evidence(kind: "direct" | "retention" | "caseStudy" | "explanation" | "finalDiagnostic", sourceEventId: string) {
+  return {
+    kind,
+    scorePercent: kind === "finalDiagnostic" ? 100 : 90,
+    sourceRef: EXERCISE_ID,
+    sourceEventId,
+    exerciseVersionId: EXERCISE_VERSION_ID,
+    sourceType: kind === "retention" ? ("review" as const) : ("graded_attempt" as const),
+    correctedAt: "2026-08-03T12:00:00.000Z"
+  };
+}
 
 describeWithDb("progression isolation", () => {
   let admin: Sql;
@@ -50,6 +64,15 @@ describeWithDb("progression isolation", () => {
     for (const file of migrationFiles) {
       await admin.unsafe(await readFile(resolve(packageRoot, file), "utf8"));
     }
+
+    await admin`
+      insert into exercises (id, domain, topic, level, statement, expected_answer)
+      values (${EXERCISE_ID}, 'compta-generale', 'fixture', 1, 'fixture', 'fixture')
+      on conflict (id) do nothing`;
+    await admin`
+      insert into exercise_versions (id, exercise_id, version, evaluation_type, spec_json, is_active)
+      values (${EXERCISE_VERSION_ID}, ${EXERCISE_ID}, 1, 'numeric', '{"expected": 1}'::jsonb, true)
+      on conflict (id) do nothing`;
 
     // Seed the catalogue the levels reference.
     assertValidCurriculum(activeCurriculum);
@@ -100,6 +123,10 @@ describeWithDb("progression isolation", () => {
 
     alice = aliceRow.id;
     bob = bobRow.id;
+    await admin`
+      insert into competency_progress (user_id, competency_id, strength, status)
+      select ${alice}, unnest(array['cg-cutoff', 'cg-provisions', 'ifrs-ias37']::text[]), 70, 'in-progress'
+      on conflict (user_id, competency_id) do update set strength = excluded.strength`;
 
     const [carolRow] = await admin`
       insert into app_users (email, email_normalized, password_hash)
@@ -124,9 +151,15 @@ describeWithDb("progression isolation", () => {
 
   it("attributes mastery events to their author only", async () => {
     for (const kind of ["direct", "retention", "caseStudy", "explanation"] as const) {
-      await db.recordMasteryEvent(alice, { levelId: LEVEL_1, kind, scorePercent: 90 });
+      await db.recordMasteryEvent(alice, {
+        levelId: LEVEL_1,
+        ...evidence(kind, `alice-${kind}`)
+      });
     }
-    await db.recordMasteryEvent(alice, { levelId: LEVEL_1, kind: "finalDiagnostic", scorePercent: 100 });
+    await db.recordMasteryEvent(alice, {
+      levelId: LEVEL_1,
+      ...evidence("finalDiagnostic", "alice-diagnostic")
+    });
 
     const aliceEvents = await db.getMasteryEvents(alice, TRACK);
     const bobEvents = await db.getMasteryEvents(bob, TRACK);
@@ -135,11 +168,24 @@ describeWithDb("progression isolation", () => {
     expect(bobEvents, "bob must not see alice's events").toHaveLength(0);
   });
 
+  it("does not count the same corrected evidence twice", async () => {
+    const replay = {
+      levelId: LEVEL_1,
+      ...evidence("direct", "alice-direct")
+    };
+
+    await db.recordMasteryEvent(alice, replay);
+    await db.recordMasteryEvent(alice, replay);
+
+    const events = await db.getMasteryEvents(alice, TRACK);
+    expect(events.filter((event) => event.sourceEventId === "alice-direct")).toHaveLength(1);
+  });
+
   it("keeps an unlock private to the learner who earned it", async () => {
     const aliceSnapshots = await db.refreshTrackProgress(alice, TRACK);
     const bobSnapshots = await db.refreshTrackProgress(bob, TRACK);
 
-    expect(aliceSnapshots[0]?.status, "alice cleared level 1").toBe("acquired");
+    expect(aliceSnapshots[0]?.status, "alice cleared level 1").toBe("passed");
     expect(bobSnapshots[0]?.status, "bob did nothing and must not inherit the unlock").toBe("available");
     expect(bobSnapshots[0]?.score).toBe(0);
 
@@ -167,10 +213,16 @@ describeWithDb("progression isolation", () => {
 
     expect(curriculum?.id).toBe(LEGACY_VERSION);
     await expect(
-      db.recordMasteryEvent(carol, { levelId: LEVEL_1, kind: "direct", scorePercent: 90 })
+      db.recordMasteryEvent(carol, {
+        levelId: LEVEL_1,
+        ...evidence("direct", "carol-wrong-version")
+      })
     ).rejects.toMatchObject({ name: "MasteryLevelNotAvailableError" });
     await expect(
-      db.recordMasteryEvent(carol, { levelId: LEGACY_LEVEL, kind: "direct", scorePercent: 90 })
+      db.recordMasteryEvent(carol, {
+        levelId: LEGACY_LEVEL,
+        ...evidence("direct", "carol-legacy")
+      })
     ).resolves.toBe(TRACK);
   });
 
@@ -189,6 +241,6 @@ describeWithDb("progression isolation", () => {
     const aliceSecond = await db.refreshTrackProgress(alice, TRACK);
 
     expect(bobFirst[0]?.status).toBe("available");
-    expect(aliceSecond[0]?.status).toBe("acquired");
+    expect(aliceSecond[0]?.status).toBe("passed");
   });
 });

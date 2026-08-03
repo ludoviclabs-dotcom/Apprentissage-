@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import {
   MAX_SCORE,
+  getAttemptEvidenceKinds,
   getModuleLevelForExercise,
   getModuleSourceReferences,
   remediationFromResult,
@@ -10,6 +11,7 @@ import {
   type Correction,
   type EvaluationResult,
   type Exercise,
+  type MasteryEvidenceContext,
   type RemediationPlan,
   type SourceReference
 } from "@finance/domain";
@@ -217,6 +219,7 @@ export async function submitAttempt(input: {
   userId: string;
   exerciseId: string;
   payload: SubmissionPayload;
+  activityContext?: MasteryEvidenceContext;
 }): Promise<GradedSubmission | null> {
   const exercise = await getExerciseById(input.exerciseId);
 
@@ -283,7 +286,14 @@ export async function submitAttempt(input: {
   return {
     ...graded,
     review,
-    progress: await recordModuleProgress(input.userId, exercise.id, graded.correction.score)
+    progress: await recordModuleProgress({
+      userId: input.userId,
+      exerciseId: exercise.id,
+      exerciseVersionId: graded.exerciseVersionId,
+      correctionId: graded.correction.id,
+      score: graded.correction.score,
+      context: input.activityContext ?? "exercise"
+    })
   };
 }
 
@@ -304,30 +314,58 @@ export async function submitAttempt(input: {
  * "progression did not move" is visible instead of mysterious. Because the
  * request still succeeds, there is no retry, and therefore no duplicate event.
  */
-async function recordModuleProgress(
-  userId: string,
-  exerciseId: string,
-  score: number
-): Promise<AttemptProgressResult> {
-  const levelId = getModuleLevelForExercise(exerciseId);
+async function recordModuleProgress(input: {
+  userId: string;
+  exerciseId: string;
+  exerciseVersionId: string | null;
+  correctionId: string;
+  score: number;
+  context: MasteryEvidenceContext;
+}): Promise<AttemptProgressResult> {
+  const levelId = getModuleLevelForExercise(input.exerciseId);
 
   if (!levelId) {
     return { attributed: false, levelId: null, reason: "exercise-not-in-a-module" };
   }
 
-  if (!canUseDatabase() || !userId) {
+  if (!canUseDatabase() || !input.userId) {
     return { attributed: false, levelId, reason: "not-persisted" };
+  }
+
+  if (!input.exerciseVersionId) {
+    return { attributed: false, levelId, reason: "exercise-version-missing" };
   }
 
   try {
     // The marking scale is 0–20 and mastery is a percentage; converting here
     // keeps the scale conversion in one place.
-    await recordMasteryEvent(userId, {
+    const correctedAt = new Date().toISOString();
+    const scorePercent = Math.max(0, Math.min(100, (input.score / MAX_SCORE) * 100));
+    const kinds = getAttemptEvidenceKinds({
+      exerciseId: input.exerciseId,
       levelId,
-      kind: "direct",
-      scorePercent: Math.max(0, Math.min(100, (score / MAX_SCORE) * 100)),
-      sourceRef: exerciseId
+      context: input.context
     });
+
+    for (const kind of kinds) {
+      await recordMasteryEvent(input.userId, {
+        levelId,
+        kind,
+        scorePercent,
+        sourceRef: input.exerciseId,
+        sourceEventId: input.correctionId,
+        exerciseVersionId: input.exerciseVersionId,
+        sourceType:
+          kind === "finalDiagnostic"
+            ? "diagnostic"
+            : kind === "caseStudy" && input.context === "case_study"
+              ? "case_study"
+              : kind === "caseStudy"
+                ? "diagnostic"
+              : "graded_attempt",
+        correctedAt
+      });
+    }
 
     return { attributed: true, levelId, reason: null };
   } catch (error) {
