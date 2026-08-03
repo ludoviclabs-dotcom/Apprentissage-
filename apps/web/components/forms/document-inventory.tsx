@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import Link from "next/link";
 import { domains, type DocumentRecord } from "@finance/domain";
 import { DomainBadge } from "@/components/domain-badge";
+import { SOURCE_PACK_STATUS_LABELS, statusLabel } from "@/lib/status-labels";
 
 type DocumentStatusFilter = "all" | "ready" | "processing" | "needs-review";
 
@@ -33,7 +34,7 @@ export function DocumentInventory({ documents }: { documents: DocumentRecord[] }
       <div className="panel-heading">
         <div>
           <span className="section-label">Inventaire</span>
-          <h2>Documents recents</h2>
+          <h2>Documents récents</h2>
         </div>
       </div>
 
@@ -58,12 +59,12 @@ export function DocumentInventory({ documents }: { documents: DocumentRecord[] }
           </select>
         </label>
         <label>
-          Etat
+          État
           <select value={status} onChange={(event) => setStatus(event.target.value as DocumentStatusFilter)}>
             <option value="all">Tous</option>
-            <option value="ready">Pret</option>
-            <option value="processing">En traitement</option>
-            <option value="needs-review">A verifier</option>
+            <option value="ready">{SOURCE_PACK_STATUS_LABELS.ready}</option>
+            <option value="processing">{SOURCE_PACK_STATUS_LABELS.processing}</option>
+            <option value="needs-review">{SOURCE_PACK_STATUS_LABELS["needs-review"]}</option>
           </select>
         </label>
       </div>
@@ -81,14 +82,14 @@ export function DocumentInventory({ documents }: { documents: DocumentRecord[] }
               </div>
               <span>{document.fileType.toUpperCase()}</span>
               <span>{document.pages} pages</span>
-              <span className={`state-token ${document.status}`}>{document.status}</span>
+              <span className={`state-token ${document.status}`}>{statusLabel(document.status)}</span>
             </article>
           ))}
         </div>
       ) : (
         <div className="result-box">
-          <strong>Aucun document trouve</strong>
-          <span>Elargis la recherche ou change les filtres pour retrouver les imports disponibles.</span>
+          <strong>Aucun document trouvé</strong>
+          <span>Élargis la recherche ou change les filtres pour retrouver les imports disponibles.</span>
         </div>
       )}
     </section>

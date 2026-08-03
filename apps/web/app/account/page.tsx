@@ -1,9 +1,15 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { getUserProfile } from "@finance/db";
 import { FeatureNotice } from "@/components/feature-notice";
 import { SignOutButton } from "@/components/forms/sign-out-button";
 import { getCurrentUser } from "@/lib/auth/current-user";
 import { getFeatures } from "@/lib/features";
+
+export const metadata: Metadata = {
+  title: "Mon compte",
+  description: "Identité, session et données privées rattachées au compte."
+};
 
 export default async function AccountPage() {
   const features = getFeatures();

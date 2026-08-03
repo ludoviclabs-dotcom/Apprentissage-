@@ -1,7 +1,13 @@
+import type { Metadata } from "next";
 import { DocumentInventory } from "@/components/forms/document-inventory";
 import { DocumentUploadForm } from "@/components/forms/document-upload-form";
 import { getRuntimeFlags } from "@/lib/runtime-flags";
 import { getDocuments } from "@finance/db";
+
+export const metadata: Metadata = {
+  title: "Documents — Administration",
+  description: "Inventaire du corpus importé : fichiers, pages, statuts et upload local."
+};
 
 export default async function DocumentsPage() {
   const runtime = getRuntimeFlags();

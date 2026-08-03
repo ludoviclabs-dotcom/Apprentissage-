@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { certificateBlockerLabel } from "@finance/domain";
 import { CertificateRequestButton } from "@/components/forms/certificate-request-button";
@@ -5,6 +6,11 @@ import { FeatureNotice } from "@/components/feature-notice";
 import { getCurrentUser } from "@/lib/auth/current-user";
 import { getTrackAttestations } from "@/lib/billing/certificates";
 import { getFeatures } from "@/lib/features";
+
+export const metadata: Metadata = {
+  title: "Attestations — Progression",
+  description: "Certificats de fin de track : conditions d'émission et attestations déjà obtenues."
+};
 
 /**
  * What a learner has earned, and what stands between them and the rest.

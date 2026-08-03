@@ -1,7 +1,13 @@
+import type { Metadata } from "next";
 import { CorrectionSummary } from "@/components/correction-summary";
 import { getCorrectionHistory } from "@finance/db";
 import Link from "next/link";
 import { getCurrentUser } from "@/lib/auth/current-user";
+
+export const metadata: Metadata = {
+  title: "Corrections — Réviser",
+  description: "Historique des corrections : barème, erreurs, remédiation et sources citées."
+};
 
 export default async function CorrectionsPage() {
   const user = await getCurrentUser();

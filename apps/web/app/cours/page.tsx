@@ -1,7 +1,13 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { SourceReference } from "@/components/source-reference";
 import { getKnowledgeModel } from "@/lib/view-model";
 import { getCurrentUser } from "@/lib/auth/current-user";
+
+export const metadata: Metadata = {
+  title: "Cours — Apprendre",
+  description: "Leçons structurées : concept, règle, raisonnement, exemple et erreur fréquente."
+};
 
 export default async function CoursPage() {
   const user = await getCurrentUser();
@@ -12,9 +18,9 @@ export default async function CoursPage() {
       <section className="page-header">
         <div>
           <span className="section-label">Cours</span>
-          <h1>Lecons structurees autour de la logique</h1>
+          <h1>Leçons structurées autour de la logique</h1>
           <p>
-            Chaque lecon expose concept, regle, raisonnement, exemple, erreur frequente et exercice lie.
+            Chaque leçon expose concept, règle, raisonnement, exemple, erreur fréquente et exercice lié.
           </p>
         </div>
         <Link href="/exercices" className="primary-action">
@@ -31,7 +37,7 @@ export default async function CoursPage() {
                 <h2>{lesson.title}</h2>
               </div>
               <Link className="secondary-action" href={`/exercices/${lesson.linkedExerciseId}`}>
-                Exercice lie
+                Exercice lié
               </Link>
             </div>
             <div className="logic-grid">
@@ -40,7 +46,7 @@ export default async function CoursPage() {
                 <p>{lesson.concept}</p>
               </article>
               <article>
-                <span>Regle</span>
+                <span>Règle</span>
                 <p>{lesson.rule}</p>
               </article>
               <article>
@@ -48,7 +54,7 @@ export default async function CoursPage() {
                 <p>{lesson.reasoning}</p>
               </article>
               <article>
-                <span>Erreur frequente</span>
+                <span>Erreur fréquente</span>
                 <p>{lesson.frequentError}</p>
               </article>
             </div>

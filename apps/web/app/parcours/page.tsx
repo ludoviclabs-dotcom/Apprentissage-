@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { DomainBadge } from "@/components/domain-badge";
 import { FeatureNotice } from "@/components/feature-notice";
@@ -6,13 +7,20 @@ import { ProgressMeter } from "@/components/progress-meter";
 import { getCurrentUser } from "@/lib/auth/current-user";
 import { getFeatures } from "@/lib/features";
 import { getLevelTrackModel } from "@/lib/mastery-model";
+import { statusLabel } from "@/lib/status-labels";
 import { getPathModel } from "@/lib/view-model";
 import { getDomain } from "@finance/domain";
+
+export const metadata: Metadata = {
+  title: "Parcours",
+  description:
+    "Le parcours de trente jours : paliers pédagogiques, niveaux à débloquer et modules d'apprentissage."
+};
 
 const tierLabels = {
   fondations: "Fondations",
   application: "Application",
-  maitrise: "Maitrise"
+  maitrise: "Maîtrise"
 } as const;
 
 export default async function ParcoursPage() {
@@ -25,14 +33,14 @@ export default async function ParcoursPage() {
       <section className="page-header">
         <div>
           <span className="section-label">Parcours</span>
-          <h1>Apprendre, s'entrainer, puis passer en conditions reelles</h1>
+          <h1>Apprendre, s'entraîner, puis passer en conditions réelles</h1>
           <p>
-            Le hub se lit comme une progression : notions guidees, exercices corriges, revision active,
-            examens courts puis cas metier avances.
+            Le hub se lit comme une progression : notions guidées, exercices corrigés, révision active,
+            examens courts puis cas métier avancés.
           </p>
         </div>
         <Link className="primary-action" href="/revisions">
-          Lancer les revisions
+          Lancer les révisions
         </Link>
       </section>
 
@@ -82,7 +90,7 @@ export default async function ParcoursPage() {
                   <h2>{module.title}</h2>
                 </div>
                 <span className={`state-token ${module.status === "mastered" ? "ready" : module.status === "fragile" ? "needs-review" : "processing"}`}>
-                  {module.status}
+                  {statusLabel(module.status)}
                 </span>
               </div>
               <p>{module.description}</p>
@@ -113,7 +121,7 @@ export default async function ParcoursPage() {
               <span>Jour {day.day}</span>
               <strong>{day.title}</strong>
               <small>
-                {getDomain(day.domainId).shortName} - {day.minutes} min - {day.status}
+                {getDomain(day.domainId).shortName} · {day.minutes} min · {statusLabel(day.status)}
               </small>
             </article>
           ))}

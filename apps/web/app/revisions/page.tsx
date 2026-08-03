@@ -1,8 +1,15 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { ReviewCard } from "@/components/forms/review-card";
 import { getFeatures } from "@/lib/features";
 import { getRevisionModel } from "@/lib/view-model";
 import { getCurrentUser } from "@/lib/auth/current-user";
+
+export const metadata: Metadata = {
+  title: "Réviser — Session du jour",
+  description:
+    "La file des items dus : réponse masquée jusqu'à la révélation, remédiations datées et carnet d'erreurs."
+};
 
 /**
  * Active review.
@@ -22,8 +29,8 @@ export default async function RevisionsPage() {
     <div className="page-stack">
       <section className="page-header">
         <div>
-          <span className="section-label">Revisions</span>
-          <h1>A revoir aujourd'hui</h1>
+          <span className="section-label">Révisions</span>
+          <h1>À revoir aujourd'hui</h1>
           <p>
             La file remonte les items dus, du plus ancien au plus récent. La réponse reste masquée
             jusqu'à ce que tu demandes à la voir : c'est le rappel qui ancre, pas la relecture.
@@ -120,9 +127,9 @@ export default async function RevisionsPage() {
         )}
       </section>
 
-      <section className="panel">
+      <section className="panel" id="carnet-erreurs">
         <span className="section-label">Carnet d'erreurs</span>
-        <h2>Reviser par erreur, pas seulement par chapitre</h2>
+        <h2>Réviser par erreur, pas seulement par chapitre</h2>
         <div className="priority-list">
           {model.errorJournal.map((entry) => (
             <article key={entry.id} className="priority-row">

@@ -1,8 +1,15 @@
+import type { Metadata } from "next";
 import { DomainBadge } from "@/components/domain-badge";
 import { SourcePackImportForm } from "@/components/forms/source-pack-import-form";
 import { getRuntimeFlags } from "@/lib/runtime-flags";
+import { statusLabel } from "@/lib/status-labels";
 import { getSourcePacks } from "@finance/db";
 import Link from "next/link";
+
+export const metadata: Metadata = {
+  title: "Source packs — Administration",
+  description: "Packs de sources versionnés : domaine, date d'effet, statut et volume indexé."
+};
 
 export default async function SourcePacksPage() {
   const runtime = getRuntimeFlags();
@@ -23,7 +30,7 @@ export default async function SourcePacksPage() {
           <article key={pack.id} className="pack-card">
             <div className="pack-top">
               <DomainBadge domainId={pack.domainId} />
-              <span className={`state-token ${pack.status}`}>{pack.status}</span>
+              <span className={`state-token ${pack.status}`}>{statusLabel(pack.status)}</span>
             </div>
             <h2>
               <Link href={`/source-packs/${pack.id}`}>{pack.name}</Link>

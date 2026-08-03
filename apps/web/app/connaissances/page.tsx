@@ -1,9 +1,15 @@
+import type { Metadata } from "next";
 import { DomainBadge } from "@/components/domain-badge";
 import { ProgressMeter } from "@/components/progress-meter";
 import { SourceReference } from "@/components/source-reference";
 import { getKnowledgeModel } from "@/lib/view-model";
 import { getDomain } from "@finance/domain";
 import { getCurrentUser } from "@/lib/auth/current-user";
+
+export const metadata: Metadata = {
+  title: "Connaissances — Apprendre",
+  description: "Notions et cartes organisées par domaine, avec sources citées."
+};
 
 export default async function ConnaissancesPage() {
   const user = await getCurrentUser();

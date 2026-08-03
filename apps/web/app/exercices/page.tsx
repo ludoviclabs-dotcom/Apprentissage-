@@ -1,8 +1,14 @@
+import type { Metadata } from "next";
 import { ExercisePanel } from "@/components/exercise-panel";
 import { DomainBadge } from "@/components/domain-badge";
 import { ExerciseAttemptForm } from "@/components/forms/exercise-attempt-form";
 import { getExercises } from "@finance/db";
 import Link from "next/link";
+
+export const metadata: Metadata = {
+  title: "Exercices — S'entraîner",
+  description: "S'entraîner avec barème affiché, compétence cible et correction structurée."
+};
 
 export default async function ExercisesPage() {
   const exercises = await getExercises();
