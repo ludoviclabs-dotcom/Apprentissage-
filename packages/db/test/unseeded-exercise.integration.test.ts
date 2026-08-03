@@ -9,25 +9,14 @@ import { migrationFiles } from "../src/schema";
 /**
  * Reproduces a migrated-but-unseeded deployment.
  *
- * Content added to `@finance/domain` — like the comptabilité générale v1
- * module of PR-05 — ships no migration of its own: `exercises` is a table, not
- * a schema, and its rows come from `pnpm db:seed`. An operator who applies the
- * code but does not re-run the seed ends up exactly here: the exercise resolves
- * fine for a read (`getExerciseById` falls back to the in-memory catalogue), but
- * no row for it exists in the `exercises` table.
+ * Content added to `@finance/domain` ships through `pnpm db:seed`, not through
+ * a schema migration. A deployment that applies migrations but omits the seed
+ * must fail closed: configured database mode cannot resolve the missing exercise
+ * from the in-memory demo catalogue, grade it, or write a review for it.
  *
- * Before `isExercisePersisted`, submitting that exercise reached `recordAttempt`,
- * whose insert into `attempts` carries a foreign key to `exercises` — and inside
- * the single transaction PR-04 introduced for atomicity, that violation aborted
- * the review schedule and remediation for the same submission too, surfacing as
- * a raw database error instead of the correction the learner had already been
- * shown. This proves the degraded path instead: graded, reviewed, no crash.
- *
- * Writing this suite also caught a second gap in the same neighbourhood before
- * `getActiveExerciseVersion` learned the same lesson: with the database active,
- * a missing `exercise_versions` row fell back to `legacy_rubric` instead of the
- * authored specification, so the very first run of this file graded 1300 as
- * 0/20 rather than 20/20. Both fixes landed together.
+ * This is intentionally different from public-demo mode. The operator must run
+ * the seed before turning on the database-backed runtime; returning a correction
+ * for unpersisted content would conceal an incomplete deployment.
  *
  * Skips loudly without a database, and CI fails on the warning: an unverified
  * claim must never read as a passing one.
@@ -91,21 +80,14 @@ describeWithDb("submitting an exercise the database has not been seeded with", (
     expect(await isExercisePersisted(UNSEEDED_EXERCISE_ID)).toBe(false);
   });
 
-  it("still grades, schedules a review and reports progress — no foreign key violation", async () => {
-    const graded = await submitAttempt({
+  it("fails closed instead of grading from the in-memory catalogue", async () => {
+    const result = await submitAttempt({
       userId,
       exerciseId: UNSEEDED_EXERCISE_ID,
       payload: { kind: "numeric", value: 1300 }
     });
 
-    expect(graded).not.toBeNull();
-    expect(graded?.correction.score).toBe(20);
-    // The review schedule carries no foreign key to `exercises`, so it is
-    // unaffected by the attempt itself being skipped.
-    expect(graded?.review?.persisted).toBe(true);
-    expect(graded?.review?.intervalDays).toBe(14);
-    // Not thrown, and not silently swallowed either: the caller can tell.
-    expect(graded?.progress).toBeDefined();
+    expect(result).toBeNull();
   });
 
   it("skips the attempt row rather than inserting against a foreign key that would reject it", async () => {
@@ -115,20 +97,11 @@ describeWithDb("submitting an exercise the database has not been seeded with", (
     expect(rows).toHaveLength(0);
   });
 
-  it("still writes the review schedule row, which carries no foreign key to exercises", async () => {
-    // Checked directly against the table, not through `getReviewQueue`: that
-    // read additionally resolves content via `getExercises()`, which — like
-    // `getFlashcards()` — only merges the database with the in-memory catalogue
-    // when the table is empty, not per missing id. Whether an unseeded item
-    // surfaces in the general queue *listing* is that function's pre-existing
-    // limitation, not one either review finding raised or this fix touches;
-    // what this suite is actually proving is that the write itself, unlike
-    // `attempts`, has nothing stopping it from succeeding.
+  it("does not write a review schedule for an exercise absent from the configured catalogue", async () => {
     const rows = await admin`
       select interval_days from review_queue
       where user_id = ${userId} and item_type = 'exercise' and item_ref = ${UNSEEDED_EXERCISE_ID}`;
 
-    expect(rows).toHaveLength(1);
-    expect(rows[0].interval_days).toBe(14);
+    expect(rows).toHaveLength(0);
   });
 });

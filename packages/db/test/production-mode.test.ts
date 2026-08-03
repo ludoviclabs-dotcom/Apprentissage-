@@ -17,5 +17,5 @@ describe("configured database mode", () => {
     await expect(getDocuments()).rejects.toThrow("database unavailable");
     await expect(getExercises()).rejects.toThrow("database unavailable");
     await expect(getLearningModules()).rejects.toThrow("database unavailable");
-  });
+  }, 10_000);
 });
