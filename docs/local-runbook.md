@@ -138,15 +138,43 @@ curl http://localhost:3000/api/health
 
 ## Public Demo Mode
 
-Production without auth is treated as a read-only public demo:
+Production without auth is treated as a read-only public demo — surfaced to
+visitors as **« Mode découverte »** since PR-20:
 
 ```text
 LEARNING_HUB_AUTH_ENABLED=false
 ```
 
 In this mode, write endpoints (uploads, source-pack imports, exams, revisions,
-business cases) return `403`, and the matching UI controls render disabled with
-the reason shown before the click rather than after it.
+business cases) return `403`. What the visitor *can* still do is deliberate and
+larger than "read": grading, revealing a review answer and self-assessing are
+all reads or pure computations, and all three work.
+
+- `/exercices/session-decouverte` — five deterministic exercises graded by
+  `/api/exercises/session-decouverte`, which never persists. The exercise
+  allow-list lives in `apps/web/lib/discovery-session.ts`; adding an id there
+  that belongs to a module level or to a paid entitlement breaks
+  `discovery-session.test.ts`, by design.
+- `/revisions` — the four self-assessment buttons run locally on the same ladder
+  the server uses (`REVIEW_INTERVAL_DAYS`), stored in `sessionStorage` only.
+- `/revisions/carnet-erreurs` — shows labelled demonstration examples, never
+  attributed to the visitor.
+
+### Two audiences, two strings
+
+An unavailable capability carries a **public message** and, separately, an
+**operator diagnostic**:
+
+| Where | Module | Audience | May name variables |
+|---|---|---|---|
+| `publicMessage`, `optionalAction` | `apps/web/lib/availability.ts` | visitor | **no** |
+| `adminDiagnostic` | `apps/web/lib/availability-diagnostics.ts` | operator | yes |
+
+`availability-diagnostics.ts` imports `server-only`: a Client Component that
+reaches for it fails the build rather than serialising it into the RSC payload.
+`FeatureState` has no diagnostic field at all, so there is nothing to leak by
+accident. `tests/e2e/public-demo.spec.ts` re-checks the guarantee against the
+actual response bytes of every public route.
 
 To turn production private:
 

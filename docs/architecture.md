@@ -159,8 +159,20 @@ administers, and the public demo never does. No progression table changed.
 Hidden never means removed: every historic URL keeps answering, and
 `/modules` is the only new route (the landing page of the Modules entry).
 
+Active state is resolved by `isNavItemActive`, which lights the *most specific*
+entry covering the route: `/revisions/carnet-erreurs` marks the error journal,
+not "Session du jour", and `/exercices/session-decouverte` — which has no entry
+of its own — marks "Exercices". Prefix matching alone lit both, and announced two
+current pages to a screen reader.
+
 User-facing statuses are localized once in `apps/web/lib/status-labels.ts`;
 the raw model values (`done`, `today`, `mastered`, …) must not reach a screen.
+The same rule applies to configuration: an unavailable capability carries a
+`publicMessage` written for the visitor (`apps/web/lib/availability.ts`), while
+the variables an operator must set live in `availability-diagnostics.ts` behind
+`server-only`. `FeatureState` has no operator-facing field, so a diagnostic
+cannot be passed to a Client Component and hidden — see
+`docs/adr/011-public-discovery-mode.md`.
 Below 1120 px the sidebar is replaced by a compact header and a modal drawer
 with a focus trap — never by a horizontal strip of tabs.
 
