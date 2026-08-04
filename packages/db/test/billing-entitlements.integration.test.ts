@@ -385,10 +385,24 @@ describeWithDb("billing entitlements", () => {
     const input = {
       userId: bob,
       holderEmail: "bob-billing@example.test",
+      // PR-13: the name printed on the document, and everything it asserts,
+      // frozen at issue time. The e-mail stays on the private row and never
+      // reaches the public verification projection.
+      holderLabel: "Bob Fixture",
       trackId: "track-fixture",
       trackLabel: "Parcours fixture",
       curriculumVersionId: "curriculum-2026-07",
-      levels
+      levels,
+      content: {
+        holderLabel: "Bob Fixture",
+        trackLabel: "Parcours fixture",
+        curriculumVersionId: "curriculum-2026-07",
+        levelCount: 1,
+        averageScore: 88,
+        competencies: ["Compétence fixture"],
+        caseStudies: [],
+        allLevelsAcquired: true
+      }
     };
 
     const tooEarly = await billing.issueCertificate({

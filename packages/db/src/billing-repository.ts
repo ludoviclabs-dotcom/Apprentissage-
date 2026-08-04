@@ -588,6 +588,13 @@ export async function issueCertificate(input: IssueCertificateInput): Promise<Is
     return { status: "existing", certificate: existing };
   }
 
+  // Refused here rather than left to a NOT NULL violation halfway through the
+  // insert: an attestation with no name on it is not an attestation, and a
+  // constraint error would surface to the learner as an opaque 500.
+  if (input.holderLabel.trim() === "") {
+    throw new Error("issueCertificate: le nom du titulaire est requis pour émettre une attestation.");
+  }
+
   const entitled = await hasEntitlement(input.userId, "completion-certificate");
   const eligibility = evaluateCertificateEligibility({
     levels: input.levels,
