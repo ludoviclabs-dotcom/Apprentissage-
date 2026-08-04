@@ -17,8 +17,15 @@ const VIEWPORTS = [
   { name: "desktop-1920", width: 1920, height: 1080 }
 ] as const;
 
-/** Pages représentatives : accueil, listing, formulaire riche, tableau large. */
-const KEY_PAGES = ["/", "/exercices", "/revisions", "/modules/comptabilite-generale"] as const;
+/** Pages représentatives : accueil, leçon, listing, formulaire riche, tableau
+    large. `/apprendre` porte une rangée à deux colonnes qui doit se replier. */
+const KEY_PAGES = [
+  "/",
+  "/apprendre",
+  "/exercices",
+  "/revisions",
+  "/modules/comptabilite-generale"
+] as const;
 
 async function horizontalOverflow(page: Page): Promise<number> {
   return page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);

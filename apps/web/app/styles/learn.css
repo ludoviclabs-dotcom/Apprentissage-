@@ -1,0 +1,496 @@
+/* Apprendre — refonte visuelle de `/apprendre`.
+
+   Toutes les règles sont sous `.learn-page` : la page change, le shell et les
+   autres écrans ne bougent pas. Les composants partagés (LearningCard,
+   SourceReference, boutons) gardent leur apparence ailleurs.
+
+   Hiérarchie : canvas minéral, un panneau navy pour la prochaine action, du
+   blanc réservé à l'espace pédagogique (la leçon, le tuteur, le
+   bibliothécaire), des surfaces teintées pour le reste. */
+
+/* Le canvas de la page. `:has()` garde le ciblage dans cette feuille plutôt
+   que dans le layout ; sans support, la page retombe sur le fond produit.
+   Le shell est teinté avec le workspace pour qu'il n'y ait pas de couture
+   sous la sidebar, qui garde sa propre surface. */
+.app-shell:has(.learn-page),
+.workspace:has(.learn-page) {
+  background: var(--learn-canvas);
+}
+
+/* `.page-stack.learn-page` : la page-stack des utilitaires est chargée après
+   cette feuille, il faut la spécificité pour reprendre l'espacement. */
+.page-stack.learn-page {
+  gap: var(--space-5);
+  color: var(--learn-ink);
+  /* La grotesque ne descend que sur la page ; le shell garde `--font-sans`. */
+  font-family: var(--learn-font-sans);
+}
+
+.learn-page .section-label {
+  color: var(--learn-muted);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+}
+
+/* --- Entête -------------------------------------------------------------- */
+
+/* L'entête n'est plus une carte : le titre pose la page directement sur le
+   canvas, et le premier panneau devient le point d'accroche. */
+.learn-page .page-header {
+  display: block;
+  padding: var(--space-1) 0 0;
+  border: 0;
+  background: none;
+  box-shadow: none;
+}
+
+.learn-page .page-header .section-label {
+  color: var(--learn-indigo);
+  letter-spacing: 0.14em;
+}
+
+.learn-page .page-header h1 {
+  max-width: 780px;
+  margin: 6px 0 8px;
+  color: var(--learn-navy);
+  font-family: var(--learn-font-serif);
+  font-size: clamp(1.55rem, 2.6vw, 1.875rem);
+  font-weight: 600;
+  line-height: 1.2;
+}
+
+.learn-page .page-header p {
+  max-width: 720px;
+  margin: 0;
+  color: var(--learn-text);
+  font-size: 0.905rem;
+  line-height: 1.6;
+}
+
+/* --- Prochaine action ---------------------------------------------------- */
+
+.learn-page .focus-panel {
+  flex-direction: row;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-6);
+  padding: var(--space-6) var(--space-8);
+  border: 0;
+  border-radius: var(--learn-radius-panel);
+  background: var(--learn-navy);
+  box-shadow: none;
+  color: var(--learn-on-navy);
+}
+
+/* Le texte prend la place restante ; le score garde sa largeur de contenu. */
+.learn-page .focus-panel > div:not(.learn-score) {
+  flex: 1;
+  min-width: 280px;
+}
+
+.learn-page .focus-panel .section-label {
+  color: var(--learn-on-navy-faint);
+  letter-spacing: 0.14em;
+}
+
+.learn-page .focus-panel h2 {
+  margin: var(--space-1) 0;
+  color: var(--learn-on-navy);
+  font-family: var(--learn-font-serif);
+  font-size: 1.3125rem;
+  font-weight: 600;
+  line-height: 1.25;
+}
+
+.learn-page .focus-panel p {
+  margin: 0;
+  color: var(--learn-on-navy-muted);
+  font-size: 0.845rem;
+  line-height: 1.55;
+}
+
+.learn-page .learn-score {
+  display: grid;
+  flex: none;
+  gap: 2px;
+  padding: 14px 22px;
+  border: 1px solid var(--learn-navy-border);
+  border-radius: var(--learn-radius-block);
+  background: var(--learn-navy-raised);
+  text-align: center;
+}
+
+.learn-page .learn-score .section-label {
+  color: var(--learn-on-navy-faint);
+}
+
+.learn-page .learn-score strong {
+  color: var(--learn-on-navy);
+  font-family: var(--learn-font-mono);
+  font-size: 1.5rem;
+  font-weight: 600;
+}
+
+/* --- Leçon : l'espace pédagogique ---------------------------------------- */
+
+/* Blanc, et la seule bordure teal de la page : la leçon est l'endroit où on
+   apprend, pas un panneau de plus. */
+.learn-page .lesson-panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+  padding: var(--space-7) var(--space-8);
+  border: 1px solid var(--learn-border);
+  border-left: 4px solid var(--learn-teal);
+  border-radius: var(--learn-radius-panel);
+  background: var(--learn-surface);
+}
+
+.learn-page .lesson-panel .panel-heading {
+  align-items: center;
+}
+
+.learn-page .lesson-panel .panel-heading > div {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.learn-page .lesson-panel h2 {
+  margin: 0;
+  color: var(--learn-navy);
+  font-family: var(--learn-font-serif);
+  font-size: 1.375rem;
+  font-weight: 600;
+  line-height: 1.25;
+}
+
+.learn-page .domain-badge {
+  min-height: 26px;
+  padding: 0 11px;
+  border-radius: var(--radius-full);
+  font-size: 0.75rem;
+  font-weight: 650;
+}
+
+/* --- Les six blocs de raisonnement --------------------------------------- */
+
+.learn-page .logic-grid {
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: var(--space-4);
+  margin: 0;
+}
+
+.learn-page .logic-grid article {
+  min-height: 0;
+  padding: var(--space-4) var(--space-5);
+  border: 1px solid var(--learn-border-soft);
+  border-radius: var(--learn-radius-block);
+  background: var(--learn-surface-tinted);
+}
+
+.learn-page .logic-grid span {
+  color: var(--learn-indigo);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+}
+
+.learn-page .logic-grid p {
+  margin: 6px 0 0;
+  color: var(--learn-text);
+  font-size: 0.845rem;
+  line-height: 1.6;
+}
+
+/* L'exemple bascule sur le teal : on quitte la règle pour l'application. */
+.learn-page .logic-block--example span {
+  color: var(--learn-teal);
+}
+
+/* L'erreur fréquente est un avertissement, pas une erreur de l'apprenant. */
+.learn-page .logic-block--error {
+  border-color: var(--learn-amber-border);
+  background: var(--learn-amber-surface);
+}
+
+.learn-page .logic-block--error span {
+  color: var(--learn-amber-label);
+}
+
+.learn-page .logic-block--error p {
+  color: var(--learn-amber-text);
+}
+
+/* L'exercice lié est la sortie de la leçon : surface teal et action. */
+.learn-page .logic-block--exercise {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  border-color: var(--learn-teal-border);
+  background: var(--learn-teal-soft);
+}
+
+.learn-page .logic-block--exercise span {
+  color: var(--learn-teal);
+}
+
+.learn-page .logic-block--exercise p {
+  color: var(--learn-teal-strong);
+}
+
+.learn-page .logic-block--exercise .logic-block-id {
+  color: var(--learn-teal-strong);
+  font-family: var(--learn-font-mono);
+  font-size: var(--font-size-xs);
+}
+
+.learn-page .lesson-exercise-action {
+  display: inline-flex;
+  align-self: flex-start;
+  align-items: center;
+  min-height: var(--learn-control-sm);
+  padding: 0 var(--space-4);
+  border: 0;
+  border-radius: var(--learn-radius-inset);
+  background: var(--learn-teal);
+  color: var(--text-on-accent);
+  font-size: var(--font-size-sm);
+  font-weight: 650;
+  transition: background-color var(--motion-fast) var(--ease-out);
+}
+
+.learn-page .lesson-exercise-action:hover,
+.learn-page .lesson-exercise-action:focus-visible {
+  background: var(--learn-teal-strong);
+  color: var(--text-on-accent);
+}
+
+/* --- Sources citées ------------------------------------------------------ */
+
+/* La traçabilité reste un pli discret en pied de leçon : un lien, puis des
+   lignes de texte — pas une deuxième pile de cartes. */
+.learn-page .lesson-panel .source-panel {
+  padding-top: 14px;
+  border-top: 1px solid var(--learn-canvas);
+}
+
+.learn-page .source-panel summary {
+  min-height: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: none;
+  color: var(--learn-indigo);
+  font-size: var(--font-size-sm);
+  font-weight: 650;
+}
+
+.learn-page .source-panel .source-list {
+  margin-top: var(--space-3);
+  gap: var(--space-2);
+}
+
+.learn-page .source-panel .source-row {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--learn-muted);
+  font-size: 0.79rem;
+}
+
+.learn-page .source-panel .source-row strong {
+  color: var(--learn-text);
+  font-weight: 650;
+}
+
+/* --- Contrôles : 36 / 44 / 48, rayons 10–12 ------------------------------ */
+
+.learn-page .primary-action,
+.learn-page .secondary-action {
+  min-height: var(--learn-control);
+  padding: 0 var(--space-5);
+  border-radius: var(--learn-radius-control);
+  font-size: 0.875rem;
+  font-weight: 650;
+}
+
+.learn-page .primary-action {
+  border-color: transparent;
+  background: var(--learn-indigo);
+  color: var(--text-on-accent);
+}
+
+.learn-page .primary-action:hover:not(:disabled) {
+  background: var(--learn-indigo-strong);
+}
+
+.learn-page .secondary-action {
+  border: 1.5px solid var(--learn-indigo);
+  background: none;
+  color: var(--learn-indigo);
+}
+
+.learn-page .secondary-action:hover:not(:disabled) {
+  background: var(--learn-indigo-soft);
+}
+
+/* --- Champs -------------------------------------------------------------- */
+
+.learn-page .action-form input:not([type="range"]),
+.learn-page .action-form select,
+.learn-page .action-form textarea {
+  border: 1.5px solid var(--learn-field-border);
+  border-radius: var(--learn-radius-control);
+  background: var(--learn-surface-tinted);
+  color: var(--learn-ink);
+  font-size: 0.845rem;
+  transition: border-color var(--motion-fast) var(--ease-out),
+    background-color var(--motion-fast) var(--ease-out);
+}
+
+.learn-page .action-form input:not([type="range"]),
+.learn-page .action-form select {
+  min-height: var(--learn-control);
+  padding: 0 var(--space-4);
+}
+
+.learn-page .action-form input:not([type="range"]):focus,
+.learn-page .action-form select:focus,
+.learn-page .action-form textarea:focus {
+  border-color: var(--learn-indigo);
+  background: var(--learn-surface);
+}
+
+/* --- Panneaux d'action --------------------------------------------------- */
+
+.learn-page .action-form {
+  gap: var(--space-3);
+  padding: var(--space-6) var(--space-7);
+  border: 1px solid var(--learn-border);
+  border-radius: var(--learn-radius-panel);
+  background: var(--learn-surface);
+}
+
+.learn-page .action-form h2 {
+  margin: var(--space-1) 0 2px;
+  color: var(--learn-navy);
+  font-family: var(--learn-font-serif);
+  font-size: 1.1875rem;
+  font-weight: 600;
+  line-height: 1.25;
+}
+
+.learn-page .action-form > div > p {
+  margin: 0;
+  color: var(--learn-text);
+  font-size: var(--font-size-sm);
+  line-height: 1.55;
+}
+
+.learn-page .action-form label {
+  color: var(--learn-text);
+  font-size: var(--font-size-sm);
+  font-weight: 650;
+}
+
+/* Diagnostic : zone de données, donc surface teintée et action en contour. */
+.learn-page .diagnostic-panel {
+  background: var(--learn-surface-tinted);
+}
+
+.learn-page .diagnostic-panel .primary-action {
+  justify-self: start;
+  border: 1.5px solid var(--learn-indigo);
+  background: none;
+  color: var(--learn-indigo);
+}
+
+.learn-page .diagnostic-panel .primary-action:hover:not(:disabled) {
+  background: var(--learn-indigo-soft);
+}
+
+.learn-page .slider-grid label {
+  border-color: var(--learn-border-soft);
+  border-radius: var(--learn-radius-inset);
+  background: var(--learn-surface);
+}
+
+/* Tuteur et bibliothécaire partagent la rangée : deux gestes de la même
+   nature — interroger le corpus — donc un espace pédagogique commun. */
+.learn-page .learn-duo {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(360px, 1fr));
+  gap: var(--space-5);
+  align-items: start;
+}
+
+.learn-page .tutor-panel .primary-action {
+  justify-self: start;
+}
+
+.learn-page .tutor-panel .feature-notice {
+  border: 0;
+  border-radius: var(--learn-radius-inset);
+  padding: var(--space-3) 14px;
+  background: var(--learn-indigo-soft);
+  color: var(--learn-indigo-strong);
+  font-size: 0.79rem;
+  line-height: 1.55;
+}
+
+.learn-page .librarian-query {
+  display: flex;
+  align-items: flex-end;
+  gap: var(--space-2);
+}
+
+.learn-page .librarian-query label {
+  flex: 1;
+  min-width: 0;
+}
+
+.learn-page .librarian-query .secondary-action {
+  flex: none;
+}
+
+.learn-page .source-search-row {
+  padding: var(--space-3) var(--space-4);
+  border-color: var(--learn-border-soft);
+  border-radius: var(--learn-radius-inset);
+  background: var(--learn-surface-tinted);
+}
+
+.learn-page .source-search-row span {
+  color: var(--learn-muted);
+  font-family: var(--learn-font-mono);
+  font-size: 0.72rem;
+  font-weight: 400;
+}
+
+.learn-page .source-search-row p {
+  color: var(--learn-text);
+  font-size: 0.79rem;
+  line-height: 1.5;
+}
+
+.learn-page .result-box {
+  border-radius: var(--learn-radius-inset);
+}
+
+@media (max-width: 560px) {
+  .learn-page .focus-panel,
+  .learn-page .lesson-panel,
+  .learn-page .action-form {
+    padding: var(--space-5);
+  }
+
+  /* Sous cette largeur, le bouton passe sous le champ plutôt que de le
+     réduire à une fente. */
+  .learn-page .librarian-query {
+    flex-direction: column;
+    align-items: stretch;
+  }
+}

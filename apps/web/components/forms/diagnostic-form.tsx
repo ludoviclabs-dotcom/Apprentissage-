@@ -39,7 +39,7 @@ export function DiagnosticForm() {
   }
 
   return (
-    <section className="panel action-form">
+    <section className="panel action-form diagnostic-panel">
       <div>
         <span className="section-label">Diagnostic initial</span>
         <h2>Calibrer le parcours</h2>

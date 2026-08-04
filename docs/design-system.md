@@ -12,9 +12,11 @@ cascade :
 | Fichier | Contenu |
 |---|---|
 | `styles/tokens.css` | Tous les tokens (`:root`). La seule source des valeurs. |
+| `styles/fonts.css` | `@font-face` des polices auto-hébergées de `public/fonts/`. |
 | `styles/base.css` | Reset, éléments nus, `:focus-visible` global, états `disabled`. |
 | `styles/layout.css` | Shell : sidebar, topbar, drawer mobile, workspace. |
 | `styles/components.css` | Panneaux, cartes, formulaires, tableaux, variantes PR-10. |
+| `styles/learn.css` | Habillage de `/apprendre`, entièrement sous `.learn-page`. |
 | `styles/utilities.css` | Helpers transverses (`.muted`, `.table-scroll`, skip link). |
 | `styles/motion.css` | Le système de mouvement et la politique reduced-motion. |
 
@@ -36,6 +38,32 @@ hauteur de contrôle, de z-index ou de durée passe par `tokens.css` d'abord.
 - **Couches** : `--z-topbar`, `--z-menu`, `--z-drawer`, `--z-skip-link`.
 - **Motion** : `--motion-fast|base|slow` (150/200/240 ms), `--ease-out`,
   `--ease-in-out`.
+- **Apprendre** : famille `--learn-*` (canvas minéral, navy, indigo, teal,
+  ambre, rayons 10–16 px, hauteurs de contrôle 36/44/48) et les trois piles
+  typographiques `--learn-font-sans|serif|mono`.
+
+## Refonte Apprendre
+
+`/apprendre` porte une hiérarchie bento : canvas minéral `--learn-canvas`,
+un panneau navy pour la prochaine action, du blanc réservé aux espaces
+pédagogiques (leçon, tuteur, bibliothécaire) et des surfaces teintées
+`--learn-surface-tinted` partout ailleurs. Les six blocs de la leçon sont
+lisibles au premier coup d'œil : indigo pour la conduite (concept, règle,
+raisonnement), teal pour l'application (exemple, exercice lié), ambre pour
+l'erreur fréquente.
+
+Règles : tout est sous `.learn-page`, jamais au-dessus. Les composants
+partagés (`LearningCard`, `SourceReference`, `.primary-action`) gardent leur
+apparence sur les autres écrans ; `LearningCard` n'affiche la sortie vers
+l'exercice lié que si `showExerciseAction` est passé.
+
+Typographie : Schibsted Grotesk pour l'interface, Lora pour les titres,
+Spline Sans Mono pour les chiffres et les identifiants. Les trois familles
+sont **auto-hébergées** dans `public/fonts/` (woff2 variables, latin et
+latin-ext, ~196 Ko au total) et déclarées dans `styles/fonts.css` : aucune
+requête vers un CDN de polices, ni au build ni à l'exécution, donc
+l'engagement offline tient. Provenance, licence OFL et procédure de mise à
+jour : `apps/web/public/fonts/README.md`.
 
 ## Variantes de composants (`components/ui/`)
 

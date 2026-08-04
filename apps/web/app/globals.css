@@ -1,12 +1,15 @@
 /* Entrée unique des styles globaux.
 
-   L'ordre des imports est le cascade : les tokens d'abord, la base ensuite,
-   puis le layout du shell, les composants, les utilitaires, et le motion en
-   dernier pour que la politique prefers-reduced-motion ait le dernier mot. */
+   L'ordre des imports est le cascade : les tokens d'abord, les polices et la
+   base ensuite, puis le layout du shell, les composants, les habillages de
+   page, les utilitaires, et le motion en dernier pour que la politique
+   prefers-reduced-motion ait le dernier mot. */
 
 @import "./styles/tokens.css";
+@import "./styles/fonts.css";
 @import "./styles/base.css";
 @import "./styles/layout.css";
 @import "./styles/components.css";
+@import "./styles/learn.css";
 @import "./styles/utilities.css";
 @import "./styles/motion.css";
