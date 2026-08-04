@@ -1,6 +1,7 @@
 import { comptaCaseStudies, isCaseStudyExercise } from "./compta-generale-cloture";
 import { COMPTA_GENERALE_V1_TRACK, comptaGeneraleV1MiniCase } from "./compta-generale-v1";
 import { EXCEL_LAB_TRACK } from "./excel-lab";
+import { excelCaseStudies, isExcelCaseStudyExercise } from "./excel-lab-avance";
 import type { ActivityKind, MasteryEventKind } from "./mastery";
 
 export type LearningMode = "demo" | "new" | "enrolled";
@@ -57,7 +58,12 @@ export const canonicalLearningTracks: readonly CanonicalTrackDefinition[] = [
     premium: true,
     diagnosticExerciseIds: {
       "level-excel-finance-1": "ex-xl-taux-marge",
-      "level-excel-finance-2": "ex-xl-budget-ecart"
+      "level-excel-finance-2": "ex-xl-budget-ecart",
+      // PR-12b : la dernière étape de chaque case study — le contrôle de
+      // cohérence de la prévision (N3) et l'audit du modèle Aster (N4) —
+      // clôt le diagnostic du niveau.
+      "level-excel-finance-3": "ex-xl-n3-controle-coherence",
+      "level-excel-finance-4": "ex-xl-n4-audit-modele"
     }
   }
 ] as const;
@@ -100,12 +106,13 @@ export function getAttemptEvidenceKinds(input: {
     return [];
   }
 
-  // Membership is checked against every authored case — the N2 mini-case and
-  // the PR-12a closing / annual cases — so a caller cannot claim case-study
-  // evidence for an exercise no case contains.
+  // Membership is checked against every authored case — the N2 mini-case, the
+  // PR-12a closing / annual cases and the PR-12b Excel cases — so a caller
+  // cannot claim case-study evidence for an exercise no case contains.
   const belongsToCase =
     comptaGeneraleV1MiniCase.steps.some((step) => step.exerciseId === input.exerciseId) ||
-    isCaseStudyExercise(input.exerciseId);
+    isCaseStudyExercise(input.exerciseId) ||
+    isExcelCaseStudyExercise(input.exerciseId);
   const context = input.context === "case_study" && belongsToCase ? "case_study" : "exercise";
 
   const kinds: MasteryEventKind[] = [
@@ -116,7 +123,8 @@ export function getAttemptEvidenceKinds(input: {
   const isMiniCaseClosing =
     context === "case_study" &&
     (comptaGeneraleV1MiniCase.steps.at(-1)?.exerciseId === input.exerciseId ||
-      comptaCaseStudies.some((caseStudy) => caseStudy.steps.at(-1)?.exerciseId === input.exerciseId));
+      comptaCaseStudies.some((caseStudy) => caseStudy.steps.at(-1)?.exerciseId === input.exerciseId) ||
+      excelCaseStudies.some((caseStudy) => caseStudy.steps.at(-1)?.exerciseId === input.exerciseId));
 
   if (diagnosticExerciseId === input.exerciseId || isMiniCaseClosing) {
     if (!kinds.includes("caseStudy")) {

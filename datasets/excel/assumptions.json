@@ -2,6 +2,7 @@
   "exercice": "N",
   "devise": "EUR",
   "tresorerieOuverture": 46000,
+  "tresorerieOuvertureHebdo": 18000,
   "notes": [
     "Les montants sont en euros, hors taxes, arrondis a l'euro.",
     "La variation de stock est negative lorsque le stock diminue sur la periode.",

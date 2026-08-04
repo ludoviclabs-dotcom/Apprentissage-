@@ -8,3 +8,4 @@ export * from "./mastery-repository";
 export * from "./exercise-repository";
 export * from "./review-repository";
 export * from "./billing-repository";
+export * from "./workbook-repository";

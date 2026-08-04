@@ -1,7 +1,12 @@
 # ADR 006 — Excel Finance Lab without a spreadsheet engine (PR-06)
 
-Status: accepted
+Status: accepted — superseded in part by ADR-009 (PR-12b)
 Date: 2026-08-03
+
+> **PR-12b note.** The "no engine" decision below still governs levels N1/N2,
+> whose exercises kept their contract. Levels N3/N4 are graded by the bounded
+> formula engine this ADR's own "Recommended for a v2" section asked for —
+> see `docs/adr/009-excel-formula-engine.md`.
 
 ## Context
 

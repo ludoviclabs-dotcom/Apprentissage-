@@ -5,6 +5,7 @@ import {
 } from "./compta-generale-cloture";
 import { comptaGeneraleV1Sources, getComptaGeneraleV1Level } from "./compta-generale-v1";
 import { excelLabSources, getExcelLabLevel } from "./excel-lab";
+import { excelLabAvanceLevelByExercise, excelLabAvanceSources } from "./excel-lab-avance";
 import type { SourceReference } from "./types";
 
 /**
@@ -44,7 +45,15 @@ const MODULES: ModuleRegistration[] = [
     sources: comptaGeneraleClotureSources,
     premiumFeature: null
   },
-  { level: getExcelLabLevel, sources: excelLabSources, premiumFeature: "excel-finance-lab" }
+  { level: getExcelLabLevel, sources: excelLabSources, premiumFeature: "excel-finance-lab" },
+  // PR-12b: the N3/N4 levels of the same lab, registered separately — as the
+  // compta closing levels are — so their corrections cite the ERP export, the
+  // Aster Industrie data and the VBA module rather than the N1/N2 datasets.
+  {
+    level: (exerciseId) => excelLabAvanceLevelByExercise[exerciseId] ?? null,
+    sources: excelLabAvanceSources,
+    premiumFeature: "excel-finance-lab"
+  }
 ];
 
 export function getModuleLevelForExercise(exerciseId: string): string | null {

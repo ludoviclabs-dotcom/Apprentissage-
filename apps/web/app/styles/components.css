@@ -1459,6 +1459,116 @@
   color: var(--text-tertiary);
 }
 
+/* --- PR-12b : la grille du moteur ----------------------------------------
+   Sélection, dépendances, erreurs et barre de formule. Les couleurs restent
+   celles du système ; seuls des liserés distinguent les états, pour que les
+   trois restent lisibles ensemble et sans dépendre de la couleur seule. */
+
+.formula-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: var(--space-2);
+}
+
+.formula-bar-ref {
+  min-width: 48px;
+  padding: 6px 8px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface-subtle);
+  font-family: var(--font-mono);
+  font-size: 0.82rem;
+  font-weight: 800;
+  text-align: center;
+}
+
+.formula-bar input {
+  flex: 1;
+  min-height: 34px;
+  padding: 0 8px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius);
+  background: var(--surface);
+  color: var(--text);
+  font-family: var(--font-mono);
+  font-size: 0.85rem;
+}
+
+.formula-bar input:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: 1px;
+}
+
+.formula-bar input:read-only {
+  background: var(--surface-raised);
+  color: var(--text-secondary);
+}
+
+/* La cellule sélectionnée et ses précédents : un liseré, pas un aplat, pour
+   rester lisible sur les cellules d'erreur. */
+.lab-selected {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+
+.lab-dep {
+  box-shadow: inset 0 0 0 2px var(--info, #4472c4);
+}
+
+.lab-error input,
+.lab-cycle input {
+  border-color: var(--danger, #b42318);
+}
+
+/* Le résultat calculé sous la saisie : la formule reste visible pendant que sa
+   valeur est affichée — c'est la promesse de la barre de formule d'Excel. */
+.lab-computed {
+  display: block;
+  margin-top: 2px;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+  min-height: 1em;
+}
+
+.lab-error .lab-computed {
+  color: var(--danger, #b42318);
+  font-weight: 700;
+}
+
+.formula-status {
+  margin: var(--space-2) 0 0;
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+  font-variant-numeric: tabular-nums;
+}
+
+.formula-cycles {
+  margin: var(--space-1) 0 0;
+  font-size: 0.85rem;
+  color: var(--danger, #b42318);
+}
+
+/* --- PR-12b : VBA en lecture seule --------------------------------------- */
+
+.vba-viewer-frame {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+
+.vba-fallback {
+  margin: 0;
+  padding: var(--space-3);
+  max-height: 360px;
+  overflow: auto;
+  font-family: var(--font-mono);
+  font-size: 0.82rem;
+  background: var(--surface-subtle);
+}
+
 /* --- PR-10 : variantes sémantiques ---------------------------------------
    Objectif : casser la succession de rectangles identiques. Chaque famille
    de contenu a un marqueur visuel discret — bande d'accent, bordure teintée,

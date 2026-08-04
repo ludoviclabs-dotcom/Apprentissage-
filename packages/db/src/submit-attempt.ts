@@ -135,6 +135,17 @@ function evaluateWith(
 
       return getEvaluator("spreadsheet").evaluate(spec as never, { cells: payload.cells });
     }
+
+    case "spreadsheet_formula": {
+      // Same wire shape as `spreadsheet` — cells holding an optional value and
+      // an optional formula — but graded by the engine: the formula is parsed
+      // and recalculated over the given data and over perturbed data (PR-12b).
+      if (payload.kind !== "spreadsheet") {
+        throw new UnsupportedSubmissionError(evaluationType, payload.kind);
+      }
+
+      return getEvaluator("spreadsheet_formula").evaluate(spec as never, { cells: payload.cells });
+    }
   }
 }
 

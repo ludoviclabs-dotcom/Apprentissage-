@@ -7,6 +7,8 @@ export * from "./compta-extra";
 export * from "./compta-generale-v1";
 export * from "./compta-generale-cloture";
 export * from "./excel-lab";
+export * from "./excel-lab-avance";
+export * from "./spreadsheet";
 export * from "./modules";
 export * from "./progress";
 export * from "./mastery";

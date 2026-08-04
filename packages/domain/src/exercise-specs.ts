@@ -2,6 +2,7 @@ import { comptaGeneraleV1ExerciseVersions } from "./compta-generale-v1";
 import { comptaGeneraleClotureExerciseVersions } from "./compta-generale-cloture";
 import { parcoursMigratedVersions } from "./parcours-migrations";
 import { excelLabExerciseVersions } from "./excel-lab";
+import { excelLabAvanceExerciseVersions } from "./excel-lab-avance";
 import { assertValidEvaluationSpec, type EvaluationType } from "./evaluators";
 import { exercises } from "./learning";
 
@@ -214,7 +215,10 @@ export const authoredExerciseVersions: AuthoredExerciseVersion[] = [
   ...parcoursMigratedVersions,
   // The Excel Finance Lab (PR-06): every exercise graded by the `spreadsheet`
   // evaluator, value and formula checked separately.
-  ...excelLabExerciseVersions
+  ...excelLabExerciseVersions,
+  // PR-12b: the N3/N4 lab, graded by the formula engine — the learner's
+  // formula is recalculated over the given data and over perturbed data.
+  ...excelLabAvanceExerciseVersions
 ];
 
 export class UnknownAuthoredExerciseError extends Error {

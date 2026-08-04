@@ -56,6 +56,12 @@ function evaluate(version: AuthoredExerciseVersion, payload: SubmissionPayload):
     case "spreadsheet":
       if (payload.kind !== "spreadsheet") throw new Error("payload mismatch");
       return getEvaluator("spreadsheet").evaluate(version.spec as never, { cells: payload.cells });
+    case "spreadsheet_formula":
+      // PR-12b: same wire shape as `spreadsheet`, graded by the engine.
+      if (payload.kind !== "spreadsheet") throw new Error("payload mismatch");
+      return getEvaluator("spreadsheet_formula").evaluate(version.spec as never, {
+        cells: payload.cells
+      });
   }
 }
 

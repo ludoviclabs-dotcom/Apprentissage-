@@ -42,7 +42,7 @@ import type { Competency, Exercise, SourcePack, SourceReference } from "./types"
  * So: three citations, one per committed dataset, typed `personal-note` because
  * that is what they are, and with no page numbers because CSV files have none.
  */
-function datasetSource(file: string, document: string): SourceReference {
+export function datasetSource(file: string, document: string): SourceReference {
   return {
     pack: EXCEL_LAB_PACK_ID,
     document: `${file} — ${document}`,
@@ -67,7 +67,9 @@ export const excelLabSourcePack: SourcePack = {
   effectiveDate: "2026-08-01",
   importedAt: "2026-08-01",
   status: "ready",
-  documentsCount: 4,
+  // PR-12b : les quatre fichiers historiques plus les cinq datasets N3/N4 et le
+  // module VBA fourni en lecture.
+  documentsCount: 10,
   chunksCount: 0
 };
 
@@ -191,7 +193,9 @@ export const budgetVsActual: BudgetLine[] = [
 export const labAssumptions = {
   exercice: "N",
   devise: "EUR",
-  tresorerieOuverture: 46000
+  tresorerieOuverture: 46000,
+  /** PR-12b : ouverture de la prévision hebdomadaire à treize semaines. */
+  tresorerieOuvertureHebdo: 18000
 } as const;
 
 export function parsePnlCsv(text: string): PnlLine[] {
@@ -360,11 +364,22 @@ export const excelLabLevels: ModuleLevelDefinition[] = [
 
 // --- Exercises --------------------------------------------------------------
 
+/** Every committed dataset a lab grid can be built from (N1–N4). */
+export type LabDatasetId =
+  | "monthly_pnl"
+  | "cash_forecast"
+  | "budget_vs_actual"
+  | "erp_export"
+  | "forecast_drivers"
+  | "cash_13_semaines"
+  | "aster_industrie"
+  | "dcf_aster";
+
 export interface LabExerciseDefinition {
   exercise: Exercise;
   grid: LabGrid;
   /** Which dataset the grid is built from, for the module's dataset index. */
-  datasetId: "monthly_pnl" | "cash_forecast" | "budget_vs_actual";
+  datasetId: LabDatasetId;
 }
 
 interface LabSeed {

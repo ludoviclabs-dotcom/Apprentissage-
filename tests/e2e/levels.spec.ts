@@ -12,15 +12,24 @@ test("each published track starts with N1 available and the rest locked", async 
   await page.goto("/parcours");
 
   const rows = page.locator("[data-level-status]");
-  // PR-12a : la comptabilité générale publie quatre niveaux, le lab Excel deux.
-  await expect(rows).toHaveCount(6);
+  // PR-12a : la comptabilité générale publie quatre niveaux ; PR-12b : le lab
+  // Excel aussi. Deux verticales complètes, chacune ouverte sur son seul N1.
+  await expect(rows).toHaveCount(8);
 
-  await expect(rows.nth(0)).toHaveAttribute("data-level-status", "available");
-  await expect(rows.nth(1)).toHaveAttribute("data-level-status", "locked");
-  await expect(rows.nth(2)).toHaveAttribute("data-level-status", "locked");
-  await expect(rows.nth(3)).toHaveAttribute("data-level-status", "locked");
-  await expect(rows.nth(4)).toHaveAttribute("data-level-status", "available");
-  await expect(rows.nth(5)).toHaveAttribute("data-level-status", "locked");
+  const statuses = await rows.evaluateAll((elements) =>
+    elements.map((element) => element.getAttribute("data-level-status"))
+  );
+
+  expect(statuses).toEqual([
+    "available",
+    "locked",
+    "locked",
+    "locked",
+    "available",
+    "locked",
+    "locked",
+    "locked"
+  ]);
 });
 
 test("a gated level explains what opens it", async ({ page }) => {
