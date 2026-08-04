@@ -78,6 +78,9 @@ export interface PublicPlan {
   label: string;
   description: string;
   cadence: BillingPlan["cadence"];
+  /** Display copy. Never a Stripe price id — see `BillingPlan.priceLabel`. */
+  priceLabel: string;
+  highlights: string[];
 }
 
 export function toPublicPlans(configured: ConfiguredPlan[]): PublicPlan[] {
@@ -85,6 +88,33 @@ export function toPublicPlans(configured: ConfiguredPlan[]): PublicPlan[] {
     key: plan.key,
     label: plan.label,
     description: plan.description,
-    cadence: plan.cadence
+    cadence: plan.cadence,
+    priceLabel: plan.priceLabel,
+    highlights: [...plan.highlights]
   }));
+}
+
+/**
+ * The offer as the *public* page shows it: every plan the product sells, not
+ * only the ones this deployment has wired to a Stripe price.
+ *
+ * The two lists differ on purpose. `getConfiguredPlans` answers "what can be
+ * bought right now" and drives the buttons; this answers "what is on sale",
+ * so a visitor is never shown a blank page because an operator has not
+ * finished the setup — they see the offer, and the button says why it is not
+ * available.
+ */
+export function catalogPlans(): PublicPlan[] {
+  return BILLING_PLAN_KEYS.map((key) => {
+    const plan = BILLING_PLANS[key];
+
+    return {
+      key: plan.key,
+      label: plan.label,
+      description: plan.description,
+      cadence: plan.cadence,
+      priceLabel: plan.priceLabel,
+      highlights: [...plan.highlights]
+    };
+  });
 }

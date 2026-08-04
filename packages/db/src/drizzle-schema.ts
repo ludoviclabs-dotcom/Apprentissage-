@@ -620,7 +620,51 @@ export const certificatesTable = pgTable(
     averageScore: integer("average_score").notNull(),
     issuedAt: timestamp("issued_at", { mode: "string" }).notNull().defaultNow(),
     revokedAt: timestamp("revoked_at", { mode: "string" }),
-    revokedReason: text("revoked_reason")
-  },
-  (table) => [unique().on(table.userId, table.trackId)]
+    revokedReason: text("revoked_reason"),
+    // PR-13.
+    verificationId: text("verification_id"),
+    holderLabel: text("holder_label").notNull().default(""),
+    contentJson: jsonb("content_json").notNull().default({}),
+    status: text("status").notNull().default("active"),
+    revokedBy: text("revoked_by"),
+    supersededBySerial: text("superseded_by_serial")
+  }
+  // The 0009 `UNIQUE (user_id, track_id)` is dropped by migration 0012 and
+  // replaced with a partial unique index over the *active* rows only, which
+  // drizzle cannot express — re-issue needs a second row for the same pair.
 );
+
+/**
+ * The public projection of an issued certificate (PR-13).
+ *
+ * It exists so `/verify/[id]` never touches `certificates`: the e-mail, the
+ * user id, the score and the revocation reason are simply not columns here, so
+ * no query written against this table can disclose them. No row level security,
+ * for the reason `billing_customers` has none — the row is meant to be readable
+ * by whoever holds the opaque id, and that id is the access control.
+ */
+export const certificateVerificationsTable = pgTable("certificate_verifications", {
+  verificationId: text("verification_id").primaryKey(),
+  serial: text("serial").notNull().unique(),
+  holderLabel: text("holder_label").notNull(),
+  trackLabel: text("track_label").notNull(),
+  curriculumVersionId: text("curriculum_version_id").notNull(),
+  issuedAt: timestamp("issued_at", { mode: "string" }).notNull(),
+  status: text("status").notNull().default("active"),
+  revokedAt: timestamp("revoked_at", { mode: "string" }),
+  supersededBySerial: text("superseded_by_serial"),
+  updatedAt: timestamp("updated_at", { mode: "string" }).notNull().defaultNow()
+});
+
+/**
+ * Why an attestation was withdrawn, and by whom. Internal: the public
+ * projection above deliberately has no reason column, because a stranger with
+ * the QR code has no business reading it.
+ */
+export const certificateRevocationsTable = pgTable("certificate_revocations", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  serial: text("serial").notNull(),
+  reason: text("reason").notNull(),
+  revokedBy: text("revoked_by").notNull(),
+  revokedAt: timestamp("revoked_at", { mode: "string" }).notNull().defaultNow()
+});

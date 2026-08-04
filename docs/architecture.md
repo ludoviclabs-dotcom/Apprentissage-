@@ -98,11 +98,42 @@ gate itself hangs off `packages/domain/src/modules.ts`: the registry that maps a
 exercise to its level also names the entitlement it needs, so the module page,
 the level page and the submission endpoint cannot disagree about what is locked.
 
+Since PR-13 a learner manages their own subscription: `POST /api/stripe/portal`
+opens Stripe's hosted customer portal for the caller's own customer id, read
+from `billing_customers` — the body carries nothing, so it cannot name somebody
+else's. It grants nothing either; a change made there reaches the application
+through the same signed webhook as everything else. Each Stripe status is also
+classified rather than merely filtered (`classifySubscriptionStatus`): the gate
+stays the two-value question it was, while the learner is told whether the fix
+is a card update, a new subscription or finishing a payment.
+
 Attestations are the other half. A completion certificate is issued once per
 track, from the same PR-02 snapshots the level track renders, and only while the
 entitlement is active — but once issued it stays valid, because it records
-something that happened rather than granting access to anything. See
-`docs/adr/007-stripe-billing-entitlements.md`.
+something that happened rather than granting access to anything.
+
+PR-13 makes it a real document. `apps/web/lib/certificates/pdf.ts` renders a
+server-side PDF with `pdf-lib` and draws a QR code from `qrcode-generator`'s
+module matrix — both MIT, neither needing a font file, a native binary or a
+network call, which is what lets the offline commitment survive the reversal of
+ADR-007's "no PDF" decision. Everything printed is frozen into
+`certificates.content_json` at issue time, so a document cannot change under its
+holder; the curriculum it cites is the learner's *pinned* version, and case
+studies are listed as "travaillés" because case-study evidence on a level is
+what the schema actually records.
+
+Verification is public and deliberately thin. `/verify/[certificateId]` reads
+`certificate_verifications`, a projection with no `user_id`, no e-mail, no score
+and no revocation reason — the private `certificates` table stays under RLS and
+is never touched by that page, so the absence of a leak is structural rather
+than a matter of writing careful queries. The identifier behind the QR code is
+160 bits of CSPRNG in Crockford base32, distinct from the human-readable serial,
+which carries too little entropy to guard a public URL. Revocation writes the
+projection and an internal `certificate_revocations` trail; the reason is never
+published, and `superseded` is kept distinct from `revoked` so re-issuing after
+a curriculum change does not read as an accusation. See
+`docs/adr/007-stripe-billing-entitlements.md` and
+`docs/adr/010-certificates-and-billing-portal.md`.
 
 ## Navigation and Shells
 
