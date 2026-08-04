@@ -189,6 +189,113 @@ the submission endpoint cannot drift apart.
 Anything else is answered `200` and ignored. Subscribe the endpoint to exactly
 these five in the Stripe dashboard.
 
+### Every subscription status, and what a learner is told (PR-13)
+
+The gate is still a two-value question — `active` and `trialing` open access,
+nothing else does — but each state now carries its own message, because "access
+closed" is not something a person can act on.
+
+| Status | Access | What the learner is told to do |
+|---|---|---|
+| `active` | open | nothing |
+| `trialing` | open | nothing |
+| `past_due` | closed | update the card in the customer portal; Stripe is still retrying |
+| `unpaid` | closed | update the card or resubscribe; the retries are exhausted |
+| `incomplete` | closed | finish the first payment — usually a bank confirmation. **Not** fixable in the portal |
+| `incomplete_expired` | closed | nothing was charged; start again |
+| `paused` | closed | resume from the portal |
+| `canceled` | closed | resubscribe; access runs to the end of the paid period |
+
+`classifySubscriptionStatus` in `packages/domain/src/billing.ts` is the single
+source of those messages, and a test pins it against `isEntitlingStatus` so the
+two can never disagree about who gets in.
+
+### Reproducing the whole flow in Stripe test mode
+
+Everything below runs against Stripe's test mode with the CLI. No test card ever
+reaches this application: the card is entered on Stripe's hosted pages.
+
+1. **Configure.** In `.env.local`:
+
+   ```
+   FINANCE_HUB_BILLING_ENABLED=true
+   LEARNING_HUB_AUTH_ENABLED=true
+   FINANCE_HUB_USE_DATABASE=true
+   STRIPE_SECRET_KEY=sk_test_...
+   STRIPE_PRICE_FOUNDER_ANNUAL=price_...
+   ```
+
+   A `sk_live_` key is refused outside production by `lib/env.ts`, on purpose.
+
+2. **Forward webhooks and take the signing secret it prints.**
+
+   ```bash
+   stripe listen --forward-to localhost:3000/api/stripe/webhook
+   ```
+
+   Put that `whsec_...` in `STRIPE_WEBHOOK_SECRET` and restart. Without it the
+   endpoint answers `503`, which is retriable rather than a silent success.
+
+3. **Subscribe.** Sign in, open `/billing`, click *Souscrire*, pay with
+   `4242 4242 4242 4242`, any future expiry, any CVC. You land on
+   `/billing/success`, which reads what the webhook wrote — it never reads
+   `session_id`.
+
+4. **Watch the decision.** The `stripe listen` window shows
+   `checkout.session.completed` then `customer.subscription.created`. In the
+   application log each one prints its outcome and reason. `select feature,
+   status, expires_at from entitlements;` shows the grant.
+
+5. **Manage the subscription.** `/account` → *Gérer mon abonnement* opens
+   Stripe's portal. Cancel there: `customer.subscription.updated` arrives with
+   `cancel_at_period_end`, then `customer.subscription.deleted` at the end of
+   the period. Access closes on the second one — or on its own at
+   `expires_at`, if that webhook never arrives.
+
+6. **Fail a payment.** Use `4000 0000 0000 0341` (payment fails after the
+   subscription is created). The subscription goes `past_due`, the entitlement
+   is revoked, and `/billing` says the card needs updating. Paying from the
+   portal emits `customer.subscription.updated` with `active` and access
+   returns without anyone intervening.
+
+7. **Force the edge cases** without a browser:
+
+   ```bash
+   stripe trigger checkout.session.completed
+   stripe trigger customer.subscription.updated
+   stripe trigger customer.subscription.deleted
+   stripe trigger invoice.paid
+   ```
+
+   Replaying the same event twice must answer `{"duplicate":true}` and apply
+   nothing a second time. `select stripe_event_id, outcome, detail from
+   billing_events order by received_at desc limit 10;` is the ledger.
+
+### Attestations, verification and revocation (PR-13)
+
+- Finish a track, set a display name in *Mon compte* — the certificate refuses to
+  issue without one, because the name is printed on it — then request the
+  attestation from `/attestations`.
+- `/attestations/FLH-...` offers **Télécharger le PDF**
+  (`GET /api/certificates/{serial}/pdf`, owner only) and a link to the public
+  verification page.
+- Scan the QR or open `/verify/{id}`. The page shows validity, holder, track,
+  date, curriculum version and status — and nothing else. There is no e-mail,
+  no user id, no score: it reads `certificate_verifications`, a projection that
+  has no such columns.
+- Revoke as an administrator (an address in `LEARNING_HUB_ADMIN_EMAILS`):
+
+  ```bash
+  curl -X POST http://localhost:3000/api/admin/certificates/revoke \
+    -H 'content-type: application/json' \
+    --cookie 'finance_hub_session=...' \
+    -d '{"serial":"FLH-2026-...","reason":"émise par erreur lors d une reprise de données"}'
+  ```
+
+  The verification page then reports the attestation as revoked without
+  publishing the reason, and a re-downloaded PDF carries a revocation banner.
+  The reason and the actor are in `certificate_revocations`.
+
 Activation and revocation are decided by one pure function,
 `mapBillingEvent` in `packages/domain/src/billing-events.ts`, and applied by
 `applyBillingIntent` in `packages/db/src/billing-repository.ts`. **No other code
