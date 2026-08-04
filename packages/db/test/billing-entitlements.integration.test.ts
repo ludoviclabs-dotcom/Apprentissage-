@@ -123,6 +123,10 @@ describeWithDb("billing entitlements", () => {
   let alice: string;
   let bob: string;
   let billing: typeof import("../src/billing-repository");
+  // Verification and revocation live in their own repository (PR-13), and it
+  // has to be imported the same lazy way: the environment that decides whether
+  // a database may be used is set in `beforeAll`, above the import.
+  let certificates: typeof import("../src/certificate-repository");
 
   function subscriptionIntent(
     userId: string,
@@ -158,6 +162,7 @@ describeWithDb("billing entitlements", () => {
     process.env.FINANCE_HUB_USE_DATABASE = "true";
 
     billing = await import("../src/billing-repository");
+    certificates = await import("../src/certificate-repository");
     admin = postgres(ADMIN_DATABASE_URL!, { max: 1 });
 
     for (const file of migrationFiles) {
@@ -462,9 +467,18 @@ describeWithDb("billing entitlements", () => {
 
   // --- Review findings P1/P2: revocation, re-issue and concurrency ----------
 
+  /** A manual grant, so a re-issue is not blocked by earlier churn tests. */
+  async function grantCertificateEntitlement(userId: string): Promise<void> {
+    await admin`
+      insert into entitlements (user_id, feature, status, source)
+      values (${userId}, 'completion-certificate', 'active', 'manual')
+      on conflict (user_id, feature)
+      do update set status = 'active', source = 'manual', revoked_at = null, expires_at = null`;
+  }
+
   it("publishes a verification row a stranger can read without a session", async () => {
     const certificate = await billing.getCertificateForTrack(bob, "track-fixture");
-    const verification = await billing.getVerificationBySerial(certificate!.serial);
+    const verification = await certificates.getVerificationBySerial(certificate!.serial);
 
     expect(verification?.status).toBe("active");
     expect(verification?.holderLabel).toBe("Bob Fixture");
@@ -475,9 +489,15 @@ describeWithDb("billing entitlements", () => {
   });
 
   it("lets a revoked attestation be re-issued instead of blocking it forever", async () => {
+    // The preceding test revoked Bob's subscription to prove an issued
+    // attestation survives churn. Re-issuing is a fresh issue, so it needs the
+    // entitlement back — by hand, which is also the grant path an operator
+    // would use for a beta tester.
+    await grantCertificateEntitlement(bob);
+
     const before = await billing.getCertificateForTrack(bob, "track-fixture");
 
-    const revoked = await billing.revokeCertificate({
+    const revoked = await certificates.revokeCertificate({
       serial: before!.serial,
       reason: "émise par erreur pendant une reprise de données",
       revokedBy: "admin@example.test"
@@ -498,10 +518,12 @@ describeWithDb("billing entitlements", () => {
 
     // The withdrawn one keeps verifying — as revoked. A document already handed
     // out does not vanish; it stops standing.
-    expect((await billing.getVerificationBySerial(before!.serial))?.status).toBe("revoked");
+    expect((await certificates.getVerificationBySerial(before!.serial))?.status).toBe("revoked");
   });
 
   it("supersedes rather than revokes when the curriculum changes", async () => {
+    await grantCertificateEntitlement(bob);
+
     const before = await billing.getCertificateForTrack(bob, "track-fixture");
 
     const reissued = await billing.issueCertificate({
@@ -511,7 +533,7 @@ describeWithDb("billing entitlements", () => {
 
     expect(reissued.status).toBe("issued");
 
-    const previous = await billing.getVerificationBySerial(before!.serial);
+    const previous = await certificates.getVerificationBySerial(before!.serial);
 
     // Not "revoked": the older document was earned and still describes
     // something true. Calling it revoked would accuse its holder of nothing.
@@ -525,12 +547,12 @@ describeWithDb("billing entitlements", () => {
     const certificate = await billing.getCertificateForTrack(bob, "track-fixture");
 
     const [first, second] = await Promise.all([
-      billing.revokeCertificate({
+      certificates.revokeCertificate({
         serial: certificate!.serial,
         reason: "première révocation concurrente du test",
         revokedBy: "admin-a@example.test"
       }),
-      billing.revokeCertificate({
+      certificates.revokeCertificate({
         serial: certificate!.serial,
         reason: "seconde révocation concurrente du test",
         revokedBy: "admin-b@example.test"
@@ -544,7 +566,7 @@ describeWithDb("billing entitlements", () => {
     // must not do.
     expect(outcomes).toEqual(["already-revoked", "revoked"]);
 
-    const trail = (await billing.listCertificateRevocations(50)).filter(
+    const trail = (await certificates.listCertificateRevocations(50)).filter(
       (entry) => entry.serial === certificate!.serial
     );
 
