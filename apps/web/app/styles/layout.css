@@ -535,32 +535,32 @@
   .app-shell {
       grid-template-columns: 1fr;
       max-width: 100vw;
-  
+
   }
 
   /* La sidebar disparaît : la navigation passe par le header compact et son
        drawer, jamais par une bande horizontale scrollable. */
   .sidebar {
       display: none;
-  
+
   }
 
   .mobile-nav {
       display: block;
-  
+
   }
 
   .topbar {
       position: static;
       flex-wrap: wrap;
-  
+
   }
 
   .topbar-search {
       order: 4;
       flex: 1 1 100%;
       max-width: none;
-  
+
   }
 }
 
@@ -569,13 +569,13 @@
   .content {
       max-width: 100vw;
       overflow-x: hidden;
-  
+
   }
 
   .content {
       width: 100%;
       padding: 18px;
-  
+
   }
 
   .topbar,
@@ -585,12 +585,12 @@
   .generator-panel {
       align-items: flex-start;
       flex-direction: column;
-  
+
   }
 
   .topbar-status {
       white-space: normal;
-  
+
   }
 }
 

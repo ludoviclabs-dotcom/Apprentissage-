@@ -1008,7 +1008,7 @@
 @media (max-width: 1120px) {
   .domain-overview {
       grid-template-columns: repeat(2, minmax(0, 1fr));
-  
+
   }
 
   .tier-grid,
@@ -1017,7 +1017,7 @@
   .flashcard-grid,
   .exercise-type-grid {
       grid-template-columns: 1fr;
-  
+
   }
 }
 
@@ -1035,7 +1035,7 @@
   .metric-strip,
     .detail-grid dl {
       grid-template-columns: 1fr;
-  
+
   }
 
   .document-row,
@@ -1043,17 +1043,17 @@
   .rubric-score-row,
   .competency-row {
       grid-template-columns: 1fr;
-  
+
   }
 
   .rubric-score-row b {
       justify-self: start;
-  
+
   }
 
   .domain-overview {
       grid-template-columns: 1fr;
-  
+
   }
 
   .page-header h1 {
@@ -1061,30 +1061,30 @@
       font-size: 1.55rem;
       line-height: 1.15;
       overflow-wrap: anywhere;
-  
+
   }
 
   .domain-card-title {
       display: grid;
       grid-template-columns: 1fr;
       gap: 10px;
-  
+
   }
 
   .domain-card-title span {
       justify-self: start;
-  
+
   }
 
   .domain-card-title strong {
       justify-self: start;
       font-size: 1.5rem;
-  
+
   }
 
   .domain-card p {
       min-height: auto;
-  
+
   }
 
   .slider-grid,
@@ -1092,7 +1092,7 @@
   .form-grid,
   .filter-bar {
       grid-template-columns: 1fr;
-  
+
   }
 }
 
@@ -1366,7 +1366,7 @@
   .journal-table th:nth-child(2),
   .journal-table td:nth-child(2) {
       display: none;
-  
+
   }
 }
 
