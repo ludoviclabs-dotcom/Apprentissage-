@@ -283,7 +283,10 @@ reaches this application: the card is entered on Stripe's hosted pages.
   date, curriculum version and status — and nothing else. There is no e-mail,
   no user id, no score: it reads `certificate_verifications`, a projection that
   has no such columns.
-- Revoke as an administrator (an address in `LEARNING_HUB_ADMIN_EMAILS`):
+- Revoke as an administrator. **With accounts enabled, `LEARNING_HUB_ADMIN_EMAILS`
+  is required**: an empty list grants administration to nobody, because on a
+  deployment open to sign-ups it used to grant it to everybody. Without accounts
+  — the single-user local install — the owner is still an administrator.
 
   ```bash
   curl -X POST http://localhost:3000/api/admin/certificates/revoke \
