@@ -399,6 +399,22 @@ test.describe("the case studies (PR-12b)", () => {
   });
 });
 
+test("the generic exercise route gates a locked lab exercise like the module route", async ({
+  page
+}) => {
+  // The generic page renders the statement, the rubric and — since the engine
+  // grids reached `AnyExerciseForm` — a working grid. Without the same gate as
+  // the module route it was a second door onto a locked premium exercise, open
+  // and fully playable.
+  expect((await page.goto("/exercices/ex-xl-n3-tri-familles"))?.status()).toBe(404);
+  expect((await page.goto("/exercices/ex-xl-n4-wacc"))?.status()).toBe(404);
+  // Level 2 of the free accounting track is gated by the same helper.
+  expect((await page.goto("/exercices/ex-cgv1-tva-a-decaisser"))?.status()).toBe(404);
+
+  // An exercise outside every module is untouched: most of the catalogue.
+  expect((await page.goto("/exercices/ex-travaux-cloture-1"))?.status()).toBe(200);
+});
+
 test("a grid draft cannot be saved without a database, and says so", async ({ request }) => {
   const response = await request.post("/api/excel/workbooks", {
     data: { exerciseId: CA, cells: { B12: "=B2+B3" } }

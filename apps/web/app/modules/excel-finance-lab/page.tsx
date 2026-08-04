@@ -10,7 +10,7 @@ import {
   getExcelLabModel,
   labOpeningCash
 } from "@/lib/excel-lab";
-import { excelLabAvanceSources, excelLabSources } from "@finance/domain";
+import { EXCEL_LAB_TRACK, excelLabAvanceSources, excelLabSources } from "@finance/domain";
 
 /**
  * The lab's front door: what it is, what it is not, and the datasets it runs on.
@@ -46,7 +46,7 @@ export default async function ExcelFinanceLabPage() {
         </div>
         <div
           className="hero-score"
-          data-canonical-track="track-excel-finance-lab"
+          data-canonical-track={EXCEL_LAB_TRACK}
           data-canonical-score={model.score ?? "neutral"}
         >
           <span>{model.score === null ? "Exemple de parcours" : "Progression"}</span>
