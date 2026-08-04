@@ -1,10 +1,11 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { ReviewCard } from "@/components/forms/review-card";
+import { LegacyHashRedirect } from "@/components/legacy-hash-redirect";
 import { EmptyState } from "@/components/ui/empty-state";
 import { PageHeader } from "@/components/ui/page-header";
 import { StatCard } from "@/components/ui/stat-card";
-import { getFeatures } from "@/lib/features";
+import { PUBLIC_DEMO_TITLE, getFeatures } from "@/lib/features";
 import { getRevisionModel } from "@/lib/view-model";
 import { getCurrentUser } from "@/lib/auth/current-user";
 
@@ -20,6 +21,11 @@ export const metadata: Metadata = {
  * The page renders prompts and never answers: `ReviewQueueEntry` carries no
  * `answer` field at all, so there is nothing here to accidentally leak into the
  * HTML. Revealing is a request the learner makes, handled by `ReviewCard`.
+ *
+ * En mode découverte, les cartes restent pleinement utilisables : la révélation
+ * est une lecture, et l'auto-évaluation est calculée dans le navigateur. La page
+ * n'affiche plus aucun message de configuration — la notice unique du shell dit
+ * déjà ce qui est enregistré, une fois, en haut.
  */
 export default async function RevisionsPage() {
   const user = await getCurrentUser();
@@ -28,44 +34,42 @@ export default async function RevisionsPage() {
   const { queue } = model;
   const personal = user !== null;
   const remaining = Math.max(0, queue.dueCount - queue.entries.length);
+  const mode = features.writes.enabled ? "persisted" : "local";
 
   return (
     <div className="page-stack">
+      {/* Les anciens liens pointaient vers /revisions#carnet-erreurs. Le carnet
+          a maintenant sa route ; l'ancre reste honorée par une redirection. */}
+      <LegacyHashRedirect hash="carnet-erreurs" href="/revisions/carnet-erreurs" />
+
       <PageHeader
         label="Révisions"
         title={personal ? "À revoir aujourd'hui" : "Exemple de session de révision"}
         description={
           personal
             ? "La file remonte les items dus, du plus ancien au plus récent. La réponse reste masquée jusqu'à ce que tu demandes à la voir : c'est le rappel qui ancre, pas la relecture."
-            : "Ces cartes illustrent le rappel actif. Aucune date, révision ou erreur du catalogue n'est attribuée au visiteur."
+            : "Ces cartes illustrent le rappel actif. Révèle la réponse, puis auto-évalue-toi : la planification est simulée et n'est attribuée à personne."
         }
         aside={
           <div className="hero-score">
             <span>{personal ? "Dus" : "Mode"}</span>
-            <strong>{personal ? queue.dueCount : "Neutre"}</strong>
+            <strong>{personal ? queue.dueCount : PUBLIC_DEMO_TITLE}</strong>
           </div>
         }
       />
 
-      {personal ? <section className="stat-strip" aria-label="Volumes de la session">
-        <StatCard label="Dans cette session" value={queue.entries.length} tone="accent" />
-        <StatCard label="En attente" value={remaining} />
-        <StatCard label="Planifiés" value={queue.totalCount} />
-        <StatCard
-          label="Remédiations"
-          value={model.remediations.length}
-          tone={model.remediations.length > 0 ? "warning" : "neutral"}
-        />
-      </section> : null}
-
-      {queue.persisted ? null : (
-        <p className="muted">
-          {features.persistence.reason ?? "Les révisions ne sont pas enregistrées dans cette configuration."}
-          {" "}{personal
-            ? "La planification reste calculée et affichée, mais elle n'est pas persistée."
-            : "Les cartes restent consultables comme exemples, sans planification personnelle."}
-        </p>
-      )}
+      {personal ? (
+        <section className="stat-strip" aria-label="Volumes de la session">
+          <StatCard label="Dans cette session" value={queue.entries.length} tone="accent" />
+          <StatCard label="En attente" value={remaining} />
+          <StatCard label="Planifiés" value={queue.totalCount} />
+          <StatCard
+            label="Remédiations"
+            value={model.remediations.length}
+            tone={model.remediations.length > 0 ? "warning" : "neutral"}
+          />
+        </section>
+      ) : null}
 
       {queue.entries.length === 0 ? (
         <EmptyState
@@ -90,7 +94,7 @@ export default async function RevisionsPage() {
               lapseCount={entry.lapseCount}
               reviewCount={entry.reviewCount}
               personal={personal}
-              writes={features.writes}
+              mode={mode}
               persistence={features.persistence}
             />
           ))}
@@ -122,26 +126,10 @@ export default async function RevisionsPage() {
             ))}
           </div>
         )}
+        <Link className="secondary-action inline-link" href="/revisions/carnet-erreurs">
+          Ouvrir le carnet d'erreurs
+        </Link>
       </section>
-
-      {personal ? (
-        <section className="panel" id="carnet-erreurs">
-          <span className="section-label">Carnet d'erreurs</span>
-          <h2>Réviser par erreur, pas seulement par chapitre</h2>
-          <div className="priority-list">
-            {model.errorJournal.map((entry) => (
-              <article key={entry.id} className="priority-row">
-                <span className="state-token needs-review">{entry.category}</span>
-                <div>
-                  <strong>{entry.summary}</strong>
-                  <p>{entry.nextAction}</p>
-                  <small>{entry.competencyIds.join(", ")}</small>
-                </div>
-              </article>
-            ))}
-          </div>
-        </section>
-      ) : null}
     </div>
   );
 }

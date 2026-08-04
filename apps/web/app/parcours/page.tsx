@@ -57,9 +57,10 @@ export default async function ParcoursPage() {
         <FeatureNotice
           feature={{
             enabled: false,
-            reason: features.persistence.enabled
+            code: features.persistence.enabled ? "account-required" : "persistence-unavailable",
+            publicMessage: features.persistence.enabled
               ? "Connecte-toi pour voir ta progression réelle : ces niveaux affichent l'état d'un parcours vierge."
-              : `${features.persistence.reason} Les niveaux affichent l'état d'un parcours vierge.`
+              : `${features.persistence.publicMessage} Les niveaux affichent l'état d'un parcours vierge.`
           }}
         />
       )}

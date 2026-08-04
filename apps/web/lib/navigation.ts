@@ -55,7 +55,9 @@ export const PRIMARY_NAV_SECTIONS: readonly NavSection[] = [
     label: "Réviser",
     items: [
       { href: "/revisions", label: "Session du jour" },
-      { href: "/revisions#carnet-erreurs", label: "Carnet d'erreurs", anchor: true },
+      // Une vraie route depuis PR-20 : le lien menait à une ancre, la page
+      // atteinte s'appelait « Session du jour » et c'est elle qui restait active.
+      { href: "/revisions/carnet-erreurs", label: "Carnet d'erreurs" },
       { href: "/corrections", label: "Corrections" }
     ]
   },
@@ -84,8 +86,8 @@ export const ADMIN_NAV_SECTION = {
 } as const;
 
 /**
- * L'état actif d'un lien, compatible avec les routes imbriquées :
- * `/modules/excel-finance-lab/exercices/xyz` active l'entrée `/modules`.
+ * Un lien *couvre* une route : correspondance exacte ou ancêtre de segment.
+ * `/modules/excel-finance-lab/exercices/xyz` est couvert par `/modules`.
  * La racine ne matche qu'exactement, sinon elle serait active partout.
  */
 export function isPathActive(pathname: string, href: string): boolean {
@@ -100,8 +102,41 @@ export function isPathActive(pathname: string, href: string): boolean {
   return pathname === href || pathname.startsWith(`${href}/`);
 }
 
+/** Toutes les destinations réelles du menu, ancres exclues. */
+function allDestinations(): string[] {
+  return [
+    HOME_NAV_ITEM.href,
+    ...PRIMARY_NAV_SECTIONS.flatMap((section) => section.items.map((item) => item.href)),
+    ...ADMIN_NAV_SECTION.items.map((item) => item.href)
+  ].filter((href) => !href.includes("#"));
+}
+
+/**
+ * Le lien du menu qui revendique la route courante — le plus spécifique, un
+ * seul.
+ *
+ * `isPathActive` seul ne suffit plus depuis que `/revisions/carnet-erreurs`
+ * existe : il est couvert par `/revisions` *et* par lui-même, et les deux
+ * entrées s'allumaient, avec deux `aria-current` simultanés. La règle « le plus
+ * long href gagne » range le cas sans liste d'exceptions, et laisse
+ * `/exercices/session-decouverte` — qui n'a pas d'entrée propre — allumer
+ * « Exercices », ce qui est le comportement voulu.
+ */
+export function resolveActiveHref(pathname: string): string | undefined {
+  return allDestinations()
+    .filter((href) => isPathActive(pathname, href))
+    .sort((left, right) => right.length - left.length)[0];
+}
+
+/** L'état actif d'une entrée de menu, en tenant compte de ses voisines. */
+export function isNavItemActive(pathname: string, href: string): boolean {
+  return !href.includes("#") && resolveActiveHref(pathname) === href;
+}
+
 export function isSectionActive(pathname: string, section: NavSection): boolean {
-  return section.items.some((item) => isPathActive(pathname, item.href));
+  const active = resolveActiveHref(pathname);
+
+  return active !== undefined && section.items.some((item) => item.href === active);
 }
 
 /**
@@ -109,7 +144,7 @@ export function isSectionActive(pathname: string, section: NavSection): boolean 
  * un ancêtre d'une route imbriquée, absent sinon.
  */
 export function ariaCurrentFor(pathname: string, href: string): "page" | "true" | undefined {
-  if (!isPathActive(pathname, href)) {
+  if (!isNavItemActive(pathname, href)) {
     return undefined;
   }
 

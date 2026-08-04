@@ -1,8 +1,10 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { GraduationCap } from "lucide-react";
+import { PUBLIC_DEMO_TITLE } from "@/lib/features";
 import type { RuntimeFlags } from "@/lib/runtime-flags";
 import { MobileNav } from "@/components/shell/mobile-nav";
+import { PublicDemoNotice } from "@/components/public-demo-notice";
 import { SidebarNav } from "@/components/shell/sidebar-nav";
 import { Topbar } from "@/components/shell/topbar";
 
@@ -22,7 +24,7 @@ export function PublicShell({
 }) {
   const authEnabled = runtime.features.auth.enabled;
   const tagline = runtime.publicDemo ? "Démonstration publique" : "Apprendre la finance";
-  const statusLabel = runtime.publicDemo ? "Démo publique lecture seule" : "Espace de découverte";
+  const statusLabel = runtime.publicDemo ? PUBLIC_DEMO_TITLE : "Espace de découverte";
 
   return (
     <div className="app-shell">
@@ -64,15 +66,7 @@ export function PublicShell({
         />
         <Topbar variant="public" statusLabel={statusLabel} authEnabled={authEnabled} userEmail={null} />
 
-        {runtime.publicDemo ? (
-          <section className="demo-banner" aria-label="Statut de la démonstration">
-            <strong>Démo publique</strong>
-            <span>
-              Les imports et uploads sont bloqués en production publique. Les données affichées sont
-              un jeu de démonstration, pas une progression personnelle.
-            </span>
-          </section>
-        ) : null}
+        {runtime.publicDemo ? <PublicDemoNotice /> : null}
 
         <main id="contenu" className="content">
           {children}

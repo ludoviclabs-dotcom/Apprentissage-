@@ -293,8 +293,9 @@ test("the public demo grades the module but says nothing is kept", async ({ page
 
   // Grading is a pure computation and the API performs it here, so the control
   // is live rather than disabled. What the demo cannot do is remember, and the
-  // form says which of the two is missing.
-  await expect(page.getByText(/Indisponible sans base de données/).first()).toBeVisible();
+  // form says which of the two is missing — in the learner's terms since PR-20,
+  // no longer by naming the database variables.
+  await expect(page.getByText(/restent affichés jusqu'à la fermeture de l'onglet/).first()).toBeVisible();
 
   await fillLine(page, 1, { account: "607", debit: "1200" });
   await fillLine(page, 2, { account: "44566", debit: "240" });

@@ -88,14 +88,25 @@ test("the main search form navigates to the search page", async ({ page }) => {
   await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
 });
 
-test("an unimplemented action is disabled instead of silently doing nothing", async ({ page }) => {
+/**
+ * L'inverse de l'assertion précédente, et c'est voulu.
+ *
+ * Ce test vérifiait qu'une action non implémentée était *désactivée* plutôt que
+ * muette — un progrès quand l'alternative était un bouton qui ne faisait rien.
+ * PR-20 va au bout : une action principale visible doit être implémentée. La
+ * règle « désactivé plutôt que muet » reste valable pour les contrôles
+ * secondaires ; elle ne l'est plus pour un CTA de page.
+ */
+test("the page's main call to action leads somewhere real", async ({ page }) => {
   await page.goto("/exercices");
 
-  const plannedAction = page.getByRole("button", { name: "Préparer la session" });
+  const cta = page.getByRole("link", { name: "Lancer la session découverte" });
 
-  await expect(plannedAction).toBeVisible();
-  await expect(plannedAction).toBeDisabled();
-  await expect(page.getByText("Bientôt disponible")).toBeVisible();
+  await expect(cta).toBeVisible();
+  await cta.click();
+
+  await expect(page).toHaveURL(/\/exercices\/session-decouverte$/);
+  await expect(page.getByRole("heading", { level: 1, name: "Session découverte" })).toBeVisible();
 });
 
 test("no enabled button on a page is left without a handler", async ({ page }) => {
@@ -109,20 +120,28 @@ test("no enabled button on a page is left without a handler", async ({ page }) =
   await expect(page.getByRole("button", { name: "Corriger" })).toBeEnabled();
 });
 
-test("the tutor states that no model is configured", async ({ page }) => {
+test("the tutor states that no model is configured, without naming the variable", async ({
+  page
+}) => {
   await page.goto("/apprendre");
 
   await page.getByRole("button", { name: "Demander au tuteur" }).click();
 
-  await expect(page.getByText(/AI_PROVIDER=none/)).toBeVisible();
+  // Le fait reste dit ; c'est la façon de le dire qui a changé (PR-20). Nommer
+  // `AI_PROVIDER` renseignait l'opérateur et laissait l'apprenant sans réponse.
+  await expect(page.getByText(/Aucun tuteur conversationnel n'est activé/)).toBeVisible();
+  await expect(page.getByText(/AI_PROVIDER/)).toHaveCount(0);
 });
 
 test("public demo disables protected CTAs before submission and rejects writes", async ({ page, request }, testInfo) => {
   test.skip(testInfo.project.name !== "public-demo", "requires the dedicated public-demo server");
 
+  // L'auto-évaluation n'est plus « protégée » : depuis PR-20 elle fonctionne
+  // localement, sans écrire. Ce qui reste vrai est qu'elle attend la révélation
+  // — et que l'API refuse toujours l'écriture, vérifié plus bas.
   await page.goto("/revisions");
   await expect(page.getByRole("button", { name: "Su", exact: true }).first()).toBeDisabled();
-  await expect(page.getByText(/Indisponible en démo publique/).first()).toBeVisible();
+  await expect(page.getByText("Affiche la réponse avant de t'auto-évaluer.").first()).toBeVisible();
 
   await page.goto("/documents");
   await expect(page.getByRole("button", { name: "Uploader" })).toBeDisabled();

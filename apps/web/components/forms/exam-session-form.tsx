@@ -83,7 +83,7 @@ export function ExamSessionForm({
           type="button"
           className="primary-action"
           disabled={pending || locked}
-          title={locked ? writes.reason : undefined}
+          title={locked ? writes.publicMessage : undefined}
           onClick={() => void start()}
         >
           Demarrer l'examen
@@ -123,7 +123,7 @@ export function ExamSessionForm({
       {score !== null ? (
         <div className="result-box">
           Score moyen : {score}/20
-          {persistence.enabled ? null : <span className="muted">{persistence.reason}</span>}
+          {persistence.enabled ? null : <span className="muted">{persistence.publicMessage}</span>}
         </div>
       ) : null}
       {error ? <div className="result-box error">{error}</div> : null}

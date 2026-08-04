@@ -88,10 +88,13 @@ export default async function VerifyCertificatePage({
           <div>
             <span className="section-label">Vérification</span>
             <h1>Vérification indisponible</h1>
-            {/* Deliberately not `features.persistence.reason`: that string names
-                the environment variables this deployment is missing, and this
-                page is the one surface built for strangers. An operator reads
-                the reason in the server logs and in the administration area. */}
+            {/* Cette page a été la première à distinguer les deux publics, avant
+                que PR-20 n'en fasse une règle : `features.persistence` ne porte
+                plus que le message destiné au lecteur, et le diagnostic
+                d'exploitation vit dans `availability-diagnostics.ts`, côté
+                serveur. La phrase ci-dessous reste néanmoins écrite ici : elle
+                s'adresse à un tiers qui vérifie une attestation, pas à un
+                apprenant, et n'a pas à parler de session ni d'onglet. */}
             <p>
               Le service de vérification n&apos;est pas disponible sur ce déploiement. Réessayez plus
               tard ou contactez l&apos;émetteur de l&apos;attestation.

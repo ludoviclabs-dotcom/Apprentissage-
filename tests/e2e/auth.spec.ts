@@ -15,7 +15,9 @@ test("login and signup explain that accounts are off instead of failing on submi
     await page.goto(path);
 
     await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
-    await expect(page.getByText(/Comptes désactivés/)).toBeVisible();
+    // Ce que le visiteur peut en déduire, pas la variable qui le décide (PR-20).
+    await expect(page.getByText(/Cet espace fonctionne sans compte/)).toBeVisible();
+    await expect(page.getByText(/LEARNING_HUB_AUTH_ENABLED/)).toHaveCount(0);
     await expect(
       page.getByRole("button", { name: path === "/signup" ? "Créer le compte" : "Se connecter" })
     ).toBeDisabled();

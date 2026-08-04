@@ -35,7 +35,10 @@ describe("stripe environment contract", () => {
     const features = resolveFeatures(parseEnv({}));
 
     expect(features.billing.enabled).toBe(false);
-    expect(features.billing.reason).toContain("FINANCE_HUB_BILLING_ENABLED");
+    // Le visiteur apprend que tout est ouvert ; le nom du drapeau reste au
+    // diagnostic serveur, qui est vérifié dans `features.test.ts`.
+    expect(features.billing.code).toBe("billing-disabled");
+    expect(features.billing.publicMessage).toContain("tous les modules restent ouverts");
   });
 
   it("accepts a complete configuration", () => {

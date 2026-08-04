@@ -1,12 +1,13 @@
 "use client";
 
-import { useState } from "react";
-import type {
-  RemediationDraft,
-  ReviewItemType,
-  ReviewOutcome,
-  ReviewRating,
-  SourceReference as SourceReferenceType
+import { useEffect, useState } from "react";
+import {
+  REVIEW_INTERVAL_DAYS,
+  type RemediationDraft,
+  type ReviewItemType,
+  type ReviewOutcome,
+  type ReviewRating,
+  type SourceReference as SourceReferenceType
 } from "@finance/domain";
 import { SourceReference } from "@/components/source-reference";
 import { postJson } from "@/lib/api-client";
@@ -22,9 +23,23 @@ import type { FeatureState } from "@/lib/features";
  * who has not decided to look, and an answer seen before the attempt to recall
  * makes the rating that follows meaningless.
  *
- * The four rating buttons stay rendered while the answer is hidden, and say why
- * they are disabled. A control that appears only after a reveal would make the
- * card change shape under the learner mid-decision.
+ * DEUX MODES, UN SEUL COMPOSANT.
+ *
+ * `persisted` : le comportement historique. La notation part vers
+ * `/api/revisions/review`, qui planifie, crée la remédiation et écrit.
+ *
+ * `local` : le mode découverte. Les quatre boutons fonctionnent, mais la
+ * notation est calculée dans le navigateur sur la MÊME échelle
+ * (`REVIEW_INTERVAL_DAYS`, importée du domaine, pas recopiée) et aucune requête
+ * d'écriture n'est émise. Avant PR-20 ces boutons étaient désactivés et
+ * portaient, sous chaque carte, un message nommant `LEARNING_HUB_AUTH_ENABLED` :
+ * le visiteur ne pouvait ni essayer le geste central du produit, ni comprendre
+ * pourquoi.
+ *
+ * L'état local va dans `sessionStorage`, jamais dans `localStorage`. Un onglet
+ * fermé doit tout oublier : `localStorage` fabriquerait une progression qui
+ * survit à la visite alors qu'aucun serveur ne la connaît, ce qui est
+ * exactement le mensonge que ce mode doit éviter.
  */
 
 const RATINGS: Array<{ value: ReviewRating; label: string; hint: string }> = [
@@ -35,6 +50,12 @@ const RATINGS: Array<{ value: ReviewRating; label: string; hint: string }> = [
 ];
 
 const REVEAL_FIRST = "Affiche la réponse avant de t'auto-évaluer.";
+const TEMPORARY_RATING = "Évaluation temporaire — non enregistrée";
+
+/** Préfixe de clé, pour pouvoir tout retrouver et tout effacer d'un bloc. */
+const LOCAL_RATING_PREFIX = "flh:decouverte:revision:";
+
+export type ReviewCardMode = "persisted" | "local";
 
 interface RevealedAnswer {
   answer: string;
@@ -51,12 +72,40 @@ export interface ReviewCardProps {
   lapseCount: number;
   reviewCount: number;
   personal: boolean;
-  writes: FeatureState;
+  /** `local` en mode découverte : aucune requête d'écriture n'est émise. */
+  mode: ReviewCardMode;
   persistence: FeatureState;
 }
 
 function formatDay(iso: string): string {
   return iso.slice(0, 10);
+}
+
+function storageKey(itemType: ReviewItemType, itemRef: string): string {
+  return `${LOCAL_RATING_PREFIX}${itemType}:${itemRef}`;
+}
+
+/**
+ * Lecture tolérante : un `sessionStorage` indisponible (mode privé strict,
+ * quota) ou une valeur devenue invalide ne doit pas empêcher la carte de
+ * s'afficher. Une auto-évaluation de démonstration perdue n'est pas une panne.
+ */
+function readLocalRating(itemType: ReviewItemType, itemRef: string): ReviewRating | null {
+  try {
+    const stored = window.sessionStorage.getItem(storageKey(itemType, itemRef));
+
+    return stored !== null && stored in REVIEW_INTERVAL_DAYS ? (stored as ReviewRating) : null;
+  } catch {
+    return null;
+  }
+}
+
+function writeLocalRating(itemType: ReviewItemType, itemRef: string, rating: ReviewRating): void {
+  try {
+    window.sessionStorage.setItem(storageKey(itemType, itemRef), rating);
+  } catch {
+    // L'état reste dans le composant : la session courante fonctionne quand même.
+  }
 }
 
 export function ReviewCard({
@@ -68,17 +117,28 @@ export function ReviewCard({
   lapseCount,
   reviewCount,
   personal,
-  writes,
+  mode,
   persistence
 }: ReviewCardProps) {
   const [revealed, setRevealed] = useState<RevealedAnswer | null>(null);
   const [outcome, setOutcome] = useState<ReviewOutcome | null>(null);
+  const [localRating, setLocalRating] = useState<ReviewRating | null>(null);
   const [remediation, setRemediation] = useState<RemediationDraft | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
 
-  const locked = !writes.enabled;
-  const done = outcome !== null;
+  const local = mode === "local";
+  const done = local ? localRating !== null : outcome !== null;
+
+  // Restauré après le premier rendu, pas pendant : lire `sessionStorage` au
+  // rendu initial ferait diverger le HTML serveur et le DOM client.
+  useEffect(() => {
+    if (!local) {
+      return;
+    }
+
+    setLocalRating(readLocalRating(itemType, itemRef));
+  }, [local, itemType, itemRef]);
 
   async function reveal() {
     setPending(true);
@@ -97,6 +157,11 @@ export function ReviewCard({
     }
 
     setRevealed(result.data.item);
+  }
+
+  function rateLocally(rating: ReviewRating) {
+    setLocalRating(rating);
+    writeLocalRating(itemType, itemRef, rating);
   }
 
   async function rate(rating: ReviewRating) {
@@ -128,7 +193,7 @@ export function ReviewCard({
   }
 
   return (
-    <article className="panel flashcard" data-item-type={itemType} data-item-ref={itemRef}>
+    <article className="panel flashcard" data-item-type={itemType} data-item-ref={itemRef} data-mode={mode}>
       <div className="panel-heading">
         <div>
           <span className="section-label">{kindLabel}</span>
@@ -163,16 +228,29 @@ export function ReviewCard({
             key={rating.value}
             type="button"
             className="secondary-action"
-            disabled={!revealed || locked || pending || done}
-            title={locked ? writes.reason : !revealed ? REVEAL_FIRST : rating.hint}
-            onClick={() => void rate(rating.value)}
+            disabled={!revealed || pending || done}
+            title={!revealed ? REVEAL_FIRST : rating.hint}
+            onClick={() => (local ? rateLocally(rating.value) : void rate(rating.value))}
           >
             {rating.label}
           </button>
         ))}
-        {locked ? <span className="result-inline muted">{writes.reason}</span> : null}
-        {!locked && !revealed ? <span className="result-inline muted">{REVEAL_FIRST}</span> : null}
+        {/* Un seul message, et il parle de la carte — plus de rappel de
+            configuration répété sous chacune d'elles. */}
+        {!revealed ? <span className="result-inline muted">{REVEAL_FIRST}</span> : null}
       </div>
+
+      {local && localRating ? (
+        <div className="feedback-appear" role="status">
+          <p className="result-inline">
+            Simulation : cette carte reviendrait dans {REVIEW_INTERVAL_DAYS[localRating]} jour
+            {REVIEW_INTERVAL_DAYS[localRating] > 1 ? "s" : ""}.
+          </p>
+          <p className="result-inline muted" data-testid="local-rating-note">
+            {TEMPORARY_RATING}
+          </p>
+        </div>
+      ) : null}
 
       {outcome ? (
         <p className="result-inline feedback-appear" role="status">

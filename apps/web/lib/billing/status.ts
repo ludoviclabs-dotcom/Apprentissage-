@@ -62,7 +62,7 @@ export async function getBillingStatus(now: Date = new Date()): Promise<BillingS
   if (!features.billing.enabled) {
     return {
       billingEnabled: false,
-      disabledReason: features.billing.reason,
+      disabledReason: features.billing.publicMessage,
       signedIn: false,
       plans,
       entitlements: [],

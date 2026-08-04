@@ -93,7 +93,7 @@ export function AuthForm({
         type="button"
         className="primary-action"
         disabled={pending || locked || !canSubmit}
-        title={locked ? auth.reason : undefined}
+        title={locked ? auth.publicMessage : undefined}
         onClick={() => void submit()}
       >
         {pending ? "..." : isSignup ? "Créer le compte" : "Se connecter"}

@@ -30,9 +30,12 @@ export default async function AccountPage() {
         </section>
         <section className="panel">
           <FeatureNotice feature={features.auth} />
+          {/* La marche à suivre — quelles variables activer, dans quel ordre —
+              est une consigne d'exploitation. Elle vit dans le runbook, pas
+              dans une page que n'importe quel visiteur peut ouvrir. */}
           <p className="muted">
-            Pour activer les comptes : <code>FINANCE_HUB_USE_DATABASE=true</code>,{" "}
-            <code>DATABASE_URL</code> puis <code>LEARNING_HUB_AUTH_ENABLED=true</code>.
+            L'activation des comptes est une opération d'administration : elle se fait au
+            déploiement, en suivant le guide d'installation du dépôt.
           </p>
         </section>
       </div>

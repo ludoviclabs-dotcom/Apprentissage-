@@ -18,7 +18,7 @@ import {
   HOME_NAV_ITEM,
   PRIMARY_NAV_SECTIONS,
   ariaCurrentFor,
-  isPathActive,
+  isNavItemActive,
   isSectionActive,
   type NavSectionKey
 } from "@/lib/navigation";
@@ -86,7 +86,7 @@ export function SidebarNav({
     <nav className="nav-groups" aria-label="Navigation principale">
       <Link
         href={HOME_NAV_ITEM.href}
-        className={isPathActive(pathname, HOME_NAV_ITEM.href) ? "nav-item active" : "nav-item"}
+        className={isNavItemActive(pathname, HOME_NAV_ITEM.href) ? "nav-item active" : "nav-item"}
         aria-current={ariaCurrentFor(pathname, HOME_NAV_ITEM.href)}
         onClick={onNavigate}
       >
@@ -125,7 +125,7 @@ export function SidebarNav({
                 <li key={item.href}>
                   <Link
                     href={item.href}
-                    className={isPathActive(pathname, item.href) ? "nav-subitem active" : "nav-subitem"}
+                    className={isNavItemActive(pathname, item.href) ? "nav-subitem active" : "nav-subitem"}
                     aria-current={ariaCurrentFor(pathname, item.href)}
                     onClick={onNavigate}
                   >
@@ -151,7 +151,7 @@ export function SidebarNav({
                 <li key={item.href}>
                   <Link
                     href={item.href}
-                    className={isPathActive(pathname, item.href) ? "nav-subitem active" : "nav-subitem"}
+                    className={isNavItemActive(pathname, item.href) ? "nav-subitem active" : "nav-subitem"}
                     aria-current={ariaCurrentFor(pathname, item.href)}
                     onClick={onNavigate}
                   >

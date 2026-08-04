@@ -28,7 +28,7 @@ export async function POST(request: Request) {
   const features = getFeatures();
 
   if (!features.auth.enabled) {
-    return Response.json({ error: "Comptes désactivés", details: features.auth.reason }, { status: 501 });
+    return Response.json({ error: "Comptes désactivés", details: features.auth.publicMessage }, { status: 501 });
   }
 
   let payload: unknown;

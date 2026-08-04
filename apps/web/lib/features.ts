@@ -1,20 +1,23 @@
 import { getEnv, type Env } from "@/lib/env";
+import { AVAILABLE, unavailable, type AvailabilityState } from "@/lib/availability";
 
 /**
  * Feature availability, derived from validated environment configuration.
  *
  * Rule for this codebase: an action must be either functional or visibly
- * disabled. A feature that is off carries a `reason` the UI can show, so a
+ * disabled. A feature that is off carries a message the UI can show, so a
  * disabled control always explains itself instead of failing after the click.
+ *
+ * That message is now the *public* one. It says what the visitor can and cannot
+ * do; it never names the variable that decided it. The operator's version lives
+ * in `availability-diagnostics.ts`, behind `server-only`. Before PR-20 the two
+ * were the same string, and the operator's version is what /revisions printed
+ * under every card in production.
  */
-export interface FeatureState {
-  enabled: boolean;
-  /** Present only when `enabled` is false. Written for end users, in French. */
-  reason?: string;
-}
+export type FeatureState = AvailabilityState;
 
 export interface FeatureSet {
-  /** HTTP basic auth in front of the app. */
+  /** Account-based sessions in front of the private workspace. */
   auth: FeatureState;
   /** Reads and writes go to PostgreSQL instead of the seeded fallback. */
   database: FeatureState;
@@ -39,16 +42,29 @@ export interface FeatureSet {
   billing: FeatureState;
 }
 
-const ON: FeatureState = { enabled: true };
+export type FeatureKey = keyof FeatureSet;
 
-function off(reason: string): FeatureState {
-  return { enabled: false, reason };
-}
+export const FEATURE_KEYS: readonly FeatureKey[] = [
+  "auth",
+  "database",
+  "writes",
+  "uploads",
+  "sourcePackImport",
+  "aiTutor",
+  "persistence",
+  "billing"
+];
 
-const PUBLIC_DEMO_REASON =
-  "Indisponible en démo publique : active LEARNING_HUB_AUTH_ENABLED et une base privée.";
-const NO_DATABASE_REASON =
-  "Indisponible sans base de données : active FINANCE_HUB_USE_DATABASE=true et DATABASE_URL.";
+/**
+ * La notice unique du mode découverte. Une page pertinente l'affiche une fois,
+ * via `<PublicDemoNotice />` ; aucune carte ne la répète.
+ */
+export const PUBLIC_DEMO_TITLE = "Mode découverte";
+export const PUBLIC_DEMO_MESSAGE =
+  "Vous pouvez consulter les contenus et tester les exercices. Vos réponses, vos révisions et votre progression ne sont pas enregistrées.";
+
+const NO_PERSISTENCE_MESSAGE =
+  "Les résultats de cette session restent affichés jusqu'à la fermeture de l'onglet, puis disparaissent.";
 
 export function isPublicDemo(env: Env): boolean {
   return env.FINANCE_HUB_PUBLIC_DEMO || (env.VERCEL_ENV === "production" && !env.LEARNING_HUB_AUTH_ENABLED);
@@ -80,26 +96,48 @@ export function isBillingActive(env: Env): boolean {
 export function resolveFeatures(env: Env): FeatureSet {
   const publicDemo = isPublicDemo(env);
   const databaseActive = isDatabaseActive(env);
+  const authEnabled = env.LEARNING_HUB_AUTH_ENABLED;
+
+  // Proposer « Créer mon espace » n'a de sens que si l'inscription existe. Sans
+  // comptes, l'action est absente plutôt que morte.
+  const demoWrites = unavailable(
+    "public-demo",
+    PUBLIC_DEMO_MESSAGE,
+    authEnabled ? { label: "Créer mon espace", href: "/signup" } : undefined
+  );
 
   return {
-    auth: env.LEARNING_HUB_AUTH_ENABLED
-      ? ON
-      : off(
-          "Comptes désactivés : LEARNING_HUB_AUTH_ENABLED=false. Les données restent partagées et non attribuées."
+    auth: authEnabled
+      ? AVAILABLE
+      : unavailable(
+          "account-required",
+          "Cet espace fonctionne sans compte : les contenus sont partagés et aucun profil personnel n'est créé."
         ),
-    database: databaseActive ? ON : off(NO_DATABASE_REASON),
-    writes: publicDemo ? off(PUBLIC_DEMO_REASON) : ON,
-    uploads: publicDemo ? off(PUBLIC_DEMO_REASON) : ON,
-    sourcePackImport: publicDemo ? off(PUBLIC_DEMO_REASON) : ON,
+    database: databaseActive
+      ? AVAILABLE
+      : unavailable("persistence-unavailable", NO_PERSISTENCE_MESSAGE),
+    writes: publicDemo ? demoWrites : AVAILABLE,
+    uploads: publicDemo
+      ? unavailable("public-demo", "L'import de documents n'est pas ouvert en mode découverte.")
+      : AVAILABLE,
+    sourcePackImport: publicDemo
+      ? unavailable("public-demo", "L'import de packs de sources n'est pas ouvert en mode découverte.")
+      : AVAILABLE,
     aiTutor:
       env.AI_PROVIDER === "none"
-        ? off("Tuteur IA désactivé : AI_PROVIDER=none. Les réponses restent issues du corpus seedé.")
-        : ON,
-    persistence: databaseActive ? ON : off(NO_DATABASE_REASON),
+        ? unavailable(
+            "ai-disabled",
+            "Le tuteur conversationnel n'est pas activé ici : les réponses proviennent du corpus documentaire local."
+          )
+        : AVAILABLE,
+    persistence: databaseActive
+      ? AVAILABLE
+      : unavailable("persistence-unavailable", NO_PERSISTENCE_MESSAGE),
     billing: isBillingActive(env)
-      ? ON
-      : off(
-          "Paiement désactivé : FINANCE_HUB_BILLING_ENABLED=false ou configuration Stripe incomplète. Tous les modules restent ouverts."
+      ? AVAILABLE
+      : unavailable(
+          "billing-disabled",
+          "Aucun paiement n'est activé sur cette instance : tous les modules restent ouverts."
         )
   };
 }
