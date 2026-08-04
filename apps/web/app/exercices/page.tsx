@@ -3,6 +3,7 @@ import { ExercisePanel } from "@/components/exercise-panel";
 import { DomainBadge } from "@/components/domain-badge";
 import { AnyExerciseForm } from "@/components/forms/any-exercise-form";
 import { PageHeader } from "@/components/ui/page-header";
+import { DISCOVERY_SESSION_SUMMARY } from "@/lib/discovery-session";
 import { getExercises } from "@finance/db";
 import Link from "next/link";
 
@@ -23,18 +24,18 @@ export default async function ExercisesPage() {
         description="Le MVP affiche les exercices seedés ; la génération IA gardera ce format structuré."
       />
 
+      {/* Ce bloc portait un bouton désactivé et un badge « Bientôt disponible ».
+          Une action principale visible doit mener quelque part : elle mène
+          maintenant à une session réelle. */}
       <section className="generator-panel">
         <div>
-          <span className="section-label">Générer</span>
-          <h2>Session recommandée</h2>
-          <p>5 QCM, 1 cas pratique, 1 correction guidée, 1 fiche de remédiation.</p>
+          <span className="section-label">Commencer</span>
+          <h2>Session découverte</h2>
+          <p>{DISCOVERY_SESSION_SUMMARY}</p>
         </div>
-        <div className="planned-action">
-          <button type="button" className="primary-action" disabled title="Génération de session non implémentée">
-            Préparer la session
-          </button>
-          <span className="badge-soon">Bientôt disponible</span>
-        </div>
+        <Link className="primary-action inline-link" href="/exercices/session-decouverte">
+          Lancer la session découverte
+        </Link>
       </section>
 
       <div className="two-column">
