@@ -117,7 +117,13 @@ test("the engine grid recalculates, navigates by keyboard, keeps a draft and gra
 
   // Type a formula: the computed value appears in the cell without submitting,
   // because the same engine that grades runs the grid.
-  const b12 = page.getByLabel("Cellule B12");
+  //
+  // `exact` is load-bearing on every cell locator here. Playwright matches an
+  // accessible name case-insensitively *by substring*, and once B12 is selected
+  // the formula bar is named "Barre de formule, cellule B12" — which contains
+  // "cellule B12". Without `exact` the locator resolves to two inputs and the
+  // press fails in strict mode.
+  const b12 = page.getByLabel("Cellule B12", { exact: true });
 
   await b12.fill('=SOMME.SI(A2:A10;"VENTES";B2:B10)');
   await expect(page.locator('[data-cell-value="B12"]')).toHaveText(/51\s?200/);
@@ -129,23 +135,23 @@ test("the engine grid recalculates, navigates by keyboard, keeps a draft and gra
   await expect(page.getByTestId("formula-status")).toContainText("B12");
 
   // Keyboard: ArrowDown moves to the next editable cell.
+  const b13 = page.getByLabel("Cellule B13", { exact: true });
+
   await b12.press("ArrowDown");
-  await expect(page.getByLabel("Cellule B13")).toBeFocused();
+  await expect(b13).toBeFocused();
 
   // An error is shown as a value, in the cell and in the status line.
-  await page.getByLabel("Cellule B13").fill("=1/0");
+  await b13.fill("=1/0");
   await expect(page.locator('[data-cell-value="B13"]')).toHaveText("#DIV/0!");
 
   // The draft autosaves; a reload restores both cells as typed.
   await expect(page.getByTestId("draft-state")).toContainText("Brouillon enregistré.");
   await page.reload();
-  await expect(page.getByLabel("Cellule B12")).toHaveValue(
-    '=SOMME.SI(A2:A10;"VENTES";B2:B10)'
-  );
-  await expect(page.getByLabel("Cellule B13")).toHaveValue("=1/0");
+  await expect(b12).toHaveValue('=SOMME.SI(A2:A10;"VENTES";B2:B10)');
+  await expect(b13).toHaveValue("=1/0");
 
   // Fix B13, submit, and the engine-backed evaluator grades it 20/20.
-  await page.getByLabel("Cellule B13").fill('=SUMIF(A2:A10,"ACHATS",B2:B10)');
+  await b13.fill('=SUMIF(A2:A10,"ACHATS",B2:B10)');
 
   const pending = page.waitForResponse(
     (response) =>
@@ -200,7 +206,7 @@ test("a case-study step submits with case evidence once the level is open", asyn
 
   await page.goto(`${BASE}/cas/tresorerie-13-semaines/2`);
   await expect(page.getByRole("heading", { level: 1 })).toContainText("Totalisez ventes et achats");
-  await expect(page.getByLabel("Cellule B12")).toBeVisible();
+  await expect(page.getByLabel("Cellule B12", { exact: true })).toBeVisible();
 
   const response = await page.request.post("/api/exercises/attempts", {
     data: {
