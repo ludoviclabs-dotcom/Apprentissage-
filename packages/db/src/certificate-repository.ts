@@ -1,4 +1,5 @@
 import { and, desc, eq } from "drizzle-orm";
+// `certificatesTable` is written here only through the owner's own context.
 import type { CertificateContent, CertificateStatus, CertificateVerification } from "@finance/domain";
 import { canUseDatabase, createDb } from "./client";
 import { certificateRevocationsTable, certificateVerificationsTable, certificatesTable } from "./drizzle-schema";
@@ -179,7 +180,8 @@ export type RevokeCertificateResult =
  * Runs outside any user context on purpose: the operator is not the holder, and
  * the projection carries no policy to satisfy. The private `certificates` row
  * is left untouched — see migration 0012 — so the holder keeps their copy and
- * the document simply stops verifying.
+ * the document simply stops verifying. Its own `status` column converges the
+ * next time its owner touches it, in {@link syncCertificateStatusFromPublic}.
  */
 export async function revokeCertificate(
   input: RevokeCertificateInput
@@ -193,22 +195,37 @@ export async function revokeCertificate(
   }
 
   const db = createDb();
-  const existing = await getVerificationBySerial(input.serial);
-
-  if (!existing) {
-    return { status: "not-found" };
-  }
-
-  if (existing.status === "revoked") {
-    return { status: "already-revoked", verification: existing };
-  }
-
   const revokedAt = new Date().toISOString();
 
-  await db
+  // THE STATE CHANGE IS THE CLAIM, not a check followed by a write.
+  //
+  // Reading the row, deciding it was still active and then updating it let two
+  // simultaneous revocations both pass the check and both write an audit entry
+  // — one withdrawal, two records of who withdrew it, which is precisely what
+  // an audit trail must not do. `WHERE status = 'active' … RETURNING` makes
+  // exactly one caller the winner, and the loser learns it from an empty
+  // result rather than from a second read.
+  const claimed = await db
     .update(certificateVerificationsTable)
     .set({ status: "revoked", revokedAt, updatedAt: revokedAt })
-    .where(eq(certificateVerificationsTable.serial, input.serial));
+    .where(
+      and(
+        eq(certificateVerificationsTable.serial, input.serial),
+        eq(certificateVerificationsTable.status, "active")
+      )
+    )
+    .returning({ verificationId: certificateVerificationsTable.verificationId });
+
+  if (claimed.length === 0) {
+    // Either the serial is unknown, or somebody else got there first.
+    const existing = await getVerificationBySerial(input.serial);
+
+    if (!existing) {
+      return { status: "not-found" };
+    }
+
+    return { status: "already-revoked", verification: existing };
+  }
 
   await db.insert(certificateRevocationsTable).values({
     serial: input.serial,
@@ -217,7 +234,7 @@ export async function revokeCertificate(
     revokedAt
   });
 
-  const verification = await getVerificationBySerial(input.serial);
+  const verification = await getCertificateVerification(claimed[0]!.verificationId);
 
   return verification ? { status: "revoked", verification } : { status: "not-found" };
 }
@@ -242,6 +259,57 @@ export async function supersedeCertificate(
     .update(certificateVerificationsTable)
     .set({ status: "superseded", supersededBySerial: replacementSerial, updatedAt: now })
     .where(eq(certificateVerificationsTable.serial, previousSerial));
+}
+
+/**
+ * Brings a learner's private certificate row in line with the public status.
+ *
+ * WHY THIS EXISTS. Revocation and supersession are written by an operator, or
+ * by a re-issue, and neither can touch `certificates`: it is FORCE row level
+ * security keyed on its owner. Left alone, the private row stayed `active`
+ * forever — and since the partial unique index counts *active* rows, a revoked
+ * attestation permanently blocked its own replacement. The learner was told
+ * "you already have one" about a document that no longer verified.
+ *
+ * So the owner reconciles it themselves, in their own context, the next time
+ * they ask for an attestation. The public projection stays the single authority
+ * on validity; this only lets the private row stop contradicting it.
+ *
+ * Returns the status now recorded, so the caller can decide whether an active
+ * certificate really exists.
+ */
+export async function syncCertificateStatusFromPublic(
+  userId: string,
+  serial: string
+): Promise<CertificateStatus> {
+  assertDatabase("synchroniser le statut d'une attestation");
+  assertUserId(userId, "syncCertificateStatusFromPublic");
+
+  const verification = await getVerificationBySerial(serial);
+
+  // No projection row at all means the certificate predates PR-13; it has no
+  // public status to converge on and is left exactly as it is.
+  if (!verification || verification.status === "active") {
+    return verification?.status ?? "active";
+  }
+
+  await withUserContext(userId, (db) =>
+    db
+      .update(certificatesTable)
+      .set({
+        status: verification.status,
+        supersededBySerial: verification.supersededBySerial,
+        revokedAt: verification.revokedAt,
+        // The paired CHECK from migration 0009 refuses a revocation date with
+        // no reason. The real reason lives in `certificate_revocations` and is
+        // internal to the operator, so the owner's copy records only that it
+        // was withdrawn.
+        revokedReason: verification.status === "revoked" ? "révoquée par l'émetteur" : null
+      })
+      .where(and(eq(certificatesTable.userId, userId), eq(certificatesTable.serial, serial)))
+  );
+
+  return verification.status;
 }
 
 export interface CertificateRevocationEntry {

@@ -28,6 +28,7 @@ import {
   subscriptionsTable
 } from "./drizzle-schema";
 import { assertUserId, withUserContext } from "./user-context";
+import { supersedeCertificate, syncCertificateStatusFromPublic } from "./certificate-repository";
 
 /**
  * Persistence for billing: who pays, what that opens, and what it earns.
@@ -583,9 +584,27 @@ export async function issueCertificate(input: IssueCertificateInput): Promise<Is
   assertUserId(input.userId, "issueCertificate");
 
   const existing = await getCertificateForTrack(input.userId, input.trackId);
+  /** Set when a live certificate must be replaced rather than returned. */
+  let supersededSerial: string | null = null;
 
   if (existing) {
-    return { status: "existing", certificate: existing };
+    // "Already issued" is only true while the document still stands. A revoked
+    // or superseded attestation used to be returned here as though nothing had
+    // happened, which made re-issue impossible: the caller got the dead
+    // certificate back, and the partial unique index — which counts active rows
+    // — refused any replacement. Reconciling the private row first is what lets
+    // a withdrawn attestation be replaced.
+    const status = await syncCertificateStatusFromPublic(input.userId, existing.serial);
+
+    // A live certificate issued against the same syllabus is the answer.
+    // Against a *different* one it is out of date, and PR-13 promised a
+    // re-issue when the curriculum changes — so it is replaced rather than
+    // returned. `supersede`, never `revoke`: the old document was earned.
+    if (status === "active" && existing.curriculumVersionId === input.curriculumVersionId) {
+      return { status: "existing", certificate: existing };
+    }
+
+    supersededSerial = status === "active" ? existing.serial : null;
   }
 
   // Refused here rather than left to a NOT NULL violation halfway through the
@@ -608,6 +627,14 @@ export async function issueCertificate(input: IssueCertificateInput): Promise<Is
 
   const serial = formatCertificateSerial(new Date().getUTCFullYear(), randomBytes(5).toString("hex"));
   const verificationId = encodeVerificationId(randomBytes(VERIFICATION_ID_BYTES));
+
+  if (supersededSerial) {
+    // Public first, then the owner's row: the partial unique index counts
+    // active rows, so the replacement cannot be inserted until the previous
+    // one has stopped being one.
+    await supersedeCertificate(supersededSerial, serial);
+    await syncCertificateStatusFromPublic(input.userId, supersededSerial);
+  }
 
   const inserted = await withUserContext(input.userId, async (db) => {
     const rows = await db
@@ -668,11 +695,16 @@ export async function getCertificateForTrack(
   assertDatabase("getCertificateForTrack");
   assertUserId(userId, "getCertificateForTrack");
 
+  // A track can now hold more than one row: re-issuing keeps the superseded
+  // ones so a document already handed out still verifies. Newest first, so the
+  // one that is current — the only one the partial unique index lets be active
+  // — is the one returned.
   const rows = await withUserContext(userId, (db) =>
     db
       .select(CERTIFICATE_COLUMNS)
       .from(certificatesTable)
       .where(and(eq(certificatesTable.userId, userId), eq(certificatesTable.trackId, trackId)))
+      .orderBy(desc(certificatesTable.issuedAt))
       .limit(1)
   );
 
