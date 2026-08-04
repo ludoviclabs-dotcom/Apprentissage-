@@ -36,6 +36,19 @@ export interface BillingPlan {
   priceEnvVar: string;
   /** A plan the deployment may leave unconfigured without failing boot. */
   optional: boolean;
+  /**
+   * What the offer page prints, e.g. `"180 € / an"`.
+   *
+   * INDICATIVE, AND SAID TO BE. The authority on what is charged is the Stripe
+   * price behind {@link priceEnvVar}, which the learner sees on the hosted
+   * checkout page before entering a card. Reading the real amount would mean a
+   * Stripe round trip on a page that must render for signed-out visitors and
+   * with billing switched off, so the label is content and the checkout is
+   * truth — and the page says which is which.
+   */
+  priceLabel: string;
+  /** Three or four bullets for the offer card. Marketing copy, not features. */
+  highlights: string[];
 }
 
 /**
@@ -53,7 +66,14 @@ export const BILLING_PLANS: Record<BillingPlanKey, BillingPlan> = {
     cadence: "annuel",
     features: PREMIUM_FEATURES,
     priceEnvVar: "STRIPE_PRICE_FOUNDER_ANNUAL",
-    optional: false
+    optional: false,
+    priceLabel: "180 € / an",
+    highlights: [
+      "Les quatre niveaux du lab Excel, moteur de formules compris",
+      "Attestation de réussite vérifiable pour chaque parcours terminé",
+      "Tarif fondateur conservé aux renouvellements",
+      "Résiliable à tout moment depuis votre compte"
+    ]
   },
   "pro-monthly": {
     key: "pro-monthly",
@@ -62,9 +82,22 @@ export const BILLING_PLANS: Record<BillingPlanKey, BillingPlan> = {
     cadence: "mensuel",
     features: PREMIUM_FEATURES,
     priceEnvVar: "STRIPE_PRICE_PRO_MONTHLY",
-    optional: true
+    optional: true,
+    priceLabel: "19 € / mois",
+    highlights: [
+      "Les mêmes accès que l'offre annuelle",
+      "Engagement au mois, sans reconduction imposée",
+      "Résiliable à tout moment depuis votre compte"
+    ]
   }
 };
+
+/** What the free tier gives, printed next to the paid plans. */
+export const FREE_TIER_HIGHLIGHTS: string[] = [
+  "Le parcours complet de comptabilité générale, ses quatre niveaux et ses deux cas pratiques",
+  "Corrections structurées et file de révision active",
+  "Les deux premiers niveaux du lab Excel en démonstration"
+];
 
 export function isBillingPlanKey(value: string): value is BillingPlanKey {
   return (BILLING_PLAN_KEYS as readonly string[]).includes(value);
@@ -115,6 +148,121 @@ const ENTITLING_STATUSES: readonly string[] = ["active", "trialing"];
 
 export function isEntitlingStatus(status: string): boolean {
   return ENTITLING_STATUSES.includes(status);
+}
+
+/**
+ * What a status means *to the learner*, as opposed to what it means to the gate.
+ *
+ * The gate only ever needs one bit, and {@link isEntitlingStatus} is that bit.
+ * But "access is closed" is not a message: somebody whose card was declined
+ * needs to update it, somebody who cancelled needs to resubscribe, and somebody
+ * whose 3-D Secure step was abandoned needs to finish paying. Collapsing all of
+ * them into "abonnement inactif" turns a fixable problem into a dead end, and
+ * every one of these states is reachable in production.
+ *
+ * `selfServiceable` says whether the customer portal can actually fix it. It is
+ * false for `incomplete` — an unconfirmed first payment is finished at
+ * checkout, not in the portal — and for the terminal states, where the answer
+ * is a new subscription rather than a repair.
+ */
+export type SubscriptionAccessKind =
+  | "entitling"
+  | "payment-retry"
+  | "payment-failed"
+  | "awaiting-confirmation"
+  | "setup-abandoned"
+  | "paused"
+  | "ended"
+  | "unknown";
+
+export interface SubscriptionStatusFacts {
+  status: string;
+  kind: SubscriptionAccessKind;
+  entitling: boolean;
+  /** French, shown next to the subscription on the account page. */
+  learnerMessage: string;
+  /** True when the Stripe customer portal is the right place to fix it. */
+  selfServiceable: boolean;
+}
+
+const STATUS_FACTS: Record<SubscriptionStatus, Omit<SubscriptionStatusFacts, "status">> = {
+  active: {
+    kind: "entitling",
+    entitling: true,
+    learnerMessage: "Abonnement actif.",
+    selfServiceable: true
+  },
+  trialing: {
+    kind: "entitling",
+    entitling: true,
+    learnerMessage: "Période d'essai en cours : l'accès est ouvert.",
+    selfServiceable: true
+  },
+  past_due: {
+    kind: "payment-retry",
+    entitling: false,
+    learnerMessage:
+      "Le dernier paiement a échoué et Stripe le represente. L'accès est suspendu en attendant : mettez à jour votre moyen de paiement pour le rouvrir.",
+    selfServiceable: true
+  },
+  unpaid: {
+    kind: "payment-failed",
+    entitling: false,
+    learnerMessage:
+      "Les relances de paiement ont toutes échoué et l'abonnement n'est plus honoré. Mettez à jour votre moyen de paiement ou reprenez un abonnement.",
+    selfServiceable: true
+  },
+  incomplete: {
+    kind: "awaiting-confirmation",
+    entitling: false,
+    learnerMessage:
+      "Le premier paiement n'a pas été confirmé — il manque souvent la validation bancaire. Reprenez le paiement pour ouvrir l'accès.",
+    selfServiceable: false
+  },
+  incomplete_expired: {
+    kind: "setup-abandoned",
+    entitling: false,
+    learnerMessage:
+      "Le premier paiement n'a jamais été confirmé et la session a expiré. Aucun montant n'a été débité.",
+    selfServiceable: false
+  },
+  paused: {
+    kind: "paused",
+    entitling: false,
+    learnerMessage: "Abonnement en pause : l'accès est suspendu jusqu'à sa reprise.",
+    selfServiceable: true
+  },
+  canceled: {
+    kind: "ended",
+    entitling: false,
+    learnerMessage: "Abonnement résilié. L'accès reste ouvert jusqu'à la fin de la période payée.",
+    selfServiceable: false
+  }
+};
+
+export function isSubscriptionStatus(value: string): value is SubscriptionStatus {
+  return (SUBSCRIPTION_STATUSES as readonly string[]).includes(value);
+}
+
+/**
+ * Facts about a status, including one Stripe has never sent.
+ *
+ * An unrecognised status resolves to `unknown` and grants nothing. Stripe adds
+ * statuses; guessing that a new one is safe is how a gate opens by accident.
+ */
+export function classifySubscriptionStatus(status: string): SubscriptionStatusFacts {
+  if (!isSubscriptionStatus(status)) {
+    return {
+      status,
+      kind: "unknown",
+      entitling: false,
+      learnerMessage:
+        "État d'abonnement non reconnu par cette version de l'application. L'accès reste fermé par précaution.",
+      selfServiceable: true
+    };
+  }
+
+  return { status, ...STATUS_FACTS[status] };
 }
 
 /**

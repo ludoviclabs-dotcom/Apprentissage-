@@ -76,11 +76,19 @@ export async function POST(request: Request) {
 
   if (!configured) {
     // The plan exists in the catalogue but this deployment has no price for it.
-    // Saying so beats a Stripe error about a missing price the caller cannot see.
+    // The *learner* is told that plainly; which variable an operator has to set
+    // is written to the server log and to `/admin/billing`, because a response
+    // body ends up on a stranger's screen and an environment variable name is
+    // an unnecessary hint about how this deployment is wired.
+    console.warn(
+      `[stripe-checkout] plan "${body.data.plan}" has no price configured (${BILLING_PLANS[body.data.plan].priceEnvVar})`
+    );
+
     return Response.json(
       {
-        error: "Plan non configuré",
-        details: `Aucun prix Stripe pour ce plan : renseigne ${BILLING_PLANS[body.data.plan].priceEnvVar}.`
+        error: "Formule indisponible",
+        details:
+          "Cette formule n'est pas proposée sur ce déploiement. Choisissez une autre formule ou réessayez plus tard."
       },
       { status: 409 }
     );
@@ -104,7 +112,7 @@ export async function POST(request: Request) {
         {
           error: "Abonnement déjà actif",
           details:
-            "Un abonnement est déjà actif sur ce compte. Résilie-le depuis Stripe avant d'en souscrire un autre.",
+            "Un abonnement est déjà actif sur ce compte. Ouvrez « Gérer mon abonnement » depuis votre compte pour le modifier ou le résilier.",
           planKey: active.planKey
         },
         { status: 409 }
