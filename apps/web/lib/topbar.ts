@@ -105,6 +105,15 @@ const RULES: readonly TopbarRule[] = [
     }
   },
   {
+    prefix: "/exercices/session-decouverte",
+    config: {
+      section: "S'entraîner",
+      title: "Session découverte",
+      subtitle: "Cinq exercices guidés, correction immédiate, rien d'enregistré.",
+      breadcrumb: [crumb("S'entraîner"), crumb("Exercices", "/exercices"), crumb("Session découverte")]
+    }
+  },
+  {
     prefix: "/exercices",
     config: {
       section: "S'entraîner",
@@ -138,6 +147,17 @@ const RULES: readonly TopbarRule[] = [
       title: "Simulations",
       subtitle: "Scénarios chiffrés à manipuler.",
       breadcrumb: [crumb("S'entraîner"), crumb("Simulations")]
+    }
+  },
+  {
+    // Avant `/revisions`, sinon la règle générale l'absorberait et le carnet
+    // s'annoncerait « Session du jour » — le défaut que PR-20 corrige.
+    prefix: "/revisions/carnet-erreurs",
+    config: {
+      section: "Réviser",
+      title: "Carnet d'erreurs",
+      subtitle: "Les erreurs à retravailler, par nature et par compétence.",
+      breadcrumb: [crumb("Réviser", "/revisions"), crumb("Carnet d'erreurs")]
     }
   },
   {

@@ -4,8 +4,10 @@ import {
   HOME_NAV_ITEM,
   PRIMARY_NAV_SECTIONS,
   ariaCurrentFor,
+  isNavItemActive,
   isPathActive,
-  isSectionActive
+  isSectionActive,
+  resolveActiveHref
 } from "@/lib/navigation";
 import { resolveTopbar } from "@/lib/topbar";
 import {
@@ -58,7 +60,7 @@ describe("état actif des routes imbriquées", () => {
   });
 
   it("un lien d'ancre ne revendique jamais l'état actif", () => {
-    expect(isPathActive("/revisions", "/revisions#carnet-erreurs")).toBe(false);
+    expect(isPathActive("/progression", "/progression#badges")).toBe(false);
     expect(ariaCurrentFor("/progression", "/progression#badges")).toBeUndefined();
   });
 
@@ -71,6 +73,78 @@ describe("état actif des routes imbriquées", () => {
   });
 });
 
+/**
+ * PR-20. `/revisions/carnet-erreurs` est couvert par deux entrées du menu, et
+ * c'est la plus spécifique qui doit gagner. `isPathActive` seul en allumait
+ * deux, avec deux `aria-current` simultanés — un lecteur d'écran annonçait deux
+ * pages courantes.
+ */
+describe("une seule entrée active, la plus spécifique", () => {
+  it("désigne le carnet d'erreurs, pas la session du jour", () => {
+    expect(resolveActiveHref("/revisions/carnet-erreurs")).toBe("/revisions/carnet-erreurs");
+    expect(isNavItemActive("/revisions/carnet-erreurs", "/revisions/carnet-erreurs")).toBe(true);
+    expect(isNavItemActive("/revisions/carnet-erreurs", "/revisions")).toBe(false);
+    expect(ariaCurrentFor("/revisions/carnet-erreurs", "/revisions")).toBeUndefined();
+    expect(ariaCurrentFor("/revisions/carnet-erreurs", "/revisions/carnet-erreurs")).toBe("page");
+  });
+
+  it("laisse la session du jour active sur /revisions", () => {
+    expect(isNavItemActive("/revisions", "/revisions")).toBe(true);
+    expect(isNavItemActive("/revisions", "/revisions/carnet-erreurs")).toBe(false);
+  });
+
+  /**
+   * La session découverte n'a pas d'entrée propre : c'est « Exercices » qui la
+   * porte, comme n'importe quelle route imbriquée sans lien dédié.
+   */
+  it("laisse Exercices porter la session découverte", () => {
+    expect(resolveActiveHref("/exercices/session-decouverte")).toBe("/exercices");
+    expect(ariaCurrentFor("/exercices/session-decouverte", "/exercices")).toBe("true");
+  });
+
+  it("garde la section Réviser dépliée sur les deux routes", () => {
+    const reviser = PRIMARY_NAV_SECTIONS.find((section) => section.key === "reviser");
+
+    expect(reviser && isSectionActive("/revisions", reviser)).toBe(true);
+    expect(reviser && isSectionActive("/revisions/carnet-erreurs", reviser)).toBe(true);
+  });
+
+  it("n'active exactement qu'une entrée par route", () => {
+    const everyLeaf = [
+      HOME_NAV_ITEM,
+      ...PRIMARY_NAV_SECTIONS.flatMap((section) => section.items),
+      ...ADMIN_NAV_SECTION.items
+    ];
+
+    for (const pathname of [
+      "/",
+      "/exercices",
+      "/exercices/session-decouverte",
+      "/revisions",
+      "/revisions/carnet-erreurs",
+      "/corrections/corr-1",
+      "/modules/excel-finance-lab/exercices/lab-1",
+      "/documents"
+    ]) {
+      const active = everyLeaf.filter((item) => isNavItemActive(pathname, item.href));
+
+      expect(active.map((item) => item.href), pathname).toHaveLength(1);
+    }
+  });
+
+  it("n'active rien sur une route hors menu", () => {
+    expect(resolveActiveHref("/route-inconnue")).toBeUndefined();
+  });
+
+  it("expose le carnet d'erreurs comme une vraie route, plus comme une ancre", () => {
+    const reviser = PRIMARY_NAV_SECTIONS.find((section) => section.key === "reviser");
+    const carnet = reviser?.items.find((item) => item.label === "Carnet d'erreurs");
+
+    expect(carnet?.href).toBe("/revisions/carnet-erreurs");
+    expect(carnet?.anchor).toBeUndefined();
+  });
+});
+
 describe("topbar contextuelle", () => {
   it("résout les exemples du cahier des charges", () => {
     expect(resolveTopbar("/exercices")).toMatchObject({ section: "S'entraîner", title: "Exercices" });
@@ -80,6 +154,34 @@ describe("topbar contextuelle", () => {
       section: "Apprendre",
       title: "Excel Finance Lab"
     });
+  });
+
+  /**
+   * Les deux routes de PR-20 s'annoncent elles-mêmes. Le carnet affichait
+   * « Session du jour » parce que la règle `/revisions` l'absorbait — c'est
+   * l'ordre des règles, du plus spécifique au plus général, qui le corrige.
+   */
+  it("donne au carnet et à la session découverte leur propre titre", () => {
+    expect(resolveTopbar("/revisions/carnet-erreurs")).toMatchObject({
+      section: "Réviser",
+      title: "Carnet d'erreurs"
+    });
+    expect(resolveTopbar("/revisions/carnet-erreurs").breadcrumb.map((entry) => entry.label)).toEqual(
+      ["Réviser", "Carnet d'erreurs"]
+    );
+
+    expect(resolveTopbar("/exercices/session-decouverte")).toMatchObject({
+      section: "S'entraîner",
+      title: "Session découverte"
+    });
+    expect(
+      resolveTopbar("/exercices/session-decouverte").breadcrumb.map((entry) => entry.label)
+    ).toEqual(["S'entraîner", "Exercices", "Session découverte"]);
+  });
+
+  it("ne casse pas les routes voisines", () => {
+    expect(resolveTopbar("/revisions").title).toBe("Session du jour");
+    expect(resolveTopbar("/exercices/tva-101").title).toBe("Exercices");
   });
 
   it("couvre les routes dynamiques par préfixe", () => {
