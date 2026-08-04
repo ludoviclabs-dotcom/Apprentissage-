@@ -22,6 +22,8 @@
 .page-stack.learn-page {
   gap: var(--space-5);
   color: var(--learn-ink);
+  /* La grotesque ne descend que sur la page ; le shell garde `--font-sans`. */
+  font-family: var(--learn-font-sans);
 }
 
 .learn-page .section-label {
@@ -125,7 +127,7 @@
 
 .learn-page .learn-score strong {
   color: var(--learn-on-navy);
-  font-family: var(--font-mono);
+  font-family: var(--learn-font-mono);
   font-size: 1.5rem;
   font-weight: 600;
 }
@@ -241,7 +243,7 @@
 
 .learn-page .logic-block--exercise .logic-block-id {
   color: var(--learn-teal-strong);
-  font-family: var(--font-mono);
+  font-family: var(--learn-font-mono);
   font-size: var(--font-size-xs);
 }
 
@@ -463,7 +465,7 @@
 
 .learn-page .source-search-row span {
   color: var(--learn-muted);
-  font-family: var(--font-mono);
+  font-family: var(--learn-font-mono);
   font-size: 0.72rem;
   font-weight: 400;
 }

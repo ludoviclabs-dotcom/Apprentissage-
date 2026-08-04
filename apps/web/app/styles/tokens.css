@@ -154,9 +154,12 @@
   --learn-control: 44px;
   --learn-control-lg: 48px;
 
-  /* Titres en serif éditorial. Aucune police n'est téléchargée : l'engagement
-     offline du produit interdit un appel réseau, la pile retombe donc sur les
-     serifs présents sur le système. */
+  /* Typographie de la refonte : trois familles auto-hébergées, déclarées dans
+     `styles/fonts.css` et servies depuis `public/fonts/`. Aucune requête vers
+     un CDN de polices, l'engagement offline du produit interdisant l'appel
+     réseau ; les piles de repli couvrent le temps du `font-display: swap`. */
+  --learn-font-sans: "Schibsted Grotesk", var(--font-sans);
   --learn-font-serif: Lora, "Iowan Old Style", "Palatino Linotype", Palatino,
     "Book Antiqua", Georgia, serif;
+  --learn-font-mono: "Spline Sans Mono", var(--font-mono);
 }

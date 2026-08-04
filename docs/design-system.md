@@ -12,6 +12,7 @@ cascade :
 | Fichier | Contenu |
 |---|---|
 | `styles/tokens.css` | Tous les tokens (`:root`). La seule source des valeurs. |
+| `styles/fonts.css` | `@font-face` des polices auto-hébergées de `public/fonts/`. |
 | `styles/base.css` | Reset, éléments nus, `:focus-visible` global, états `disabled`. |
 | `styles/layout.css` | Shell : sidebar, topbar, drawer mobile, workspace. |
 | `styles/components.css` | Panneaux, cartes, formulaires, tableaux, variantes PR-10. |
@@ -38,7 +39,8 @@ hauteur de contrôle, de z-index ou de durée passe par `tokens.css` d'abord.
 - **Motion** : `--motion-fast|base|slow` (150/200/240 ms), `--ease-out`,
   `--ease-in-out`.
 - **Apprendre** : famille `--learn-*` (canvas minéral, navy, indigo, teal,
-  ambre, rayons 10–16 px, hauteurs de contrôle 36/44/48, serif éditorial).
+  ambre, rayons 10–16 px, hauteurs de contrôle 36/44/48) et les trois piles
+  typographiques `--learn-font-sans|serif|mono`.
 
 ## Refonte Apprendre
 
@@ -55,8 +57,13 @@ partagés (`LearningCard`, `SourceReference`, `.primary-action`) gardent leur
 apparence sur les autres écrans ; `LearningCard` n'affiche la sortie vers
 l'exercice lié que si `showExerciseAction` est passé.
 
-Aucune police n'est téléchargée : `--learn-font-serif` est une pile de serifs
-système, l'engagement offline interdisant l'appel réseau d'un Google Font.
+Typographie : Schibsted Grotesk pour l'interface, Lora pour les titres,
+Spline Sans Mono pour les chiffres et les identifiants. Les trois familles
+sont **auto-hébergées** dans `public/fonts/` (woff2 variables, latin et
+latin-ext, ~196 Ko au total) et déclarées dans `styles/fonts.css` : aucune
+requête vers un CDN de polices, ni au build ni à l'exécution, donc
+l'engagement offline tient. Provenance, licence OFL et procédure de mise à
+jour : `apps/web/public/fonts/README.md`.
 
 ## Variantes de composants (`components/ui/`)
 
