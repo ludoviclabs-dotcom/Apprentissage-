@@ -46,7 +46,7 @@ export function TutorAskForm() {
   const providerMessage = response?.providerStatus ? PROVIDER_MESSAGES[response.providerStatus] : null;
 
   return (
-    <section className="panel action-form">
+    <section className="panel action-form tutor-panel">
       <div>
         <span className="section-label">Tuteur sourcé</span>
         <h2>Poser une question</h2>

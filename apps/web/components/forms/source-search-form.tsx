@@ -45,7 +45,7 @@ export function SourceSearchForm() {
   }
 
   return (
-    <section className="panel action-form">
+    <section className="panel action-form librarian-panel">
       <div>
         <span className="section-label">Bibliothecaire</span>
         <h2>Retrouver les sources avant de raisonner</h2>
@@ -54,13 +54,17 @@ export function SourceSearchForm() {
           seedé du repo ; avec la base active, elle porte sur les chunks importés.
         </p>
       </div>
-      <label>
-        Recherche
-        <input value={query} onChange={(event) => setQuery(event.target.value)} />
-      </label>
-      <button type="button" className="secondary-action" onClick={searchSources} disabled={isPending || query.length < 3}>
-        {isPending ? "Recherche..." : "Chercher les sources"}
-      </button>
+      {/* Le champ et son action tiennent la même ligne : la recherche est un
+          geste, pas un formulaire à parcourir. */}
+      <div className="librarian-query">
+        <label>
+          Recherche
+          <input value={query} onChange={(event) => setQuery(event.target.value)} />
+        </label>
+        <button type="button" className="secondary-action" onClick={searchSources} disabled={isPending || query.length < 3}>
+          {isPending ? "Recherche..." : "Chercher les sources"}
+        </button>
+      </div>
       {result?.hits ? (
         <div className="source-list">
           {result.hits.length > 0 ? (

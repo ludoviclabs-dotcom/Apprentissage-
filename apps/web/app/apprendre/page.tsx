@@ -23,7 +23,7 @@ export default async function LearnPage() {
 
   if (!currentLesson) {
     return (
-      <div className="page-stack">
+      <div className="page-stack learn-page">
         <section className="page-header">
           <div>
             <span className="section-label">Apprendre</span>
@@ -36,8 +36,11 @@ export default async function LearnPage() {
   }
 
   return (
-    <div className="page-stack">
+    <div className="page-stack learn-page">
+      {/* L'entête pose la page sur le canvas : la première carte est le
+          panneau de prochaine action, pas un cadre autour du titre. */}
       <PageHeader
+        variant="plain"
         label="Apprendre"
         title="Comprendre la logique avant de répondre"
         description="Chaque notion est découpée en concept, règle, raisonnement, exemple, erreur fréquente et exercice lié."
@@ -55,17 +58,23 @@ export default async function LearnPage() {
               : "Aucun ancien jour seedé n'est substitué à ton état."}
           </p>
         </div>
-        <strong>{progression.score === null ? "Neutre" : `${Math.round(progression.score)} %`}</strong>
+        <div className="learn-score">
+          <span className="section-label">Score</span>
+          <strong>{progression.score === null ? "Neutre" : `${Math.round(progression.score)} %`}</strong>
+        </div>
       </section>
 
-      <LearningCard lesson={currentLesson} />
+      <LearningCard lesson={currentLesson} showExerciseAction />
 
       <DiagnosticForm />
 
-      <TutorAskForm />
+      {/* Interroger le tuteur et fouiller le corpus sont le même geste vu de
+          deux côtés : ils partagent la rangée. */}
+      <div className="learn-duo">
+        <TutorAskForm />
 
-      <SourceSearchForm />
-
+        <SourceSearchForm />
+      </div>
     </div>
   );
 }

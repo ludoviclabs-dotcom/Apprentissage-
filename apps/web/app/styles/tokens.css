@@ -108,4 +108,55 @@
   --motion-slow: 240ms;
   --ease-out: cubic-bezier(0.2, 0, 0, 1);
   --ease-in-out: cubic-bezier(0.4, 0, 0.2, 1);
+
+  /* --- Refonte Apprendre ---------------------------------------------------
+     Palette éditoriale de la page /apprendre : canvas minéral, panneau navy
+     pour la prochaine action, indigo pour la conduite et teal pour l'espace
+     pédagogique. Les valeurs vivent ici, comme toute autre valeur du produit ;
+     seules les règles de `styles/learn.css` les consomment, sous `.learn-page`.
+     Le reste du produit garde sa palette. */
+  --learn-canvas: #e8edf5;
+  --learn-navy: #0b132b;
+  --learn-navy-raised: #141f3c;
+  --learn-navy-border: #253254;
+  --learn-on-navy: #f2f5fc;
+  --learn-on-navy-muted: #c3cce0;
+  --learn-on-navy-faint: #8b97b5;
+
+  --learn-surface: #ffffff;
+  --learn-surface-tinted: #f4f7fb;
+  --learn-border: #d5deea;
+  --learn-border-soft: #e1e7f0;
+  --learn-field-border: #c2cede;
+
+  --learn-ink: #16213a;
+  --learn-text: #3d4a63;
+  --learn-muted: #64718c;
+
+  --learn-indigo: #4f46e5;
+  --learn-indigo-strong: #4338ca;
+  --learn-indigo-soft: #eef0fd;
+  --learn-teal: #0f766e;
+  --learn-teal-strong: #0c5f58;
+  --learn-teal-soft: #e1efed;
+  --learn-teal-border: #bfdcd8;
+  --learn-amber-surface: #fffbeb;
+  --learn-amber-border: #fde68a;
+  --learn-amber-label: #b45309;
+  --learn-amber-text: #92650b;
+
+  /* Rayons plus généreux et trois hauteurs de contrôle : 36 / 44 / 48. */
+  --learn-radius-panel: 16px;
+  --learn-radius-block: 12px;
+  --learn-radius-control: 11px;
+  --learn-radius-inset: 10px;
+  --learn-control-sm: 36px;
+  --learn-control: 44px;
+  --learn-control-lg: 48px;
+
+  /* Titres en serif éditorial. Aucune police n'est téléchargée : l'engagement
+     offline du produit interdit un appel réseau, la pile retombe donc sur les
+     serifs présents sur le système. */
+  --learn-font-serif: Lora, "Iowan Old Style", "Palatino Linotype", Palatino,
+    "Book Antiqua", Georgia, serif;
 }

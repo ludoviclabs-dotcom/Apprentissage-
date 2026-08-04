@@ -15,6 +15,7 @@ cascade :
 | `styles/base.css` | Reset, éléments nus, `:focus-visible` global, états `disabled`. |
 | `styles/layout.css` | Shell : sidebar, topbar, drawer mobile, workspace. |
 | `styles/components.css` | Panneaux, cartes, formulaires, tableaux, variantes PR-10. |
+| `styles/learn.css` | Habillage de `/apprendre`, entièrement sous `.learn-page`. |
 | `styles/utilities.css` | Helpers transverses (`.muted`, `.table-scroll`, skip link). |
 | `styles/motion.css` | Le système de mouvement et la politique reduced-motion. |
 
@@ -36,6 +37,26 @@ hauteur de contrôle, de z-index ou de durée passe par `tokens.css` d'abord.
 - **Couches** : `--z-topbar`, `--z-menu`, `--z-drawer`, `--z-skip-link`.
 - **Motion** : `--motion-fast|base|slow` (150/200/240 ms), `--ease-out`,
   `--ease-in-out`.
+- **Apprendre** : famille `--learn-*` (canvas minéral, navy, indigo, teal,
+  ambre, rayons 10–16 px, hauteurs de contrôle 36/44/48, serif éditorial).
+
+## Refonte Apprendre
+
+`/apprendre` porte une hiérarchie bento : canvas minéral `--learn-canvas`,
+un panneau navy pour la prochaine action, du blanc réservé aux espaces
+pédagogiques (leçon, tuteur, bibliothécaire) et des surfaces teintées
+`--learn-surface-tinted` partout ailleurs. Les six blocs de la leçon sont
+lisibles au premier coup d'œil : indigo pour la conduite (concept, règle,
+raisonnement), teal pour l'application (exemple, exercice lié), ambre pour
+l'erreur fréquente.
+
+Règles : tout est sous `.learn-page`, jamais au-dessus. Les composants
+partagés (`LearningCard`, `SourceReference`, `.primary-action`) gardent leur
+apparence sur les autres écrans ; `LearningCard` n'affiche la sortie vers
+l'exercice lié que si `showExerciseAction` est passé.
+
+Aucune police n'est téléchargée : `--learn-font-serif` est une pile de serifs
+système, l'engagement offline interdisant l'appel réseau d'un Google Font.
 
 ## Variantes de composants (`components/ui/`)
 
