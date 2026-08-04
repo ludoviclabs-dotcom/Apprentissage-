@@ -32,7 +32,7 @@ export async function POST(request: Request) {
 
   if (!features.persistence.enabled) {
     return Response.json(
-      { error: "Administration indisponible", details: features.persistence.reason },
+      { error: "Administration indisponible", details: features.persistence.publicMessage },
       { status: 501 }
     );
   }

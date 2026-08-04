@@ -1,8 +1,10 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { GraduationCap } from "lucide-react";
+import { PUBLIC_DEMO_TITLE } from "@/lib/features";
 import type { RuntimeFlags } from "@/lib/runtime-flags";
 import { MobileNav } from "@/components/shell/mobile-nav";
+import { PublicDemoNotice } from "@/components/public-demo-notice";
 import { SidebarNav } from "@/components/shell/sidebar-nav";
 import { Topbar } from "@/components/shell/topbar";
 
@@ -28,7 +30,7 @@ export function AppShell({
   // Démo publique forcée avec un compte connecté : le shell reste l'AppShell
   // (progression personnelle), mais le branding et le statut disent la vérité.
   const statusLabel = runtime.publicDemo
-    ? "Démo publique lecture seule"
+    ? PUBLIC_DEMO_TITLE
     : runtime.databaseActive
       ? "Base privée active"
       : "Données locales seedées";
@@ -74,15 +76,7 @@ export function AppShell({
           authEnabled={runtime.features.auth.enabled}
           userEmail={user?.email ?? null}
         />
-        {runtime.publicDemo ? (
-          <section className="demo-banner" aria-label="Statut de la démonstration">
-            <strong>Démo publique</strong>
-            <span>
-              Les imports et uploads sont bloqués en production publique. Rien de ce qui est saisi
-              ici n'est enregistré.
-            </span>
-          </section>
-        ) : null}
+        {runtime.publicDemo ? <PublicDemoNotice /> : null}
         <main id="contenu" className="content">
           {children}
         </main>

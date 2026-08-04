@@ -36,7 +36,7 @@ export async function POST(request: Request) {
     // An attestation that vanishes on restart is worse than none: it is a
     // document the learner would go on to quote.
     return Response.json(
-      { error: "Attestation indisponible", details: features.persistence.reason },
+      { error: "Attestation indisponible", details: features.persistence.publicMessage },
       { status: 501 }
     );
   }

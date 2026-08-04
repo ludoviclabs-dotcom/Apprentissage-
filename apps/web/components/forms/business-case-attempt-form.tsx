@@ -70,7 +70,7 @@ export function BusinessCaseAttemptForm({
         type="button"
         className="primary-action"
         disabled={pending || locked || tooShort}
-        title={locked ? writes.reason : undefined}
+        title={locked ? writes.publicMessage : undefined}
         onClick={() => void submit()}
       >
         Soumettre le cas
@@ -79,7 +79,7 @@ export function BusinessCaseAttemptForm({
         <div className="result-box">
           <strong>{attempt.score}/20</strong>
           <span>{attempt.correction}</span>
-          {persistence.enabled ? null : <span className="muted">{persistence.reason}</span>}
+          {persistence.enabled ? null : <span className="muted">{persistence.publicMessage}</span>}
         </div>
       ) : null}
       {error ? <div className="result-box error">{error}</div> : null}

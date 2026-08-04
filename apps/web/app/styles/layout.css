@@ -504,14 +504,21 @@
   color: var(--text);
 }
 
+/* La notice de mode découverte.
+
+   Elle portait les couleurs de danger. Le rouge annonçait une panne alors que
+   la page fonctionne : le visiteur peut tout consulter et tout essayer, seule
+   la mémoire manque. Un ton d'information dit la même chose sans alarmer, et
+   c'est le seul changement visuel de PR-20 — l'état a changé de nature, pas la
+   grille. */
 .demo-banner {
   display: flex;
   align-items: center;
   gap: 12px;
   padding: 12px 28px;
-  border-bottom: 1px solid var(--danger-border);
-  background: var(--danger-surface);
-  color: var(--danger-strong);
+  border-bottom: 1px solid var(--border);
+  background: var(--accent-softer);
+  color: var(--accent-strong);
 }
 
 .demo-banner strong {
@@ -521,7 +528,7 @@
 }
 
 .demo-banner span {
-  color: #4b5563;
+  color: var(--text);
   line-height: 1.45;
 }
 

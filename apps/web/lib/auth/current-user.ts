@@ -67,9 +67,12 @@ export async function resolveWriteUser(): Promise<
     return {
       response: Response.json(
         {
+          // Le diagnostic — quelle variable activer — reste serveur : il est
+          // dans `availability-diagnostics.ts`. Ce que lit le navigateur dit
+          // seulement ce qui est possible ici.
           error: "Comptes requis pour enregistrer",
           details:
-            "La base est active mais LEARNING_HUB_AUTH_ENABLED=false : une écriture ne pourrait être rattachée à personne."
+            "Cet espace fonctionne sans compte : une réponse enregistrée ne pourrait être rattachée à personne."
         },
         { status: 409 }
       )
@@ -135,7 +138,7 @@ export async function requireCurrentUser(): Promise<
       response: Response.json(
         {
           error: "Authentification désactivée",
-          details: features.auth.reason
+          details: features.auth.publicMessage
         },
         { status: 501 }
       )

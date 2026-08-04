@@ -179,7 +179,7 @@ export function FormulaExerciseForm({
                 : "Brouillon enregistré automatiquement."}
           </span>
         ) : persistence.enabled ? null : (
-          <span className="result-inline muted">{persistence.reason}</span>
+          <span className="result-inline muted">{persistence.publicMessage}</span>
         )}
       </div>
 

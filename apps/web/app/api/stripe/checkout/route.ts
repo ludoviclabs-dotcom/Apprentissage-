@@ -44,7 +44,7 @@ export async function POST(request: Request) {
 
   if (!features.billing.enabled) {
     return Response.json(
-      { error: "Paiement indisponible", details: features.billing.reason },
+      { error: "Paiement indisponible", details: features.billing.publicMessage },
       { status: 501 }
     );
   }

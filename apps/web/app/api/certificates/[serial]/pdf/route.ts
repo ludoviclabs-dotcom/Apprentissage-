@@ -26,7 +26,7 @@ export async function GET(
 
   if (!features.persistence.enabled) {
     return Response.json(
-      { error: "Attestations indisponibles", details: features.persistence.reason },
+      { error: "Attestations indisponibles", details: features.persistence.publicMessage },
       { status: 501 }
     );
   }

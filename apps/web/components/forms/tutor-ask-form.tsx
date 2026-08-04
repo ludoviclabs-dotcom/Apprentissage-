@@ -15,7 +15,8 @@ interface TutorResponse {
 
 const PROVIDER_MESSAGES: Record<NonNullable<TutorResponse["providerStatus"]>, string | null> = {
   ok: null,
-  disabled: "Aucun modèle configuré (AI_PROVIDER=none) : réponse assemblée depuis le corpus seedé.",
+  disabled:
+    "Aucun tuteur conversationnel n'est activé ici : la réponse est assemblée depuis le corpus documentaire local.",
   failed: "Le modèle configuré n'a pas répondu : réponse de repli assemblée depuis le corpus seedé."
 };
 

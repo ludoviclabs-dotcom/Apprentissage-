@@ -30,7 +30,7 @@ export async function POST() {
 
   if (!features.billing.enabled) {
     return Response.json(
-      { error: "Gestion de l'abonnement indisponible", details: features.billing.reason },
+      { error: "Gestion de l'abonnement indisponible", details: features.billing.publicMessage },
       { status: 501 }
     );
   }
