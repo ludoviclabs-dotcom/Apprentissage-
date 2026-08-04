@@ -95,7 +95,10 @@ export default async function AttestationPage({
         <span className="section-label">Attestation</span>
         <h2>Finance Learning Hub certifie que</h2>
         <p>
-          <strong>{certificate.holderEmail}</strong> a suivi et validé l'intégralité du parcours{" "}
+          {/* The printed name, not the account address: an attestation is shown
+              to third parties. Pre-PR-13 rows have no label and fall back. */}
+          <strong>{certificate.holderLabel || certificate.holderEmail}</strong> a suivi et validé
+          l'intégralité du parcours{" "}
           <strong>{certificate.trackLabel}</strong>, soit {certificate.levelCount} niveau
           {certificate.levelCount > 1 ? "x" : ""} acquis selon les règles du référentiel{" "}
           <strong>{certificate.curriculumVersionId}</strong>
@@ -111,6 +114,41 @@ export default async function AttestationPage({
           parcours interne : elle ne constitue ni un diplôme, ni une certification professionnelle
           reconnue par l'État.
         </p>
+      </section>
+
+      <section className="panel">
+        <span className="section-label">Document</span>
+        <h2>Télécharger l&apos;attestation</h2>
+        {certificate.verificationId ? (
+          <>
+            <p className="muted">
+              Le PDF porte un QR code et une adresse de vérification : un tiers peut confirmer sa
+              validité sans avoir accès à votre compte.
+            </p>
+            <div className="journal-actions">
+              <a
+                className="primary-action"
+                href={`/api/certificates/${certificate.serial}/pdf`}
+                download
+              >
+                Télécharger le PDF
+              </a>
+              <a
+                className="secondary-action"
+                href={`/verify/${certificate.verificationId}`}
+                target="_blank"
+                rel="noreferrer"
+              >
+                Voir la page de vérification
+              </a>
+            </div>
+          </>
+        ) : (
+          <p className="muted">
+            Cette attestation a été délivrée avant la mise en place de la vérification publique :
+            elle reste consultable ici, mais sans PDF ni QR code.
+          </p>
+        )}
       </section>
 
       <section className="panel">

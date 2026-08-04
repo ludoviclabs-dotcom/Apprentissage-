@@ -1,11 +1,14 @@
 import { randomBytes } from "node:crypto";
 import { and, desc, eq, sql } from "drizzle-orm";
 import {
+  VERIFICATION_ID_BYTES,
+  encodeVerificationId,
   evaluateCertificateEligibility,
   formatCertificateSerial,
   isEntitlementActive,
   isEntitlementFeature,
   type BillingIntent,
+  type CertificateContent,
   type CertificateEligibility,
   type CertificateRecord,
   type EntitlementFeature,
@@ -19,6 +22,7 @@ import { canUseDatabase, createDb } from "./client";
 import {
   billingCustomersTable,
   billingEventsTable,
+  certificateVerificationsTable,
   certificatesTable,
   entitlementsTable,
   subscriptionsTable
@@ -516,11 +520,15 @@ async function revokeEntitlements(
 export interface IssueCertificateInput {
   userId: string;
   holderEmail: string;
+  /** The name printed on the document, frozen here (PR-13). */
+  holderLabel: string;
   trackId: string;
   trackLabel: string;
   curriculumVersionId: string;
   levels: ModuleLevelDefinition[];
   snapshots: LevelSnapshot[];
+  /** Everything the PDF asserts, as asserted at this instant (PR-13). */
+  content: CertificateContent;
 }
 
 export type IssueCertificateResult =
@@ -537,6 +545,8 @@ function toCertificateRecord(row: {
   averageScore: number;
   issuedAt: string;
   revokedAt: string | null;
+  holderLabel?: string;
+  verificationId?: string | null;
 }): CertificateRecord {
   return {
     ...row,
@@ -554,7 +564,11 @@ const CERTIFICATE_COLUMNS = {
   levelCount: certificatesTable.levelCount,
   averageScore: certificatesTable.averageScore,
   issuedAt: certificatesTable.issuedAt,
-  revokedAt: certificatesTable.revokedAt
+  revokedAt: certificatesTable.revokedAt,
+  // PR-13. `revokedReason` stays out: it is internal, and a projection that
+  // never selects it cannot accidentally render it.
+  holderLabel: certificatesTable.holderLabel,
+  verificationId: certificatesTable.verificationId
 };
 
 /**
@@ -586,9 +600,10 @@ export async function issueCertificate(input: IssueCertificateInput): Promise<Is
   }
 
   const serial = formatCertificateSerial(new Date().getUTCFullYear(), randomBytes(5).toString("hex"));
+  const verificationId = encodeVerificationId(randomBytes(VERIFICATION_ID_BYTES));
 
-  const inserted = await withUserContext(input.userId, (db) =>
-    db
+  const inserted = await withUserContext(input.userId, async (db) => {
+    const rows = await db
       .insert(certificatesTable)
       .values({
         userId: input.userId,
@@ -596,16 +611,37 @@ export async function issueCertificate(input: IssueCertificateInput): Promise<Is
         trackId: input.trackId,
         trackLabel: input.trackLabel,
         holderEmail: input.holderEmail,
+        holderLabel: input.holderLabel,
         curriculumVersionId: input.curriculumVersionId,
         levelCount: eligibility.totalLevels,
-        averageScore: eligibility.averageScore
+        averageScore: eligibility.averageScore,
+        verificationId,
+        contentJson: input.content,
+        status: "active"
       })
-      // The unique index on (user_id, track_id) is the real guard against a
-      // double click racing itself; this turns the collision into "you already
-      // have one" rather than a 500.
+      // The partial unique index on the *active* rows is the real guard against
+      // a double click racing itself; this turns the collision into "you
+      // already have one" rather than a 500.
       .onConflictDoNothing()
-      .returning(CERTIFICATE_COLUMNS)
-  );
+      .returning(CERTIFICATE_COLUMNS);
+
+    if (rows.length > 0) {
+      // Written in the same transaction as the certificate: a document that
+      // exists but cannot be verified — or a verification row for a document
+      // that was never issued — would both be worse than failing outright.
+      await db.insert(certificateVerificationsTable).values({
+        verificationId,
+        serial,
+        holderLabel: input.holderLabel,
+        trackLabel: input.trackLabel,
+        curriculumVersionId: input.curriculumVersionId,
+        issuedAt: rows[0]!.issuedAt,
+        status: "active"
+      });
+    }
+
+    return rows;
+  });
 
   if (inserted.length === 0) {
     const raced = await getCertificateForTrack(input.userId, input.trackId);

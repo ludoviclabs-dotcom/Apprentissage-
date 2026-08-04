@@ -1,9 +1,15 @@
-import { issueCertificate, refreshTrackProgress } from "@finance/db";
-import { activeCurriculum, certificateBlockerLabel } from "@finance/domain";
+import { getUserProfile, issueCertificate, refreshTrackProgress } from "@finance/db";
+import {
+  activeCurriculum,
+  certificateBlockerLabel,
+  evaluateCertificateEligibility
+} from "@finance/domain";
 import { z } from "zod";
 import { requireCurrentUser } from "@/lib/auth/current-user";
 import { findAttestableTrack, getTrackLevelDefinitions } from "@/lib/billing/certificates";
+import { buildCertificateContent, resolveHolderLabel } from "@/lib/certificates/content";
 import { getFeatures } from "@/lib/features";
+import { getCanonicalTrackState } from "@/lib/learning-progression";
 
 /**
  * Issues the completion attestation for a finished track.
@@ -65,15 +71,55 @@ export async function POST(request: Request) {
     return Response.json({ error: "Parcours sans attestation" }, { status: 404 });
   }
 
+  // The name goes on the document and cannot be invented. Refusing here is
+  // kinder than printing an attestation addressed to an inbox.
+  const profile = await getUserProfile(caller.user.id).catch(() => null);
+  const holderLabel = resolveHolderLabel(profile?.displayName);
+
+  if (!holderLabel) {
+    return Response.json(
+      {
+        error: "Nom manquant",
+        details:
+          "Renseigne ton nom dans « Mon compte » avant de demander une attestation : c'est le nom qui sera imprimé dessus.",
+        blockers: ["holder-name-missing"]
+      },
+      { status: 409 }
+    );
+  }
+
   try {
+    const levels = getTrackLevelDefinitions(track.trackId);
+    const snapshots = await refreshTrackProgress(caller.user.id, track.trackId);
+    // The curriculum that graded this learner, not whichever one is active
+    // today. An enrolment is pinned to a version, and an attestation citing a
+    // version that never scored them would be false — durably so, once it is a
+    // PDF in somebody's files.
+    const progression = await getCanonicalTrackState(caller.user.id, track.trackId);
+    const curriculumVersionId = progression.curriculumId || activeCurriculum.id;
+
     const result = await issueCertificate({
       userId: caller.user.id,
       holderEmail: caller.user.email,
+      holderLabel,
       trackId: track.trackId,
       trackLabel: track.label,
-      curriculumVersionId: activeCurriculum.id,
-      levels: getTrackLevelDefinitions(track.trackId),
-      snapshots: await refreshTrackProgress(caller.user.id, track.trackId)
+      curriculumVersionId,
+      levels,
+      snapshots,
+      content: buildCertificateContent({
+        holderLabel,
+        trackLabel: track.label,
+        curriculumVersionId,
+        trackId: track.trackId,
+        levels,
+        snapshots,
+        averageScore: evaluateCertificateEligibility({
+          levels,
+          snapshots,
+          entitled: true
+        }).averageScore
+      })
     });
 
     if (result.status === "refused") {

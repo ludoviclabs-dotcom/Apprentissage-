@@ -14,7 +14,8 @@ export const migrationFiles = [
   "migrations/0008_spreadsheet_evaluation_type.sql",
   "migrations/0009_billing_entitlements.sql",
   "migrations/0010_canonical_learning_progression.sql",
-  "migrations/0011_excel_formula_engine.sql"
+  "migrations/0011_excel_formula_engine.sql",
+  "migrations/0012_certificate_verification.sql"
 ] as const;
 
 /** Tables protected by row level security, keyed on `user_id`. */
@@ -103,7 +104,13 @@ export const tables = [
   "entitlements",
   "certificates",
   // Excel lab drafts (PR-12b): owned, hence also in `userOwnedTables` above.
-  "lab_workbooks"
+  "lab_workbooks",
+  // PR-13: the public projection of an issued certificate, and the internal
+  // revocation trail. Both absent from `userOwnedTables` on purpose — neither
+  // has a `user_id` to police, and the opaque verification id is what guards
+  // the projection. See migration 0012.
+  "certificate_verifications",
+  "certificate_revocations"
 ] as const;
 
 export type TableName = (typeof tables)[number];
