@@ -7,7 +7,7 @@ import {
 } from "./errors";
 import { BudgetExhausted, evaluateNode, type Scalar } from "./evaluate";
 import { MAX_EVAL_STEPS, MAX_WORKBOOK_CELLS } from "./limits";
-import { addressKey, compareCellKeys, parseCellKey } from "./refs";
+import { compareCellKeys, parseCellKey, type CellAddress } from "./refs";
 import { parseFormula } from "./parser";
 
 /**
@@ -408,7 +408,20 @@ export function evaluateWorkbook(input: WorkbookInput): EvaluatedWorkbook {
   return { cells, order, cycles, stepsUsed: steps };
 }
 
-/** Direct precedents of a cell (the cells its formula reads), for highlighting. */
+/**
+ * Direct precedents of a cell (the cells its formula reads), for highlighting.
+ *
+ * IT ENUMERATES POPULATED CELLS, NOT COORDINATES. Expanding a range corner to
+ * corner looks equivalent and is not: the sheet is 64 × 9999, a formula may
+ * carry thirty ranges within the 512-character limit, and `=SUM(A1:BL9999)`
+ * repeated thirty times expands to roughly 640 000 keys. This function runs on
+ * the UI thread every time a cell is selected, so that expansion froze the grid
+ * for about a second — on a formula the engine considers perfectly valid, since
+ * `MAX_RANGE_CELLS` only bounds *evaluation*.
+ *
+ * Walking the workbook instead bounds the work by `MAX_WORKBOOK_CELLS`, and
+ * loses nothing: a coordinate with no cell behind it cannot be highlighted.
+ */
 export function getPrecedents(workbook: EvaluatedWorkbook, key: string): string[] {
   const cell = workbook.cells.get(key.toUpperCase());
 
@@ -416,20 +429,41 @@ export function getPrecedents(workbook: EvaluatedWorkbook, key: string): string[
     return [];
   }
 
-  const refs = new Set<string>(cell.formula.profile.cellRefs);
+  const { cellRefs, rangeRefs } = cell.formula.profile;
+  const refs = new Set<string>(cellRefs.filter((ref) => workbook.cells.has(ref)));
 
-  for (const rangeRef of cell.formula.profile.rangeRefs) {
-    const [startKey, endKey] = rangeRef.split(":");
-    const start = parseCellKey(startKey);
-    const end = parseCellKey(endKey);
+  if (rangeRefs.length > 0) {
+    const bounds = rangeRefs
+      .map((rangeRef) => {
+        const [startKey, endKey] = rangeRef.split(":");
 
-    if (!start || !end) {
-      continue;
-    }
+        return { start: parseCellKey(startKey), end: parseCellKey(endKey) };
+      })
+      .filter((range): range is { start: CellAddress; end: CellAddress } =>
+        Boolean(range.start && range.end)
+      );
 
-    for (let row = start.row; row <= end.row; row += 1) {
-      for (let column = start.column; column <= end.column; column += 1) {
-        refs.add(addressKey({ column, row }));
+    for (const populated of workbook.cells.keys()) {
+      if (refs.has(populated)) {
+        continue;
+      }
+
+      const address = parseCellKey(populated);
+
+      if (!address) {
+        continue;
+      }
+
+      const inside = bounds.some(
+        (range) =>
+          address.column >= range.start.column &&
+          address.column <= range.end.column &&
+          address.row >= range.start.row &&
+          address.row <= range.end.row
+      );
+
+      if (inside) {
+        refs.add(populated);
       }
     }
   }

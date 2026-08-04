@@ -10,6 +10,7 @@ import {
   MAX_RANGE_CELLS,
   MAX_WORKBOOK_CELLS,
   WorkbookLimitError,
+  compareCellKeys,
   evaluateWorkbook,
   formatFormula,
   getDependents,
@@ -235,6 +236,33 @@ describe("the dependency graph", () => {
 
     expect(values.get("B1")).toBe(11);
     expect(values.get("C1")).toBe(22);
+  });
+
+  it("bounds a large valid range by the populated cells, not by its corners", () => {
+    // Review finding P2. `MAX_RANGE_CELLS` bounds *evaluation*; nothing bounded
+    // the highlight expansion, so a formula the engine accepts — 30 ranges of
+    // A1:BL9999 fit inside the 512-character limit — expanded to ~640 000 keys
+    // on the UI thread every time a cell was selected, and froze the grid.
+    // Column BK and below, so the formula in BL1 is not inside its own ranges
+    // — that would be a cycle, and this test is about the expansion cost.
+    const ranges = Array.from({ length: 30 }, () => "SUM(A1:BK9999)").join("+");
+    const formula = `=${ranges}`;
+
+    expect(formula.length).toBeLessThanOrEqual(MAX_FORMULA_LENGTH);
+
+    const workbook = evaluateWorkbook({
+      cells: { A1: 1, A2: 2, B1: 3, Z50: 4, BK9999: 5, BL1: formula }
+    });
+
+    const started = Date.now();
+    const precedents = getPrecedents(workbook, "BL1");
+    const elapsed = Date.now() - started;
+
+    // Only the cells that exist: a coordinate with nothing behind it cannot be
+    // highlighted, so enumerating it bought nothing.
+    expect(precedents).toEqual(["A1", "B1", "A2", "Z50", "BK9999"].sort(compareCellKeys));
+    expect(precedents.length).toBeLessThanOrEqual(MAX_WORKBOOK_CELLS);
+    expect(elapsed).toBeLessThan(250);
   });
 
   it("exposes precedents and dependents, ranges expanded", () => {

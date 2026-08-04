@@ -39,8 +39,22 @@ export function resolveViewerRole(input: ViewerRoleInput): ViewerRole {
     return "guest";
   }
 
+  // An empty allow-list grants administration to NOBODY once accounts exist.
+  //
+  // It used to grant it to everybody, on the reasoning that a private install
+  // has a single user who should not be locked out of their own machine. That
+  // reasoning holds only while `authEnabled` is false — the branch above, which
+  // still returns `admin` — because that is the configuration with exactly one
+  // user. The moment accounts are on, anybody can sign up, and "no list
+  // configured" silently meant "every visitor who registers is an
+  // administrator". Harmless while administration only hid navigation links;
+  // not harmless since PR-13, where an administrator can revoke somebody else's
+  // attestation.
+  //
+  // Failing closed costs a configuration step and is recoverable. Failing open
+  // costs somebody else's document.
   if (input.adminEmails.length === 0) {
-    return "admin";
+    return "learner";
   }
 
   const email = input.userEmail.toLowerCase();

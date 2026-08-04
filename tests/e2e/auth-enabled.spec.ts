@@ -153,6 +153,19 @@ test("a signed-in learner without the admin role never sees the administration a
   const response = await page.goto("/documents");
   expect(response?.status()).toBeLessThan(400);
   await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
+
+  // Mais l'administration destructrice, elle, est refusée côté serveur. C'est
+  // la différence que PR-13 introduit : masquer un lien suffisait pour un
+  // inventaire documentaire, pas pour révoquer l'attestation d'un tiers.
+  const revoke = await page.request.post("/api/admin/certificates/revoke", {
+    data: {
+      serial: "FLH-2026-1A2B3C4D5E",
+      reason: "tentative de révocation par un compte non administrateur"
+    }
+  });
+
+  // 404 plutôt que 403 : répondre « interdit » confirmerait que la route existe.
+  expect(revoke.status()).toBe(404);
 });
 
 test("a signed-in user gets the personal continue CTA and the account menu", async ({ page }, testInfo) => {

@@ -1,15 +1,14 @@
 import { getUserProfile, issueCertificate, refreshTrackProgress } from "@finance/db";
-import {
-  activeCurriculum,
-  certificateBlockerLabel,
-  evaluateCertificateEligibility
-} from "@finance/domain";
+import { certificateBlockerLabel, evaluateCertificateEligibility } from "@finance/domain";
 import { z } from "zod";
 import { requireCurrentUser } from "@/lib/auth/current-user";
-import { findAttestableTrack, getTrackLevelDefinitions } from "@/lib/billing/certificates";
+import {
+  findAttestableTrack,
+  getTrackLevelDefinitions,
+  resolveLearnerCurriculumId
+} from "@/lib/billing/certificates";
 import { buildCertificateContent, resolveHolderLabel } from "@/lib/certificates/content";
 import { getFeatures } from "@/lib/features";
-import { getCanonicalTrackState } from "@/lib/learning-progression";
 
 /**
  * Issues the completion attestation for a finished track.
@@ -89,14 +88,17 @@ export async function POST(request: Request) {
   }
 
   try {
-    const levels = getTrackLevelDefinitions(track.trackId);
-    const snapshots = await refreshTrackProgress(caller.user.id, track.trackId);
     // The curriculum that graded this learner, not whichever one is active
-    // today. An enrolment is pinned to a version, and an attestation citing a
-    // version that never scored them would be false — durably so, once it is a
-    // PDF in somebody's files.
-    const progression = await getCanonicalTrackState(caller.user.id, track.trackId);
-    const curriculumVersionId = progression.curriculumId || activeCurriculum.id;
+    // today — and it decides the *levels* as well as the printed version
+    // string. Reading levels from the active curriculum while grading against
+    // the pinned one made an attestation unobtainable for anybody who finished
+    // a track before a level was added to it.
+    const curriculumVersionId = await resolveLearnerCurriculumId(
+      caller.user.id,
+      track.trackId
+    );
+    const levels = getTrackLevelDefinitions(track.trackId, curriculumVersionId);
+    const snapshots = await refreshTrackProgress(caller.user.id, track.trackId);
 
     const result = await issueCertificate({
       userId: caller.user.id,

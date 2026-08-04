@@ -59,11 +59,74 @@ const EVENT_AT = "2026-07-27T00:00:00.000Z";
 const LATER_EVENT_AT = "2026-08-27T00:00:00.000Z";
 const NEWEST_EVENT_AT = "2026-09-27T00:00:00.000Z";
 
+// --- Certificate fixture, shared by the issuing and re-issuing tests --------
+
+const FIXTURE_LEVELS: ModuleLevelDefinition[] = [
+  {
+    id: "level-fixture-1",
+    trackId: "track-fixture",
+    moduleId: "module-fixture",
+    domainId: "compta-generale",
+    level: 1,
+    title: "Fixture",
+    objective: "Fixture",
+    competencyIds: ["cg-cutoff"],
+    criticalCompetencyIds: ["cg-cutoff"],
+    estimatedMinutes: 60
+  }
+];
+
+function snapshot(status: LevelSnapshot["status"], score: number): LevelSnapshot {
+  return {
+    levelId: "level-fixture-1",
+    rulesVersion: "curriculum-2026-07",
+    status,
+    score,
+    components: { direct: score, retention: score, caseStudy: score, explanation: score },
+    missingKinds: [],
+    finalDiagnosticCompleted: true,
+    blockers: []
+  };
+}
+
+/**
+ * `curriculumVersionId` is a parameter because re-issuing on a curriculum
+ * change is decided by comparing it against the certificate already held.
+ */
+function certificateInput(userId: string, curriculumVersionId = "curriculum-2026-07") {
+  return {
+    userId,
+    holderEmail: "bob-billing@example.test",
+    // PR-13: the name printed on the document, and everything it asserts,
+    // frozen at issue time. The e-mail stays on the private row and never
+    // reaches the public verification projection.
+    holderLabel: "Bob Fixture",
+    trackId: "track-fixture",
+    trackLabel: "Parcours fixture",
+    curriculumVersionId,
+    levels: FIXTURE_LEVELS,
+    content: {
+      holderLabel: "Bob Fixture",
+      trackLabel: "Parcours fixture",
+      curriculumVersionId,
+      levelCount: 1,
+      averageScore: 88,
+      competencies: ["Compétence fixture"],
+      caseStudies: [],
+      allLevelsAcquired: true
+    }
+  };
+}
+
 describeWithDb("billing entitlements", () => {
   let admin: Sql;
   let alice: string;
   let bob: string;
   let billing: typeof import("../src/billing-repository");
+  // Verification and revocation live in their own repository (PR-13), and it
+  // has to be imported the same lazy way: the environment that decides whether
+  // a database may be used is set in `beforeAll`, above the import.
+  let certificates: typeof import("../src/certificate-repository");
 
   function subscriptionIntent(
     userId: string,
@@ -99,6 +162,7 @@ describeWithDb("billing entitlements", () => {
     process.env.FINANCE_HUB_USE_DATABASE = "true";
 
     billing = await import("../src/billing-repository");
+    certificates = await import("../src/certificate-repository");
     admin = postgres(ADMIN_DATABASE_URL!, { max: 1 });
 
     for (const file of migrationFiles) {
@@ -354,56 +418,7 @@ describeWithDb("billing entitlements", () => {
   });
 
   it("refuses an attestation while the track is unfinished, and issues exactly one after", async () => {
-    const levels: ModuleLevelDefinition[] = [
-      {
-        id: "level-fixture-1",
-        trackId: "track-fixture",
-        moduleId: "module-fixture",
-        domainId: "compta-generale",
-        level: 1,
-        title: "Fixture",
-        objective: "Fixture",
-        competencyIds: ["cg-cutoff"],
-        criticalCompetencyIds: ["cg-cutoff"],
-        estimatedMinutes: 60
-      }
-    ];
-
-    function snapshot(status: LevelSnapshot["status"], score: number): LevelSnapshot {
-      return {
-        levelId: "level-fixture-1",
-        rulesVersion: "curriculum-2026-07",
-        status,
-        score,
-        components: { direct: score, retention: score, caseStudy: score, explanation: score },
-        missingKinds: [],
-        finalDiagnosticCompleted: true,
-        blockers: []
-      };
-    }
-
-    const input = {
-      userId: bob,
-      holderEmail: "bob-billing@example.test",
-      // PR-13: the name printed on the document, and everything it asserts,
-      // frozen at issue time. The e-mail stays on the private row and never
-      // reaches the public verification projection.
-      holderLabel: "Bob Fixture",
-      trackId: "track-fixture",
-      trackLabel: "Parcours fixture",
-      curriculumVersionId: "curriculum-2026-07",
-      levels,
-      content: {
-        holderLabel: "Bob Fixture",
-        trackLabel: "Parcours fixture",
-        curriculumVersionId: "curriculum-2026-07",
-        levelCount: 1,
-        averageScore: 88,
-        competencies: ["Compétence fixture"],
-        caseStudies: [],
-        allLevelsAcquired: true
-      }
-    };
+    const input = certificateInput(bob);
 
     const tooEarly = await billing.issueCertificate({
       ...input,
@@ -448,6 +463,114 @@ describeWithDb("billing entitlements", () => {
 
     expect(await billing.hasEntitlement(bob, "completion-certificate")).toBe(false);
     expect(await billing.getCertificateForTrack(bob, "track-fixture")).not.toBeNull();
+  });
+
+  // --- Review findings P1/P2: revocation, re-issue and concurrency ----------
+
+  /** A manual grant, so a re-issue is not blocked by earlier churn tests. */
+  async function grantCertificateEntitlement(userId: string): Promise<void> {
+    await admin`
+      insert into entitlements (user_id, feature, status, source)
+      values (${userId}, 'completion-certificate', 'active', 'manual')
+      on conflict (user_id, feature)
+      do update set status = 'active', source = 'manual', revoked_at = null, expires_at = null`;
+  }
+
+  it("publishes a verification row a stranger can read without a session", async () => {
+    const certificate = await billing.getCertificateForTrack(bob, "track-fixture");
+    const verification = await certificates.getVerificationBySerial(certificate!.serial);
+
+    expect(verification?.status).toBe("active");
+    expect(verification?.holderLabel).toBe("Bob Fixture");
+    // The projection is what /verify reads, and it structurally cannot carry
+    // an address, a user id or a score.
+    expect(Object.keys(verification!)).not.toContain("holderEmail");
+    expect(JSON.stringify(verification)).not.toMatch(/@/);
+  });
+
+  it("lets a revoked attestation be re-issued instead of blocking it forever", async () => {
+    // The preceding test revoked Bob's subscription to prove an issued
+    // attestation survives churn. Re-issuing is a fresh issue, so it needs the
+    // entitlement back — by hand, which is also the grant path an operator
+    // would use for a beta tester.
+    await grantCertificateEntitlement(bob);
+
+    const before = await billing.getCertificateForTrack(bob, "track-fixture");
+
+    const revoked = await certificates.revokeCertificate({
+      serial: before!.serial,
+      reason: "émise par erreur pendant une reprise de données",
+      revokedBy: "admin@example.test"
+    });
+
+    expect(revoked.status).toBe("revoked");
+
+    // The learner asks again. Before this fix the private row stayed `active`,
+    // so this returned the dead certificate and the partial unique index
+    // refused any replacement — the attestation could never be reissued.
+    const reissued = await billing.issueCertificate({
+      ...certificateInput(bob),
+      snapshots: [snapshot("passed", 88)]
+    });
+
+    expect(reissued.status).toBe("issued");
+    expect(reissued.status !== "refused" && reissued.certificate.serial).not.toBe(before!.serial);
+
+    // The withdrawn one keeps verifying — as revoked. A document already handed
+    // out does not vanish; it stops standing.
+    expect((await certificates.getVerificationBySerial(before!.serial))?.status).toBe("revoked");
+  });
+
+  it("supersedes rather than revokes when the curriculum changes", async () => {
+    await grantCertificateEntitlement(bob);
+
+    const before = await billing.getCertificateForTrack(bob, "track-fixture");
+
+    const reissued = await billing.issueCertificate({
+      ...certificateInput(bob, "curriculum-2026-12"),
+      snapshots: [snapshot("passed", 88)]
+    });
+
+    expect(reissued.status).toBe("issued");
+
+    const previous = await certificates.getVerificationBySerial(before!.serial);
+
+    // Not "revoked": the older document was earned and still describes
+    // something true. Calling it revoked would accuse its holder of nothing.
+    expect(previous?.status).toBe("superseded");
+    expect(previous?.supersededBySerial).toBe(
+      reissued.status !== "refused" ? reissued.certificate.serial : null
+    );
+  });
+
+  it("lets exactly one of two concurrent revocations win", async () => {
+    const certificate = await billing.getCertificateForTrack(bob, "track-fixture");
+
+    const [first, second] = await Promise.all([
+      certificates.revokeCertificate({
+        serial: certificate!.serial,
+        reason: "première révocation concurrente du test",
+        revokedBy: "admin-a@example.test"
+      }),
+      certificates.revokeCertificate({
+        serial: certificate!.serial,
+        reason: "seconde révocation concurrente du test",
+        revokedBy: "admin-b@example.test"
+      })
+    ]);
+
+    const outcomes = [first.status, second.status].sort();
+
+    // One withdrawal, one audit entry. Both succeeding would leave two records
+    // of who withdrew the same document, which is exactly what an audit trail
+    // must not do.
+    expect(outcomes).toEqual(["already-revoked", "revoked"]);
+
+    const trail = (await certificates.listCertificateRevocations(50)).filter(
+      (entry) => entry.serial === certificate!.serial
+    );
+
+    expect(trail).toHaveLength(1);
   });
 
   it("claims a webhook event once and releases it on demand", async () => {

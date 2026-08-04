@@ -174,6 +174,18 @@ pour révoquer l'attestation d'un tiers, donc `requireAdmin` renvoie un refus.
 Il répond `404` et non `403` : un point d'entrée d'administration qui répond
 « interdit » confirme son existence.
 
+**La liste d'administrateurs devient obligatoire dès qu'il y a des comptes**
+(corrigé après revue). `resolveViewerRole` accordait le rôle `admin` à *tout le
+monde* quand `LEARNING_HUB_ADMIN_EMAILS` était vide, sur le raisonnement qu'une
+installation privée n'a qu'un utilisateur. Ce raisonnement ne vaut que pour la
+branche `!authEnabled`, qui est précisément la configuration à un seul
+utilisateur. Comptes activés, n'importe qui peut s'inscrire — et « aucune liste
+configurée » signifiait alors « chaque visiteur inscrit est administrateur ».
+Sans conséquence tant que l'administration ne masquait que des liens ; depuis ce
+PR, cela donnait le droit de révoquer l'attestation d'un tiers. La liste vide
+n'accorde donc plus rien : on échoue fermé, ce qui coûte une variable
+d'environnement au lieu du document de quelqu'un.
+
 ## Conséquences
 
 - Un tiers peut vérifier une attestation sans compte, et ne voit que validité,
@@ -190,16 +202,24 @@ Il répond `404` et non `403` : un point d'entrée d'administration qui répond
   est éditorial ; l'autorité est le prix Stripe présenté sur la page de
   checkout avant tout paiement, et la page le dit. Une dérive entre les deux est
   possible et se corrige dans le dépôt.
-- **La réémission sur changement de curriculum n'est pas automatique.**
-  `supersedeCertificate` existe et la page de vérification sait afficher un
-  remplacement ; aucun déclencheur ne le fait tout seul. Le jour où un
-  curriculum est publié, la réémission reste une opération.
+- **La réémission sur changement de curriculum est automatique** (corrigé après
+  revue) : redemander une attestation alors que la version épinglée a changé
+  remplace l'ancienne — `superseded`, jamais `revoked` — et la vérification
+  pointe vers le nouveau numéro. Elle reste déclenchée par l'apprenant, pas par
+  la publication elle-même.
 - **Les attestations d'avant PR-13 n'ont pas d'identifiant de vérification.**
   Elles restent consultables en HTML, sans PDF ni QR, et la page le dit plutôt
   que de promettre une vérification qu'elles ne portent pas.
-- **`certificates.status` et la projection peuvent diverger** après une
-  révocation administrative, puisque l'opérateur n'écrit pas la ligne privée.
-  La projection est l'autorité, et toute lecture de statut passe par elle.
+- **La ligne privée converge, elle ne diverge plus** (corrigé après revue).
+  L'opérateur n'écrit toujours pas `certificates` — la RLS l'en empêche — mais
+  laisser cette ligne à `active` indéfiniment ne coûtait pas qu'un peu de
+  cohérence : l'index unique partiel compte les lignes *actives*, donc une
+  attestation révoquée bloquait définitivement son propre remplacement, et
+  l'apprenant s'entendait répondre « vous en avez déjà une » à propos d'un
+  document qui ne vérifiait plus. `syncCertificateStatusFromPublic` laisse le
+  propriétaire réconcilier sa propre ligne, dans son propre contexte, au moment
+  où il redemande une attestation. La projection reste la seule autorité sur la
+  validité.
 - **Aucun test Playwright ne parcourt un vrai paiement Stripe.** Le flux en mode
   test est documenté dans `docs/local-runbook.md` et reproductible à la main ;
   l'automatiser exige des secrets de test que la CI publique n'a pas, et un skip
