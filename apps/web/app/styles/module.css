@@ -1,0 +1,308 @@
+/* Module — refonte visuelle de `/modules/comptabilite-generale`.
+
+   Même patron que `learn.css`, et c'est délibéré : toutes les règles sont sous
+   `.module-page`, la page change, le shell et les autres écrans ne bougent pas.
+   Aucun token global n'est modifié.
+
+   Les variables consommées ici sont les `--learn-*` de `tokens.css`. Le préfixe
+   dit d'où elles viennent, pas à quoi elles servent : c'est la palette de la
+   refonte, arrivée par la page Apprendre, et la partager vaut mieux que d'en
+   déclarer une seconde aux mêmes valeurs. Les renommer en tokens de refonte
+   sans préfixe de page est un travail à part, qui touchera `learn.css`.
+
+   Hiérarchie : canvas minéral, un panneau navy pour l'entête du module, du
+   blanc pour l'espace pédagogique (mini-cas, case studies), des surfaces
+   teintées pour le rail de niveaux. */
+
+/* Le canvas de la page. `:has()` garde le ciblage dans cette feuille plutôt que
+   dans le layout ; sans support, la page retombe sur le fond produit. */
+.app-shell:has(.module-page),
+.workspace:has(.module-page) {
+  background: var(--learn-canvas);
+}
+
+.page-stack.module-page {
+  gap: var(--space-5);
+  color: var(--learn-ink);
+  font-family: var(--learn-font-sans);
+}
+
+.module-page .section-label {
+  color: var(--learn-muted);
+  font-size: 0.7rem;
+  letter-spacing: 0.12em;
+}
+
+.module-page h1,
+.module-page h2 {
+  font-family: var(--learn-font-serif);
+  font-weight: 600;
+}
+
+/* --- Entête navy ---------------------------------------------------------- */
+
+.module-page .module-hero {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-8);
+  flex-wrap: wrap;
+  padding: var(--space-7) var(--space-8);
+  background: var(--learn-navy);
+  border-radius: var(--learn-radius-panel);
+  color: var(--learn-on-navy);
+}
+
+.module-page .module-hero > div:first-child {
+  flex: 1;
+  min-width: 300px;
+}
+
+.module-page .module-hero .section-label {
+  color: var(--learn-on-navy-faint);
+}
+
+.module-page .module-hero h1 {
+  margin: var(--space-2) 0;
+  font-size: 1.65rem;
+  line-height: 1.25;
+}
+
+.module-page .module-hero p {
+  max-width: 640px;
+  margin: 0;
+  color: var(--learn-on-navy-muted);
+  font-size: 0.875rem;
+  line-height: 1.6;
+}
+
+.module-stats {
+  display: grid;
+  flex: none;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--space-3);
+}
+
+.module-stats > div {
+  padding: var(--space-3) var(--space-5);
+  border: 1px solid var(--learn-navy-border);
+  background: var(--learn-navy-raised);
+  border-radius: var(--learn-radius-block);
+  text-align: center;
+}
+
+/* Le mono porte les nombres : quatre compteurs se comparent d'un coup d'œil
+   quand leurs chiffres sont alignés. */
+.module-stats strong {
+  display: block;
+  color: var(--learn-on-navy);
+  font-family: var(--learn-font-mono);
+  font-size: 1.3rem;
+  font-weight: 600;
+}
+
+.module-stats span {
+  color: var(--learn-on-navy-faint);
+  font-size: 0.72rem;
+  white-space: nowrap;
+}
+
+/* --- Contrôles : 36 / 44 / 48, rayons 10–12 ------------------------------- */
+
+.module-page .primary-action,
+.module-page .secondary-action {
+  min-height: var(--learn-control);
+  padding: 0 var(--space-5);
+  border-radius: var(--learn-radius-control);
+  font-size: 0.875rem;
+  font-weight: 650;
+}
+
+.module-page .primary-action {
+  border-color: transparent;
+  background: var(--learn-indigo);
+  color: var(--text-on-accent);
+}
+
+.module-page .primary-action:hover:not(:disabled) {
+  background: var(--learn-indigo-strong);
+}
+
+.module-page .secondary-action {
+  border: 1.5px solid var(--learn-indigo);
+  background: none;
+  color: var(--learn-indigo);
+}
+
+.module-page .secondary-action:hover:not(:disabled) {
+  background: var(--learn-indigo-soft);
+}
+
+.module-page .action-sm {
+  min-height: var(--learn-control-sm);
+  padding: 0 var(--space-4);
+  border-radius: var(--learn-radius-inset);
+  font-size: 0.82rem;
+}
+
+.module-page .action-lg {
+  min-height: var(--learn-control-lg);
+  padding: 0 var(--space-6);
+  border-radius: var(--learn-radius-block);
+  font-size: 0.94rem;
+}
+
+/* --- Rail de niveaux ------------------------------------------------------ */
+
+.module-page .level-track {
+  padding: var(--space-7);
+  border: 1px solid var(--learn-border);
+  background: var(--learn-surface);
+  border-radius: var(--learn-radius-panel);
+}
+
+.module-page .level-row {
+  border: 1px solid var(--learn-border);
+  background: var(--learn-surface-tinted);
+  border-radius: var(--learn-radius-block);
+}
+
+.module-page .level-index {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 36px;
+  min-height: 36px;
+  border: 0;
+  background: var(--learn-border-soft);
+  border-radius: var(--learn-radius-inset);
+  color: var(--learn-muted);
+  font-family: var(--learn-font-mono);
+}
+
+/* Le statut teinte la carte, et le libellé le répète en toutes lettres : la
+   couleur seule ne dit jamais où en est un niveau. */
+.module-page .level-row.passed {
+  border-color: var(--success-border);
+  background: var(--success-surface);
+}
+
+.module-page .level-row.passed .level-index {
+  background: var(--success);
+  color: var(--text-on-accent);
+}
+
+.module-page .level-row.in_progress,
+.module-page .level-row.available {
+  border-color: #c9c6f7;
+  background: var(--learn-indigo-soft);
+}
+
+.module-page .level-row.in_progress .level-index,
+.module-page .level-row.available .level-index {
+  background: var(--learn-indigo);
+  color: var(--text-on-accent);
+}
+
+.module-page .level-meta {
+  margin: var(--space-2) 0 0;
+  color: var(--learn-text);
+  font-size: 0.78rem;
+}
+
+.module-page .level-meta strong {
+  font-family: var(--learn-font-mono);
+  font-weight: 500;
+}
+
+.module-page .level-row-head .primary-action {
+  flex: none;
+  align-self: center;
+}
+
+.module-page .level-component {
+  border-color: var(--learn-border);
+  background: var(--learn-surface);
+  border-radius: var(--learn-radius-inset);
+}
+
+/* --- Espace pédagogique : mini-cas et case studies ------------------------ */
+
+.module-page .case-panel {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-6);
+  flex-wrap: wrap;
+  padding: var(--space-6) var(--space-7);
+  border: 1px solid var(--learn-border);
+  border-left: 4px solid var(--learn-teal);
+  background: var(--learn-surface);
+  border-radius: var(--learn-radius-panel);
+}
+
+.module-page .case-panel .section-label {
+  color: var(--learn-teal);
+}
+
+.case-panel-body {
+  flex: 1;
+  min-width: 280px;
+}
+
+.module-page .case-panel h2 {
+  margin: var(--space-1) 0 var(--space-2);
+  font-size: 1.25rem;
+}
+
+.module-page .case-panel p {
+  max-width: 720px;
+  margin: 0;
+  color: var(--learn-text);
+  line-height: 1.6;
+}
+
+.module-page .case-meta {
+  margin-top: var(--space-3);
+  color: var(--learn-muted);
+  font-size: 0.78rem;
+}
+
+.module-page .case-meta strong {
+  font-family: var(--learn-font-mono);
+  font-weight: 500;
+}
+
+/* Le CTA d'un espace pédagogique est teal, pas indigo : il ouvre une lecture
+   longue, il ne concurrence pas l'action dominante de l'écran. */
+.module-page .case-panel .secondary-action {
+  flex: none;
+  border-color: var(--learn-teal);
+  color: var(--learn-teal);
+}
+
+.module-page .case-panel .secondary-action:hover:not(:disabled) {
+  background: var(--learn-teal-soft);
+}
+
+@media (max-width: 900px) {
+  .module-page .module-hero {
+      flex-direction: column;
+      align-items: stretch;
+  }
+
+  .module-stats {
+      width: 100%;
+  }
+}
+
+@media (max-width: 560px) {
+  .module-stats {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .module-page .case-panel .secondary-action {
+      width: 100%;
+      justify-content: center;
+  }
+}
