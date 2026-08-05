@@ -180,6 +180,19 @@ describe("moteur de validation — calculs", () => {
     expect(result.passed).toBe(false);
     expect(result.errors.some((issue) => issue.code === "bareme-nul")).toBe(true);
   });
+
+  it("exige au moins une compétence visée", () => {
+    // AGENTS.md : « rubric, expected answer and competency tags ».
+    expect(validate(calculationPayload({ competencyTags: [] })).passed).toBe(false);
+  });
+
+  it("refuse une compétence vide ou répétée", () => {
+    const blank = validate(calculationPayload({ competencyTags: ["  "] }));
+    expect(blank.errors.some((issue) => issue.code === "competence-vide")).toBe(true);
+
+    const repeated = validate(calculationPayload({ competencyTags: ["cg-emprunts", "CG-Emprunts"] }));
+    expect(repeated.errors.some((issue) => issue.code === "competence-dupliquee")).toBe(true);
+  });
 });
 
 describe("templates de calcul", () => {
@@ -338,6 +351,7 @@ describe("moteur de validation — mini-cas", () => {
         sharedData: [],
         steps,
         finalSynthesis: "L'emprunt figure au passif pour son prix de remboursement, la prime étant amortie.",
+        competencyTags: ["cg-emprunts-obligataires"],
         sourceReferences: [dataReference],
         difficulty: 3,
         estimatedMinutes: 30

@@ -37,9 +37,13 @@ export const SHARED_RULES = `RÈGLES ABSOLUES, applicables à toute ta réponse 
    de tes connaissances générales. Si les sources ne permettent pas de produire
    un élément demandé, tu produis moins d'éléments — tu ne combles jamais.
 2. CITATION OBLIGATOIRE. Chaque élément que tu produis cite ses sources par
-   documentId, pageStart, pageEnd et chunkIds, repris À L'IDENTIQUE de
-   l'enveloppe. Tu ne cites jamais une page ou un chunk qui n'y figure pas.
-   Tu n'inventes jamais un numéro de page : ils te sont donnés.
+   pack, documentId, documentTitle, sourceType, pageStart, pageEnd et chunkIds,
+   repris À L'IDENTIQUE de l'enveloppe. Tu ne cites jamais une page ou un chunk
+   qui n'y figure pas. Tu n'inventes jamais un numéro de page : ils te sont
+   donnés. Le champ sourceType reprend la nature annoncée pour le document
+   (« course », « official-reference », « personal-note », « exercise ») : ne
+   présente JAMAIS un support de cours comme une référence officielle, ni
+   l'inverse. Reporte effectiveDate uniquement si l'enveloppe la donne.
 3. JSON UNIQUEMENT. Ta réponse entière est un objet JSON valide conforme au
    schéma demandé. Pas de texte avant, pas de texte après, pas de bloc de code
    Markdown, pas de commentaire.
@@ -119,7 +123,9 @@ const DEFINITIONS: readonly PromptDefinition[] = [
 - expectedAnswer doit être le résultat du template appliqué à templateInputs,
   arrondi selon roundingRule. Il sera recalculé par le code : une divergence
   fait échouer la validation.
-- calculationSteps décrit le raisonnement pas à pas, en français.`
+- calculationSteps décrit le raisonnement pas à pas, en français.
+- competencyTags nomme au moins une compétence visée, en minuscules avec des
+  tirets (par exemple « cg-emprunts-obligataires »).`
   ),
   definition(
     "journal-entry",
@@ -133,7 +139,8 @@ const DEFINITIONS: readonly PromptDefinition[] = [
 - requiredAccounts liste les comptes sans lesquels l'écriture est fausse ;
   chacun doit apparaître dans expectedLines.
 - expectedTotalDebit et expectedTotalCredit sont les sommes réelles des lignes.
-- Les montants proviennent des données de l'énoncé source.`
+- Les montants proviennent des données de l'énoncé source.
+- competencyTags nomme au moins une compétence visée.`
   ),
   definition(
     "error-diagnosis",
@@ -145,7 +152,9 @@ const DEFINITIONS: readonly PromptDefinition[] = [
 - expectedErrorCategory figure obligatoirement parmi errorCategories.
 - errorCategories propose au moins deux choix distincts et plausibles.
 - expectedCorrection explique la correction en s'appuyant sur les sources.
-- La faute doit porter sur une règle que les sources énoncent.`
+- La faute doit porter sur une règle que les sources énoncent.
+- gradingRubric porte sur ce qui est réellement noté : la catégorie choisie.
+- competencyTags nomme au moins une compétence visée.`
   ),
   definition(
     "progressive-case",
@@ -158,7 +167,8 @@ const DEFINITIONS: readonly PromptDefinition[] = [
 - Les écritures attendues sont équilibrées ; les calculs attendus sont exacts.
 - sharedData porte les données communes, énoncées une seule fois.
 - hintLevels va du plus discret (1) au plus explicite (3).
-- Chaque étape cite ses sources et porte un barème non nul.`
+- Chaque étape cite ses sources et porte un barème non nul.
+- competencyTags, au niveau du cas, nomme au moins une compétence visée.`
   )
 ];
 

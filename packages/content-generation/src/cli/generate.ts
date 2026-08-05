@@ -1,5 +1,5 @@
 import { buildSourceEnvelope, DEFAULT_MAX_INPUT_CHARS } from "../envelope/build";
-import { generateDrafts, parseKinds } from "../generate/orchestrator";
+import { generateDrafts, parseKinds, restrictKindsForDomain } from "../generate/orchestrator";
 import { createContentProvider, resolveMaxInputChars } from "../providers";
 import { saveDrafts } from "../store/draft-store";
 import type { ContentPayload } from "../types/artifact";
@@ -15,8 +15,13 @@ import { draftsRoot, fail, parseCommonOptions, resolveContext, UsageError } from
 
 async function main(): Promise<void> {
   const options = parseCommonOptions(process.argv.slice(2));
-  const kinds = parseKinds(options.types);
+  const requestedKinds = parseKinds(options.types);
   const { corpus, chapter } = await resolveContext(options);
+
+  // Le domaine décide de ce qui peut être produit : l'ISO ne se transforme pas
+  // en exercices sans licence explicite.
+  const restriction = restrictKindsForDomain(requestedKinds, chapter.domainId, process.env);
+  const kinds = restriction.allowed;
 
   const envelope = buildSourceEnvelope(corpus.index, {
     chapterSlug: chapter.chapterSlug,
@@ -29,7 +34,20 @@ async function main(): Promise<void> {
   console.log(`Domaine         : ${envelope.domainId}`);
   console.log(`Pack            : ${options.sourcePack}`);
   console.log(`Mode            : ${options.mode}`);
-  console.log(`Types demandés  : ${kinds.join(", ")}`);
+  console.log(`Types demandés  : ${requestedKinds.join(", ")}`);
+
+  if (restriction.refused.length > 0) {
+    console.log(`Types refusés   : ${restriction.refused.join(", ")}`);
+    console.log(`  ${restriction.reason}`);
+  }
+
+  if (kinds.length === 0) {
+    console.error(
+      `\n✖ Aucun type de contenu n'est autorisé pour le domaine « ${chapter.domainId} » avec cette demande.`
+    );
+    process.exit(1);
+  }
+
   console.log("");
   console.log("Sources sélectionnées :");
 

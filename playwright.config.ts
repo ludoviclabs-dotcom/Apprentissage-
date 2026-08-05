@@ -79,7 +79,11 @@ export default defineConfig({
             // le propriétaire de l'installation privée est administrateur : le
             // serveur public-demo, lui, laisse le drapeau absent, ce qui permet
             // de vérifier que l'espace est fermé par défaut.
-            CONTENT_REVIEW_ENABLED: "true"
+            CONTENT_REVIEW_ENABLED: "true",
+            // `next start` tourne en NODE_ENV=production : sans cet aveu
+            // explicite, le garde de `lib/env.ts` refuserait de démarrer — ce
+            // qui est précisément son rôle sur un hôte joignable par d'autres.
+            CONTENT_REVIEW_ALLOW_UNAUTHENTICATED: "true"
           }
         },
         {

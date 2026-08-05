@@ -100,6 +100,50 @@ export function kindLabel(kind: GenerationKind): string {
   return KIND_DEFINITIONS[kind].contentType;
 }
 
+/**
+ * Restriction du domaine ISO.
+ *
+ * `AGENTS.md` : « ISO content must be handled as notes/checklists unless
+ * licensed text is explicitly allowed. » Transformer une norme en exercices,
+ * flashcards et corrigés en redistribue la substance ; une fiche de synthèse
+ * reste de la note de lecture. On n'autorise donc que la fiche, sauf déclaration
+ * explicite de licence — laquelle est un fait contractuel, jamais une option de
+ * confort, d'où une variable d'environnement nommée sans ambiguïté.
+ */
+export const ISO_ALLOWED_KINDS: readonly GenerationKind[] = ["sheet"];
+
+export function isoLicensedTextAllowed(env: { ISO_LICENSED_TEXT_ALLOWED?: string }): boolean {
+  return env.ISO_LICENSED_TEXT_ALLOWED === "true";
+}
+
+export interface KindRestriction {
+  allowed: GenerationKind[];
+  refused: GenerationKind[];
+  reason?: string;
+}
+
+export function restrictKindsForDomain(
+  kinds: readonly GenerationKind[],
+  domainId: string,
+  env: { ISO_LICENSED_TEXT_ALLOWED?: string } = {}
+): KindRestriction {
+  if (domainId !== "iso" || isoLicensedTextAllowed(env)) {
+    return { allowed: [...kinds], refused: [] };
+  }
+
+  const allowed = kinds.filter((kind) => ISO_ALLOWED_KINDS.includes(kind));
+  const refused = kinds.filter((kind) => !ISO_ALLOWED_KINDS.includes(kind));
+
+  return {
+    allowed,
+    refused,
+    reason:
+      "domaine ISO : seules les fiches de synthèse sont produites. Exercices, flashcards, écritures, " +
+      "diagnostics et mini-cas redistribueraient le texte normatif. Poser ISO_LICENSED_TEXT_ALLOWED=true " +
+      "uniquement si une licence l'autorise explicitement."
+  };
+}
+
 export interface GenerateOptions {
   kinds: readonly GenerationKind[];
   envelope: SourceEnvelope;

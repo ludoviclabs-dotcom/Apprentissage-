@@ -9,10 +9,40 @@ import { z } from "zod";
  * contenu ne peut pas atteindre `needs_review` sans que chacune de ses
  * références ait passé cette vérification.
  */
+/**
+ * Nature du matériau cité.
+ *
+ * `AGENTS.md` impose de ne jamais mélanger cours et référence officielle sans
+ * le dire : la distinction ne peut donc pas rester implicite dans la catégorie
+ * du document, elle voyage avec la référence elle-même. Les valeurs reprennent
+ * `SourceType` du domaine, pour qu'une citation produite ici désigne la même
+ * chose qu'une citation du catalogue.
+ */
+export const sourceMaterialKinds = [
+  "course",
+  "official-reference",
+  "personal-note",
+  "exercise"
+] as const;
+
+export type SourceMaterialKind = (typeof sourceMaterialKinds)[number];
+
+export const sourceMaterialKindSchema = z.enum(sourceMaterialKinds);
+
 export const sourceReferenceSchema = z
   .object({
+    /** Pack d'origine — exigé par `AGENTS.md` au même titre que document et page. */
+    pack: z.string().min(1),
     documentId: z.string().min(1),
     documentTitle: z.string().min(1),
+    /** Cours, référence officielle, note personnelle ou énoncé. */
+    sourceType: sourceMaterialKindSchema,
+    /**
+     * Date d'effet du référentiel cité, quand la source la porte. Facultative
+     * parce qu'un support de cours n'en a pas toujours une — mais alors elle est
+     * absente, jamais inventée.
+     */
+    effectiveDate: z.string().min(1).optional(),
     pageStart: z.number().int().min(1, "pageStart doit valoir au moins 1"),
     pageEnd: z.number().int().min(1),
     chunkIds: z.array(z.string().min(1)).min(1, "au moins un chunk doit étayer la référence"),
@@ -47,13 +77,37 @@ export interface CorpusChunk {
 
 export interface CorpusDocument {
   documentId: string;
+  packId: string;
   title: string;
   relativePath: string;
   category: string;
   domainId: string;
   chapterSlug: string;
+  /** Date d'effet du pack, quand elle est connue. */
+  effectiveDate?: string;
   pages: CorpusPage[];
   chunks: CorpusChunk[];
+}
+
+/**
+ * Nature du matériau déduite de la catégorie documentaire du pipeline.
+ *
+ * Une synthèse reste du cours ; un corrigé et une annale restent de l'énoncé ;
+ * seul ce qui est classé `reference` est traité comme référence officielle. La
+ * table est explicite plutôt que devinée à la volée, parce que c'est elle qui
+ * décide si un contenu peut affirmer citer un référentiel.
+ */
+const MATERIAL_KIND_BY_CATEGORY: Readonly<Record<string, SourceMaterialKind>> = {
+  course: "course",
+  synthesis: "course",
+  exercise: "exercise",
+  correction: "exercise",
+  exam: "exercise",
+  reference: "official-reference"
+};
+
+export function materialKindForCategory(category: string): SourceMaterialKind {
+  return MATERIAL_KIND_BY_CATEGORY[category] ?? "personal-note";
 }
 
 /**
@@ -93,6 +147,8 @@ export class CorpusIndex {
 export interface ReferenceProblem {
   code:
     | "document-inconnu"
+    | "pack-divergent"
+    | "nature-divergente"
     | "page-inexistante"
     | "chunk-inconnu"
     | "chunk-hors-intervalle"
@@ -135,6 +191,26 @@ export function verifyReference(
       ],
       warnings
     };
+  }
+
+  // Le pack et la nature du matériau ne sont pas décoratifs : ils décident de
+  // ce qu'un contenu a le droit d'affirmer. Une référence qui présenterait un
+  // support de cours comme une référence officielle serait exactement le
+  // mélange qu'`AGENTS.md` interdit — on le refuse plutôt que de l'afficher.
+  if (reference.pack !== document.packId) {
+    problems.push({
+      code: "pack-divergent",
+      message: `la référence annonce le pack « ${reference.pack} », mais « ${document.title} » appartient à « ${document.packId} »`
+    });
+  }
+
+  const expectedKind = materialKindForCategory(document.category);
+
+  if (reference.sourceType !== expectedKind) {
+    problems.push({
+      code: "nature-divergente",
+      message: `la référence présente « ${document.title} » comme « ${reference.sourceType} », alors que ce document est de nature « ${expectedKind} »`
+    });
   }
 
   const pagesByNumber = new Map(document.pages.map((page) => [page.pageNumber, page]));

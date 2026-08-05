@@ -363,6 +363,39 @@ function checkJournalEntry(payload: ContentPayload, errors: ValidationIssue[], w
   }
 }
 
+/**
+ * Les compétences visées ne peuvent pas être des étiquettes vides : un exercice
+ * rattaché à « » ne nourrit aucune progression. Le schéma exige la présence,
+ * ce contrôle exige le contenu.
+ */
+function checkCompetencyTags(payload: ContentPayload, errors: ValidationIssue[]): void {
+  const tagged = payload.content as { competencyTags?: unknown };
+
+  if (!Array.isArray(tagged.competencyTags)) {
+    return;
+  }
+
+  const blank = tagged.competencyTags.filter(
+    (tag) => typeof tag !== "string" || tag.trim().length === 0
+  );
+
+  if (blank.length > 0) {
+    errors.push(
+      error("competence-vide", "une compétence visée est vide ou n'est pas un libellé", "content.competencyTags")
+    );
+  }
+
+  const normalized = tagged.competencyTags
+    .filter((tag): tag is string => typeof tag === "string")
+    .map((tag) => normalizeForComparison(tag));
+
+  if (new Set(normalized).size !== normalized.length) {
+    errors.push(
+      error("competence-dupliquee", "la même compétence est visée deux fois", "content.competencyTags")
+    );
+  }
+}
+
 function checkErrorDiagnosis(payload: ContentPayload, errors: ValidationIssue[]): void {
   if (payload.contentType !== "error_diagnosis_exercise") {
     return;
@@ -387,6 +420,10 @@ function checkErrorDiagnosis(payload: ContentPayload, errors: ValidationIssue[])
         )
       );
     }
+  }
+
+  if (exercise.gradingRubric.reduce((sum, item) => sum + item.points, 0) <= 0) {
+    errors.push(error("bareme-nul", "le barème totalise zéro point", "content.gradingRubric"));
   }
 }
 
@@ -554,6 +591,7 @@ export function validateContent(input: ValidationInput): ValidationResult {
   checkForbiddenStrings(payload, errors);
   checkReferences(payload, input.corpus, errors, warnings);
   checkSheet(payload, warnings);
+  checkCompetencyTags(payload, errors);
   checkFlashcard(payload, errors, warnings);
   checkDuplicates(payload, input.siblings ?? [], errors, warnings);
   checkCalculation(payload, errors, warnings);

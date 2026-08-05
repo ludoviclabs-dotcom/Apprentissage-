@@ -67,8 +67,10 @@ describe("références de source — vérification contre le corpus", () => {
   it("refuse un chunk hors de l'intervalle de pages cité", () => {
     const result = verifyReference(
       sourceReferenceSchema.parse({
+        pack: "test-pack",
         documentId: COURSE_DOC_ID,
         documentTitle: "Les emprunts obligataires - Fiche de cours",
+        sourceType: "course",
         pageStart: 1,
         pageEnd: 1,
         chunkIds: [CHUNK_ACCOUNTS]
@@ -93,8 +95,10 @@ describe("références de source — vérification contre le corpus", () => {
   it("accepte une référence couvrant plusieurs chunks d'un même document", () => {
     const result = verifyReference(
       sourceReferenceSchema.parse({
+        pack: "test-pack",
         documentId: COURSE_DOC_ID,
         documentTitle: "Les emprunts obligataires - Fiche de cours",
+        sourceType: "course",
         pageStart: 1,
         pageEnd: 2,
         chunkIds: [CHUNK_RULES, CHUNK_ACCOUNTS],
@@ -110,8 +114,10 @@ describe("références de source — vérification contre le corpus", () => {
   it("signale une page dégradée sans invalider la référence", () => {
     const result = verifyReference(
       sourceReferenceSchema.parse({
+        pack: "test-pack",
         documentId: COURSE_DOC_ID,
         documentTitle: "Les emprunts obligataires - Fiche de cours",
+        sourceType: "course",
         pageStart: 3,
         pageEnd: 3,
         chunkIds: [CHUNK_ACCOUNTS]
@@ -122,6 +128,35 @@ describe("références de source — vérification contre le corpus", () => {
     // La page 3 est dégradée : avertissement. Le chunk est hors intervalle :
     // c'est cela, et cela seul, qui invalide.
     expect(result.warnings.some((problem) => problem.code === "page-degradee")).toBe(true);
+  });
+
+  it("refuse une référence qui annonce un autre pack", () => {
+    const result = verifyReference(
+      sourceReferenceSchema.parse({ ...validReference, pack: "autre-pack" }),
+      testCorpus
+    );
+
+    expect(result.valid).toBe(false);
+    expect(result.problems.some((problem) => problem.code === "pack-divergent")).toBe(true);
+  });
+
+  it("refuse qu'un support de cours soit présenté comme une référence officielle", () => {
+    // AGENTS.md : cours et référentiel ne se mélangent pas sans le dire.
+    const result = verifyReference(
+      sourceReferenceSchema.parse({ ...validReference, sourceType: "official-reference" }),
+      testCorpus
+    );
+
+    expect(result.valid).toBe(false);
+    expect(result.problems.some((problem) => problem.code === "nature-divergente")).toBe(true);
+  });
+
+  it("exige pack et nature dès le schéma", () => {
+    const { pack: _pack, ...withoutPack } = validReference;
+    const { sourceType: _kind, ...withoutKind } = validReference;
+
+    expect(sourceReferenceSchema.safeParse(withoutPack).success).toBe(false);
+    expect(sourceReferenceSchema.safeParse(withoutKind).success).toBe(false);
   });
 
   it("agrège les problèmes de plusieurs références", () => {

@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { rubricItemSchema } from "./calculation";
+import { competencyTagsSchema, rubricItemSchema } from "./calculation";
 import { errorCategorySchema } from "./error-diagnosis";
 import { journalLineSchema } from "./journal-entry";
 import { roundingRuleSchema } from "./smart-revision-sheet";
@@ -78,6 +78,7 @@ export const progressiveCaseSchema = z.object({
   ).default([]),
   steps: z.array(progressiveCaseStepSchema).min(2, "un mini-cas comporte au moins deux étapes"),
   finalSynthesis: z.string().min(20).max(2000),
+  competencyTags: competencyTagsSchema,
   sourceReferences: z.array(sourceReferenceSchema).min(1),
   difficulty: z.number().int().min(1).max(5),
   estimatedMinutes: z.number().int().min(1).max(240)

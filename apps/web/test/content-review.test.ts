@@ -38,6 +38,43 @@ describe("CONTENT_REVIEW_ENABLED", () => {
     expect(env.CONTENT_REVIEW_ENABLED).toBe(true);
   });
 
+  it("refuse aussi une production auto-hébergée, sans VERCEL_ENV", () => {
+    // Sans comptes, resolveViewerRole donne le rôle admin à un visiteur
+    // anonyme : ne contrôler que VERCEL_ENV laissait passer exactement cette
+    // configuration sur un `next start` auto-hébergé.
+    expect(() =>
+      parseEnv({
+        CONTENT_REVIEW_ENABLED: "true",
+        NODE_ENV: "production",
+        LEARNING_HUB_AUTH_ENABLED: "false"
+      })
+    ).toThrow(EnvValidationError);
+  });
+
+  it("accepte une machine privée qui le déclare par son nom", () => {
+    const env = parseEnv({
+      CONTENT_REVIEW_ENABLED: "true",
+      NODE_ENV: "production",
+      LEARNING_HUB_AUTH_ENABLED: "false",
+      CONTENT_REVIEW_ALLOW_UNAUTHENTICATED: "true"
+    });
+
+    expect(env.CONTENT_REVIEW_ALLOW_UNAUTHENTICATED).toBe(true);
+  });
+
+  it("refuse cet aveu sur un déploiement Vercel de production", () => {
+    // L'échappatoire vaut pour un hôte que personne d'autre ne joint ; sur
+    // Vercel, l'instance est joignable par définition.
+    expect(() =>
+      parseEnv({
+        CONTENT_REVIEW_ENABLED: "true",
+        VERCEL_ENV: "production",
+        LEARNING_HUB_AUTH_ENABLED: "false",
+        CONTENT_REVIEW_ALLOW_UNAUTHENTICATED: "true"
+      })
+    ).toThrow(EnvValidationError);
+  });
+
   it("reste ouvert hors production sans comptes — le cas du poste local", () => {
     const env = parseEnv({ CONTENT_REVIEW_ENABLED: "true", LEARNING_HUB_AUTH_ENABLED: "false" });
     expect(env.CONTENT_REVIEW_ENABLED).toBe(true);

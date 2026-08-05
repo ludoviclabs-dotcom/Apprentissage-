@@ -144,6 +144,20 @@ export async function POST(request: Request) {
         // génération, et une approbation doit porter sur l'état actuel.
         const revalidated = await revalidateDraft(entry, now);
 
+        // Un corpus absent n'est pas un verdict favorable. Approuver ici
+        // reviendrait à certifier des références que personne n'a pu confronter
+        // à leur source.
+        if (!revalidated.corpusAvailable) {
+          return Response.json(
+            {
+              error: "Approbation impossible",
+              details:
+                "Le corpus extrait de ce pack est introuvable sur cette instance : les références du contenu ne peuvent pas être vérifiées. Relancer l'extraction avant d'approuver."
+            },
+            { status: 409 }
+          );
+        }
+
         if (!revalidated.passed) {
           return Response.json(
             {

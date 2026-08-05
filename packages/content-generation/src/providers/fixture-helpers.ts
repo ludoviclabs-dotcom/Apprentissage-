@@ -1,4 +1,4 @@
-import type { EnvelopeChunk, SourceEnvelope } from "../envelope/build";
+import type { EnvelopeChunk, EnvelopeDocument, SourceEnvelope } from "../envelope/build";
 import type { StrictSourceReference } from "../types/source-reference";
 
 /**
@@ -13,7 +13,7 @@ import type { StrictSourceReference } from "../types/source-reference";
 
 export interface ChunkMatch {
   chunk: EnvelopeChunk;
-  documentTitle: string;
+  document: EnvelopeDocument;
 }
 
 export function findChunk(
@@ -29,7 +29,7 @@ export function findChunk(
     const chunk = document.chunks.find((candidate) => predicate(candidate.content));
 
     if (chunk) {
-      return { chunk, documentTitle: document.title };
+      return { chunk, document };
     }
   }
 
@@ -63,8 +63,11 @@ function normalize(value: string): string {
 
 export function referenceFrom(match: ChunkMatch, excerptLength = 300): StrictSourceReference {
   return {
+    pack: match.document.packId,
     documentId: match.chunk.documentId,
-    documentTitle: match.documentTitle,
+    documentTitle: match.document.title,
+    sourceType: match.document.materialKind,
+    ...(match.document.effectiveDate ? { effectiveDate: match.document.effectiveDate } : {}),
     pageStart: match.chunk.pageStart,
     pageEnd: match.chunk.pageEnd,
     chunkIds: [match.chunk.chunkId],
@@ -133,8 +136,11 @@ export function referenceSpanningTerms(
     const first = chunks[0];
 
     return {
+      pack: document.packId,
       documentId: document.documentId,
       documentTitle: document.title,
+      sourceType: document.materialKind,
+      ...(document.effectiveDate ? { effectiveDate: document.effectiveDate } : {}),
       pageStart: Math.min(...chunks.map((chunk) => chunk.pageStart)),
       pageEnd: Math.max(...chunks.map((chunk) => chunk.pageEnd)),
       chunkIds: chunks.map((chunk) => chunk.chunkId),

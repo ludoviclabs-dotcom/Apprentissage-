@@ -219,17 +219,41 @@ export async function revalidateDraft(
   entry: DraftWithLocation,
   now: string,
   actor = "validator"
-): Promise<{ draft: ContentDraft; passed: boolean }> {
+): Promise<{ draft: ContentDraft; passed: boolean; corpusAvailable: boolean }> {
   const corpus = await loadCorpusIndex(entry.location.packId);
   const payload = { contentType: entry.draft.contentType, content: entry.draft.content } as ContentPayload;
 
   if (!corpus) {
-    // Sans corpus, on ne peut rien affirmer : le statut ne bouge pas, et le
-    // constat précédent est conservé plutôt que remplacé par un faux succès.
-    return { draft: entry.draft, passed: entry.draft.validationMetadata?.passed ?? false };
+    // Sans corpus, aucune référence n'est vérifiable. On ne rejoue donc rien et
+    // on ne rend surtout pas l'ancien verdict comme s'il venait d'être
+    // reconfirmé : `corpusAvailable: false` oblige l'appelant à distinguer
+    // « revalidé avec succès » de « impossible à revalider », et l'approbation
+    // refuse le second cas.
+    return { draft: entry.draft, passed: false, corpusAvailable: false };
   }
 
-  const result = validateContent({ payload, corpus });
+  // Les autres brouillons du même chapitre servent de voisinage : sans eux, le
+  // contrôle de doublon s'exécute sur une liste vide et une carte identique à
+  // une autre passe la revue alors que la génération l'aurait refusée. Les
+  // contenus déjà écartés (échec, rejet) n'en font pas partie — un doublon d'un
+  // contenu abandonné n'en est pas un — et le brouillon lui-même est exclu,
+  // sans quoi il serait son propre doublon.
+  const siblings = (
+    await listDrafts({
+      rootDir: DRAFTS_ROOT,
+      packId: entry.location.packId,
+      chapterSlug: entry.location.chapterSlug
+    })
+  )
+    .filter(
+      (candidate) =>
+        candidate.id !== entry.draft.id &&
+        candidate.status !== "validation_failed" &&
+        candidate.status !== "rejected"
+    )
+    .map((candidate) => ({ contentType: candidate.contentType, content: candidate.content }) as ContentPayload);
+
+  const result = validateContent({ payload, corpus, siblings });
   const revalidated = {
     ...entry.draft,
     validationMetadata: toValidationMetadata(result, now),
@@ -244,7 +268,8 @@ export async function revalidateDraft(
       actor,
       result.passed ? undefined : result.blockingReasons.slice(0, 3).join(" | ").slice(0, 2000)
     ),
-    passed: result.passed
+    passed: result.passed,
+    corpusAvailable: true
   };
 }
 

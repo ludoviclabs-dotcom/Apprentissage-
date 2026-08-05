@@ -70,6 +70,7 @@ export async function loadCorpus(extractedDir: string, packId: string): Promise<
 
       documents.push({
         documentId: documentIdFor(packId, artifact.sha256),
+        packId,
         title: entry.originalName.replace(/\.[^.]+$/, ""),
         relativePath: artifact.relativePath,
         category: artifact.category,

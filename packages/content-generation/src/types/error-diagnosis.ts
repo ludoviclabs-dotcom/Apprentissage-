@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { competencyTagsSchema, rubricItemSchema } from "./calculation";
 import { journalLineSchema } from "./journal-entry";
 import { sourceReferenceSchema } from "./source-reference";
 
@@ -40,6 +41,14 @@ export const errorDiagnosisExerciseSchema = z
     expectedErrorCategory: errorCategorySchema,
     expectedCorrection: z.string().min(10).max(2000),
     explanation: z.string().min(20).max(2000),
+    /**
+     * Barème, exigé comme sur les autres familles d'exercices. Il portait sur
+     * la seule chose notée automatiquement dans cette version — la catégorie
+     * choisie — et son absence faisait de ce type le seul évaluable sans
+     * critère de notation.
+     */
+    gradingRubric: z.array(rubricItemSchema).min(1),
+    competencyTags: competencyTagsSchema,
     sourceReferences: z.array(sourceReferenceSchema).min(1),
     difficulty: z.number().int().min(1).max(5)
   })

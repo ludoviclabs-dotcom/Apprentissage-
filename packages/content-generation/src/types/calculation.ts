@@ -37,6 +37,18 @@ export const rubricItemSchema = z.object({
   points: z.number().min(0).max(100)
 });
 
+/**
+ * Compétences visées par un exercice.
+ *
+ * `AGENTS.md` l'exige au même titre que le barème et la réponse attendue : un
+ * exercice qu'on ne peut rattacher à aucune compétence ne peut ni nourrir la
+ * progression, ni déclencher une remédiation — il n'est notable que dans le
+ * vide. La liste est donc non vide sur les quatre familles d'exercices.
+ */
+export const competencyTagsSchema = z
+  .array(z.string().min(2).max(80))
+  .min(1, "un exercice doit viser au moins une compétence");
+
 export const calculationExerciseSchema = z.object({
   title: z.string().min(3).max(200),
   statement: z.string().min(20).max(4000),
@@ -60,6 +72,7 @@ export const calculationExerciseSchema = z.object({
   calculationSteps: z.array(calculationStepSchema).min(1),
   explanation: z.string().min(20).max(2000),
   gradingRubric: z.array(rubricItemSchema).min(1),
+  competencyTags: competencyTagsSchema,
   sourceReferences: z.array(sourceReferenceSchema).min(1),
   difficulty: z.number().int().min(1).max(5)
 });

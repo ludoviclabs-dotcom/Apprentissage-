@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { rubricItemSchema } from "./calculation";
+import { competencyTagsSchema, rubricItemSchema } from "./calculation";
 import { sourceReferenceSchema } from "./source-reference";
 
 /**
@@ -45,6 +45,7 @@ export const journalEntryExerciseSchema = z.object({
   expectedTotalDebit: z.number().min(0).finite(),
   expectedTotalCredit: z.number().min(0).finite(),
   gradingRubric: z.array(rubricItemSchema).min(1),
+  competencyTags: competencyTagsSchema,
   explanation: z.string().min(20).max(2000),
   sourceReferences: z.array(sourceReferenceSchema).min(1),
   difficulty: z.number().int().min(1).max(5)

@@ -1,6 +1,11 @@
 import { createHash } from "node:crypto";
 import { CALCULATION_TEMPLATE_IDS, getTemplate } from "../calc/templates";
-import type { CorpusDocument, CorpusIndex } from "../types/source-reference";
+import {
+  materialKindForCategory,
+  type CorpusDocument,
+  type CorpusIndex,
+  type SourceMaterialKind
+} from "../types/source-reference";
 
 /**
  * Construction déterministe de l'enveloppe envoyée au générateur.
@@ -25,8 +30,12 @@ export interface EnvelopeChunk {
 
 export interface EnvelopeDocument {
   documentId: string;
+  packId: string;
   title: string;
   category: string;
+  /** Cours, référence officielle, note ou énoncé — jamais implicite. */
+  materialKind: SourceMaterialKind;
+  effectiveDate?: string;
   pageCount: number;
   /** Pages dont l'extraction est dégradée : citables, mais non approuvables. */
   degradedPages: number[];
@@ -160,8 +169,11 @@ export function buildSourceEnvelope(
 
     documents.push({
       documentId: candidate.documentId,
+      packId: candidate.packId,
       title: candidate.title,
       category: candidate.category,
+      materialKind: materialKindForCategory(candidate.category),
+      effectiveDate: candidate.effectiveDate,
       pageCount: candidate.pages.length,
       degradedPages,
       chunks
@@ -210,7 +222,7 @@ export function renderEnvelope(envelope: SourceEnvelope): string {
 
   for (const document of envelope.documents) {
     lines.push(
-      `### Document ${document.documentId} — « ${document.title} » (${document.category}, ${document.pageCount} pages)`
+      `### Document ${document.documentId} — « ${document.title} » (${document.category}, nature « ${document.materialKind} », ${document.pageCount} pages)`
     );
 
     if (document.degradedPages.length > 0) {

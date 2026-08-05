@@ -589,6 +589,7 @@ export function buildCalculationFixture(envelope: SourceEnvelope): CalculationBa
         { label: "Multiplication par le nombre d'obligations", points: 4 },
         { label: "Unité et arrondi", points: 2 }
       ],
+      competencyTags: ["cg-emprunts-obligataires", "prime-de-remboursement"],
       sourceReferences: [dataReference],
       difficulty: 2
     },
@@ -622,6 +623,7 @@ export function buildCalculationFixture(envelope: SourceEnvelope): CalculationBa
         { label: "Base de valorisation correcte (prix de remboursement)", points: 6 },
         { label: "Calcul exact", points: 4 }
       ],
+      competencyTags: ["cg-emprunts-obligataires", "dette-obligataire"],
       sourceReferences: [dataReference],
       difficulty: 2
     },
@@ -655,6 +657,7 @@ export function buildCalculationFixture(envelope: SourceEnvelope): CalculationBa
         { label: "Calcul exact", points: 6 },
         { label: "Rattachement au compte 4671", points: 4 }
       ],
+      competencyTags: ["cg-emprunts-obligataires", "emission-obligataire"],
       sourceReferences: [dataReference],
       difficulty: 1
     }
@@ -699,6 +702,7 @@ export function buildCalculationFixture(envelope: SourceEnvelope): CalculationBa
         { label: "Prorata de l'exercice", points: 4 },
         { label: "Arrondi au centime", points: 2 }
       ],
+      competencyTags: ["cg-emprunts-obligataires", "amortissement-prime"],
       sourceReferences: [anchors.amortissementPrime, dataReference],
       difficulty: 3
     });
@@ -757,6 +761,7 @@ export function buildJournalEntryFixture(envelope: SourceEnvelope): JournalEntry
         { label: "Compte 4671 débité du prix d'émission", points: 5 },
         { label: "Équilibre de l'écriture", points: 5 }
       ],
+      competencyTags: ["cg-emprunts-obligataires", "ecriture-emission"],
       explanation:
         "La dette est inscrite pour ce qui sera remboursé. La différence avec le montant encaissé est une charge financière étalée, isolée au compte 169 et présentée à l'actif du bilan tant qu'elle n'est pas amortie.",
       sourceReferences: [anchors.emissionAccounts, anchors.casData],
@@ -799,6 +804,7 @@ export function buildJournalEntryFixture(envelope: SourceEnvelope): JournalEntry
         { label: "Montant du prorata exact", points: 5 },
         { label: "Équilibre de l'écriture", points: 3 }
       ],
+      competencyTags: ["cg-emprunts-obligataires", "ecritures-inventaire"],
       explanation:
         "La prime est une charge financière répartie : sa dotation emprunte le compte 6861 et vient directement en diminution du compte 169.",
       sourceReferences: [anchors.amortissementPrime],
@@ -841,6 +847,11 @@ export function buildErrorDiagnosisFixture(envelope: SourceEnvelope): ErrorDiagn
       expectedCorrection: `Il manque la ligne de prime : le compte 163 doit être crédité du prix de remboursement, soit ${DETTE_TOTALE} €, et le compte 169 débité de ${PRIME_TOTALE} €. L'écriture proposée sous-évalue la dette de ${PRIME_TOTALE} €.`,
       explanation:
         "Une écriture équilibrée n'est pas pour autant exacte. Ici l'équilibre est obtenu en constatant la dette au prix d'émission, ce qui fait disparaître la prime de remboursement.",
+      gradingRubric: [
+        { label: "Catégorie d'erreur correctement identifiée", points: 6 },
+        { label: "Correction proposée cohérente avec la règle", points: 4 }
+      ],
+      competencyTags: ["cg-emprunts-obligataires", "diagnostic-ecriture"],
       sourceReferences: [anchors.emissionAccounts],
       difficulty: 3
     }
@@ -872,6 +883,11 @@ export function buildErrorDiagnosisFixture(envelope: SourceEnvelope): ErrorDiagn
         "La dotation doit être portée au débit du compte 6861 « Dotations aux amortissements des primes de remboursement des obligations ». Le compte 6272 est réservé aux commissions et frais d'émission.",
       explanation:
         "La prime de remboursement est une charge financière répartie ; sa dotation ne se confond pas avec les frais d'émission, qui suivent leur propre traitement.",
+      gradingRubric: [
+        { label: "Catégorie d'erreur correctement identifiée", points: 6 },
+        { label: "Compte 6861 nommé dans la correction", points: 4 }
+      ],
+      competencyTags: ["cg-emprunts-obligataires", "diagnostic-compte"],
       sourceReferences: [anchors.amortissementPrime],
       difficulty: 3
     });
@@ -1020,6 +1036,7 @@ export function buildProgressiveCaseFixture(envelope: SourceEnvelope): Progressi
       { label: "Durée", value: `${CSP.dureeMois} mois` }
     ],
     steps,
+    competencyTags: ["cg-emprunts-obligataires", "cycle-emission-inventaire"],
     finalSynthesis:
       "L'emprunt obligataire figure au passif pour son prix de remboursement. L'écart avec le montant encaissé, isolé au compte 169, est une charge financière répartie que l'entreprise amortit sur la durée de l'emprunt. Les frais d'émission suivent un traitement distinct, en charges ou étalés, selon l'option retenue et de façon permanente.",
     sourceReferences: [anchors.emissionAccounts, anchors.casData],

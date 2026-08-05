@@ -131,10 +131,20 @@ les routes API renvoient la même réponse en JSON.
 
 En production, activer le drapeau **exige** `LEARNING_HUB_AUTH_ENABLED=true` :
 l'espace affiche le texte extrait de supports de cours privés, et « qui est en
-train de lire » doit avoir une réponse. À défaut, le démarrage échoue plutôt que
-de servir ces sources à qui devine l'URL. Hors production, le drapeau reste
-utilisable sans comptes — c'est le cas de l'installation locale, qui n'a qu'un
-utilisateur.
+train de lire » doit avoir une réponse — sans comptes, `resolveViewerRole` donne
+le rôle administrateur à n'importe quel visiteur anonyme. À défaut, le démarrage
+échoue plutôt que de servir ces sources à qui devine l'URL.
+
+« Production » se lit sur **`NODE_ENV` autant que sur `VERCEL_ENV`** : un
+déploiement auto-hébergé lancé par `next start` n'a pas de `VERCEL_ENV`, et ne
+contrôler que ce dernier laissait passer exactement la configuration que ce garde
+existe pour empêcher.
+
+Reste le cas légitime d'une machine que personne d'autre ne joint — un
+`pnpm build && pnpm start` local, ou le serveur e2e. Il faut alors le dire par
+son nom : `CONTENT_REVIEW_ALLOW_UNAUTHENTICATED=true`. Ce drapeau est refusé
+d'office sur un déploiement Vercel de production, où l'instance est joignable par
+définition. Hors production, aucun des deux n'est nécessaire.
 
 Sur une instance en démonstration publique, toutes les actions d'écriture
 répondent 403 avant même le contrôle de rôle.
@@ -181,7 +191,7 @@ n'envoie qu'une intention, jamais un statut.
 | --- | --- | --- |
 | `saveDraft` | Revalide le contenu réécrit contre le schéma, puis contre le corpus, puis l'écrit. | **409** si le brouillon est approuvé. **400** si le contenu ne passe pas `contentPayloadSchema`, avec le chemin exact de chaque problème. |
 | `validateDraft` | Rejoue les contrôles déterministes et rafraîchit le constat de validation. | — |
-| `approveDraft` | **Revalide d'abord**, puis passe en `approved`. | **409** si les contrôles ne passent pas, avec les motifs bloquants. **409** si le contenu cite une page à extraction dégradée. **409** si la transition est interdite depuis l'état courant. |
+| `approveDraft` | **Revalide d'abord**, puis passe en `approved`. | **409** si le corpus du pack est introuvable — une référence invérifiable n'est pas une référence vérifiée. **409** si les contrôles ne passent pas, avec les motifs bloquants. **409** si le contenu cite une page à extraction dégradée. **409** si la transition est interdite depuis l'état courant. |
 | `rejectDraft` | Passe en `rejected` en enregistrant le motif. | **400** si le motif fait moins de 10 caractères (ou plus de 2 000). **409** si la transition est interdite. |
 | `reopenDraft` | Ramène à `draft` un contenu en échec ou rejeté. | **409** depuis tout autre état. |
 

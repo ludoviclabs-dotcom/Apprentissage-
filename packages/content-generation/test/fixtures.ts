@@ -21,6 +21,7 @@ const HASH_DATA = "c".repeat(64);
 const documents: CorpusDocument[] = [
   {
     documentId: COURSE_DOC_ID,
+    packId: "test-pack",
     title: "Les emprunts obligataires - Fiche de cours",
     relativePath: "comptabilite/cours.pdf",
     category: "course",
@@ -54,6 +55,7 @@ const documents: CorpusDocument[] = [
   },
   {
     documentId: EXERCISE_DOC_ID,
+    packId: "test-pack",
     title: "Les emprunts obligataires - Mise en situation",
     relativePath: "comptabilite/exercice.pdf",
     category: "exercise",
@@ -77,8 +79,11 @@ const documents: CorpusDocument[] = [
 export const testCorpus = new CorpusIndex(documents);
 
 export const validReference = {
+  pack: "test-pack",
   documentId: COURSE_DOC_ID,
   documentTitle: "Les emprunts obligataires - Fiche de cours",
+  // Le document est classé « course » : la nature doit le refléter.
+  sourceType: "course" as const,
   pageStart: 2,
   pageEnd: 2,
   chunkIds: [CHUNK_ACCOUNTS],
@@ -86,8 +91,10 @@ export const validReference = {
 };
 
 export const dataReference = {
+  pack: "test-pack",
   documentId: EXERCISE_DOC_ID,
   documentTitle: "Les emprunts obligataires - Mise en situation",
+  sourceType: "exercise" as const,
   pageStart: 1,
   pageEnd: 1,
   chunkIds: [CHUNK_DATA],
@@ -134,6 +141,7 @@ export function calculationPayload(overrides: Record<string, unknown> = {}): Con
       calculationSteps: [{ order: 1, description: "Prime unitaire multipliée par le nombre d'obligations." }],
       explanation: "La prime mesure l'écart entre ce qui est encaissé et ce qui sera remboursé.",
       gradingRubric: [{ label: "Calcul exact", points: 10 }],
+      competencyTags: ["cg-emprunts-obligataires"],
       sourceReferences: [dataReference],
       difficulty: 2,
       ...overrides
@@ -177,6 +185,7 @@ export function journalEntryPayload(overrides: Record<string, unknown> = {}): Co
       expectedTotalDebit: 8048000,
       expectedTotalCredit: 8048000,
       gradingRubric: [{ label: "Écriture équilibrée", points: 10 }],
+      competencyTags: ["cg-emprunts-obligataires"],
       explanation: "La prime comble l'écart entre le montant encaissé et la dette constatée.",
       sourceReferences: [validReference],
       difficulty: 3,

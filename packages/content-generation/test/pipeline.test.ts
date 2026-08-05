@@ -7,6 +7,7 @@ import {
   createContentProvider,
   CURRENT_PROMPT_VERSIONS,
   generateDrafts,
+  generationKinds,
   getPrompt,
   listDrafts,
   LiveProviderUnavailableError,
@@ -14,6 +15,7 @@ import {
   parseKinds,
   PROMPT_KEYS,
   renderEnvelope,
+  restrictKindsForDomain,
   saveDrafts,
   SHARED_RULES,
   applyTransition,
@@ -269,5 +271,39 @@ describe("stockage des brouillons", () => {
     expect(files).toContain(`${draft.id}.json`);
     const parsed = JSON.parse(await readFile(join(directory, files[0]), "utf8"));
     expect(parsed.status).not.toBe("published");
+  });
+});
+
+describe("restriction du domaine ISO", () => {
+  const allKinds = [...generationKinds];
+
+  it("n'autorise que la fiche de synthèse sur un chapitre ISO", () => {
+    // AGENTS.md : « ISO content must be handled as notes/checklists unless
+    // licensed text is explicitly allowed. »
+    const restriction = restrictKindsForDomain(allKinds, "iso");
+
+    expect(restriction.allowed).toEqual(["sheet"]);
+    expect(restriction.refused).toContain("flashcards");
+    expect(restriction.refused).toContain("calculations");
+    expect(restriction.refused).toContain("case");
+    expect(restriction.reason).toContain("ISO");
+  });
+
+  it("lève la restriction seulement sur déclaration explicite de licence", () => {
+    const licensed = restrictKindsForDomain(allKinds, "iso", { ISO_LICENSED_TEXT_ALLOWED: "true" });
+
+    expect(licensed.allowed).toEqual(allKinds);
+    expect(licensed.refused).toEqual([]);
+
+    // Toute autre valeur ne vaut pas autorisation.
+    expect(restrictKindsForDomain(allKinds, "iso", { ISO_LICENSED_TEXT_ALLOWED: "oui" }).allowed).toEqual([
+      "sheet"
+    ]);
+  });
+
+  it("ne restreint aucun autre domaine", () => {
+    for (const domain of ["compta-generale", "compta-analytique", "ifrs-ias", "fiscalite"]) {
+      expect(restrictKindsForDomain(allKinds, domain).refused, domain).toEqual([]);
+    }
   });
 });
