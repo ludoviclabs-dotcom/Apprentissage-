@@ -1,0 +1,394 @@
+/* Accueil — refonte visuelle de `/`.
+
+   Même patron que `learn.css` et `module.css` : toutes les règles sous
+   `.home-page`, la page change, le shell et les autres écrans ne bougent pas.
+   Aucun token global n'est modifié.
+
+   Les variables sont les `--learn-*` de `tokens.css` — la palette de la
+   refonte, arrivée par la page Apprendre. Le préfixe dit d'où elles viennent,
+   pas à quoi elles servent ; les renommer est un travail à part.
+
+   Hiérarchie : canvas minéral, un panneau navy pour la prochaine action, du
+   blanc pour l'espace pédagogique, des surfaces teintées pour les indicateurs. */
+
+.app-shell:has(.home-page),
+.workspace:has(.home-page) {
+  background: var(--learn-canvas);
+}
+
+.page-stack.home-page {
+  gap: var(--space-5);
+  color: var(--learn-ink);
+  font-family: var(--learn-font-sans);
+}
+
+.home-page .section-label {
+  color: var(--learn-muted);
+  font-size: 0.7rem;
+  letter-spacing: 0.12em;
+}
+
+.home-page h1,
+.home-page h2 {
+  font-family: var(--learn-font-serif);
+  font-weight: 600;
+}
+
+/* --- Entête : hero navy + anneau ------------------------------------------ */
+
+.home-hero-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
+  gap: var(--space-5);
+  align-items: stretch;
+}
+
+.home-hero {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  overflow: hidden;
+  padding: var(--space-8);
+  background: var(--learn-navy);
+  border-radius: var(--learn-radius-panel);
+  color: var(--learn-on-navy);
+}
+
+/* Le halo évite le rectangle navy plat sans rien ajouter à lire. */
+.home-hero-glow {
+  position: absolute;
+  top: -60px;
+  right: -60px;
+  width: 260px;
+  height: 260px;
+  border-radius: var(--radius-full);
+  background: rgba(79, 70, 229, 0.16);
+  pointer-events: none;
+}
+
+/* Le halo est exclu : c'est aussi un enfant direct, et lui rendre
+   `position: relative` le remettrait dans le flux — il occuperait alors une
+   ligne de 260 px au milieu du panneau au lieu de déborder du coin. */
+.home-hero > *:not(.home-hero-glow) {
+  position: relative;
+}
+
+.home-hero .section-label {
+  color: var(--learn-on-navy-faint);
+}
+
+.home-hero h1 {
+  margin: 0;
+  font-size: 2rem;
+  line-height: 1.2;
+}
+
+.home-hero p {
+  max-width: 560px;
+  margin: 0;
+  color: var(--learn-on-navy-muted);
+  font-size: 0.9rem;
+  line-height: 1.6;
+}
+
+.home-hero .state-token {
+  align-self: flex-start;
+  border-color: var(--learn-navy-border);
+  background: var(--learn-navy-raised);
+  color: var(--learn-on-navy-muted);
+}
+
+/* La carte de prochaine action devient un bloc surélevé dans le navy : c'est
+   le seul CTA dominant de l'écran, il ne partage pas la surface. */
+.home-page .next-action-card {
+  margin-top: var(--space-2);
+  max-width: 560px;
+  gap: var(--space-4);
+  padding: var(--space-4) var(--space-5);
+  border: 1px solid var(--learn-navy-border);
+  background: var(--learn-navy-raised);
+  border-radius: var(--learn-radius-block);
+  color: var(--learn-on-navy);
+}
+
+.home-page .next-action-card:hover {
+  background: #1a2749;
+}
+
+.home-page .next-action-card-label {
+  color: var(--learn-on-navy-faint);
+  font-size: 0.7rem;
+  letter-spacing: 0.12em;
+}
+
+.home-page .next-action-card strong {
+  color: var(--learn-on-navy);
+  font-size: 1rem;
+}
+
+.home-page .next-action-card small {
+  color: var(--learn-on-navy-faint);
+}
+
+.home-page .next-action-card-arrow {
+  flex: none;
+  color: var(--learn-indigo);
+}
+
+/* --- Anneau de maîtrise --------------------------------------------------- */
+
+.home-ring {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-3);
+  padding: var(--space-6);
+  border: 1px solid var(--learn-border);
+  background: var(--learn-surface-tinted);
+  border-radius: var(--learn-radius-panel);
+}
+
+.home-ring .section-label {
+  align-self: flex-start;
+}
+
+.mastery-ring-track {
+  stroke: #dde4ef;
+}
+
+.mastery-ring-arc.acquired {
+  stroke: var(--learn-indigo);
+}
+
+.mastery-ring-arc.in-progress {
+  stroke: var(--learn-teal);
+}
+
+.mastery-ring-figure {
+  fill: var(--learn-navy);
+  font-family: var(--learn-font-mono);
+  font-size: 22px;
+  font-weight: 600;
+}
+
+.mastery-ring-caption {
+  fill: var(--learn-muted);
+  font-family: var(--learn-font-sans);
+  font-size: 10px;
+}
+
+.home-ring-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-4);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  color: var(--learn-text);
+  font-size: 0.78rem;
+}
+
+.home-ring-legend li {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.home-ring-legend strong {
+  font-family: var(--learn-font-mono);
+  font-weight: 600;
+}
+
+.home-ring-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 3px;
+}
+
+.home-ring-dot.acquired {
+  background: var(--learn-indigo);
+}
+
+.home-ring-dot.in-progress {
+  background: var(--learn-teal);
+}
+
+.home-ring-dot.remaining {
+  background: #dde4ef;
+}
+
+/* --- Bandeau de garanties -------------------------------------------------- */
+
+.home-page .demo-proof-grid {
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: var(--space-5);
+}
+
+.home-page .demo-proof-grid article {
+  padding: var(--space-5) var(--space-6);
+  border: 1px solid var(--learn-border);
+  background: var(--learn-surface-tinted);
+  border-radius: var(--learn-radius-panel);
+}
+
+.home-page .demo-proof-grid span {
+  color: var(--learn-muted);
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+}
+
+.home-page .demo-proof-grid strong {
+  margin-top: var(--space-1);
+  color: var(--learn-navy);
+  font-family: var(--learn-font-serif);
+  font-size: 1.35rem;
+  font-weight: 600;
+}
+
+.home-page .demo-proof-grid p {
+  color: var(--learn-text);
+  font-size: 0.8rem;
+}
+
+/* La troisième carte est l'invitation à corriger : elle prend le teal de
+   l'espace pédagogique pour se distinguer des deux constats qui la précèdent. */
+.home-page .demo-proof-grid article:last-child {
+  border-color: var(--learn-teal-border);
+  background: var(--learn-teal-soft);
+}
+
+.home-page .demo-proof-grid article:last-child span {
+  color: var(--learn-teal);
+}
+
+.home-page .demo-proof-grid article:last-child strong {
+  color: #0b4e48;
+}
+
+.home-page .demo-proof-grid article:last-child p {
+  color: var(--learn-teal-strong);
+}
+
+/* --- Panneaux blancs : révision et recherche ------------------------------- */
+
+.home-page .panel {
+  padding: var(--space-6) var(--space-7);
+  border: 1px solid var(--learn-border);
+  background: var(--learn-surface);
+  border-radius: var(--learn-radius-panel);
+}
+
+.home-page .home-review {
+  border-left: 4px solid var(--learn-teal);
+}
+
+.home-page .home-review .section-label {
+  color: var(--learn-teal);
+}
+
+.home-page .panel h2 {
+  font-size: 1.25rem;
+}
+
+.home-page .panel p {
+  color: var(--learn-text);
+  line-height: 1.6;
+}
+
+/* --- Contrôles : 36 / 44 / 48, rayons 10–12 ------------------------------- */
+
+.home-page .primary-action,
+.home-page .secondary-action {
+  min-height: var(--learn-control);
+  padding: 0 var(--space-5);
+  border-radius: var(--learn-radius-control);
+  font-size: 0.875rem;
+  font-weight: 650;
+}
+
+.home-page .primary-action {
+  border-color: transparent;
+  background: var(--learn-indigo);
+  color: var(--text-on-accent);
+}
+
+.home-page .primary-action:hover:not(:disabled) {
+  background: var(--learn-indigo-strong);
+}
+
+/* « Réviser 5 min » ouvre l'espace pédagogique : teal, pas indigo. */
+.home-page .home-review .primary-action {
+  background: var(--learn-teal);
+}
+
+.home-page .home-review .primary-action:hover:not(:disabled) {
+  background: var(--learn-teal-strong);
+}
+
+.home-page .search-form input {
+  min-height: var(--learn-control);
+  border: 1.5px solid var(--learn-field-border);
+  background: var(--learn-surface-tinted);
+  border-radius: var(--learn-radius-control);
+  font-family: var(--learn-font-sans);
+}
+
+.home-page .search-form input:focus {
+  border-color: var(--learn-indigo);
+  background: var(--learn-surface);
+}
+
+.home-page .search-form button {
+  min-height: var(--learn-control);
+  padding: 0 var(--space-5);
+  border: 0;
+  background: var(--learn-indigo);
+  border-radius: var(--learn-radius-control);
+  color: var(--text-on-accent);
+  font-family: var(--learn-font-sans);
+  font-size: 0.875rem;
+  font-weight: 650;
+}
+
+.home-page .search-form button:hover {
+  background: var(--learn-indigo-strong);
+}
+
+/* --- Curricula publiés ----------------------------------------------------- */
+
+/* `auto-fit` plutôt que deux colonnes fixes : sans compte, le panneau
+   « Priorités » n'est pas rendu et la grille laissait « Curricula publiés » sur
+   une demi-largeur, face à un vide. */
+.home-page .dashboard-grid,
+.home-page .two-column {
+  grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
+  gap: var(--space-5);
+}
+
+.home-page .priority-row {
+  border: 1px solid var(--learn-border);
+  background: var(--learn-surface-tinted);
+  border-radius: var(--learn-radius-block);
+}
+
+.home-page .priority-row strong {
+  color: var(--learn-ink);
+}
+
+.home-page .priority-row p,
+.home-page .priority-row small {
+  color: var(--learn-muted);
+}
+
+@media (max-width: 720px) {
+  .home-hero {
+      padding: var(--space-6);
+  }
+
+  .home-hero h1 {
+      font-size: 1.6rem;
+  }
+}
