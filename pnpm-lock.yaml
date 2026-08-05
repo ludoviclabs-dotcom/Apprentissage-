@@ -51,6 +51,9 @@ importers:
       '@finance/ai':
         specifier: workspace:*
         version: link:../../packages/ai
+      '@finance/content-generation':
+        specifier: workspace:*
+        version: link:../../packages/content-generation
       '@finance/db':
         specifier: workspace:*
         version: link:../../packages/db
