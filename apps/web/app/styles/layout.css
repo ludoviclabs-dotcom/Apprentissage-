@@ -613,3 +613,287 @@
 .topbar-account:focus-visible {
   color: inherit;
 }
+
+/* ==========================================================================
+   Refonte du chrome — sidebar navy, topbar claire
+   ==========================================================================
+   Contrairement aux habillages de page (`learn.css`, `module.css`,
+   `home.css`), ce bloc n'est pas scopé : le chrome est le même sur toutes les
+   routes, et un shell qui changerait de couleur d'une page à l'autre serait
+   une couture, pas une refonte.
+
+   Il consomme les tokens `--learn-*` — la palette de la refonte, arrivée par
+   la page Apprendre. Le préfixe dit d'où ils viennent, pas à quoi ils servent.
+
+   Aucun token global n'est modifié : les pages non encore refondues gardent
+   leur canvas et leurs surfaces, seul le chrome autour change. */
+
+.sidebar {
+  border-right: 0;
+  background: var(--learn-navy);
+  /* Indispensable depuis que les sections sont ouvertes : les dix-huit
+     entrées dépassent 100vh sur un portable, et sans défilement les
+     dernières — Attestations, Administration — devenaient inatteignables. */
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.brand {
+  border-bottom-color: var(--learn-navy-border);
+}
+
+.brand-mark {
+  background: var(--learn-indigo);
+  border-radius: var(--learn-radius-inset);
+  color: var(--text-on-accent);
+  font-family: var(--learn-font-serif);
+  font-weight: 600;
+}
+
+.sidebar .brand strong {
+  color: var(--learn-on-navy);
+}
+
+.sidebar .brand small {
+  color: var(--learn-on-navy-faint);
+}
+
+/* --- Entrées de navigation ------------------------------------------------ */
+
+.sidebar .nav-item,
+.sidebar .nav-subitem {
+  color: var(--learn-on-navy-muted);
+  border-radius: var(--learn-radius-inset);
+  font-family: var(--learn-font-sans);
+}
+
+.sidebar .nav-item:hover,
+.sidebar .nav-subitem:hover {
+  background: var(--learn-navy-raised);
+  color: var(--learn-on-navy);
+}
+
+/* L'entrée active est une pastille indigo pleine : un seul élément la porte
+   par écran (`isNavItemActive`), donc elle peut être aussi franche. */
+.sidebar .nav-item.active,
+.sidebar .nav-subitem.active {
+  background: var(--learn-indigo);
+  color: var(--text-on-accent);
+  font-weight: 600;
+}
+
+.sidebar .nav-item.active:hover,
+.sidebar .nav-subitem.active:hover {
+  background: var(--learn-indigo-strong);
+  color: var(--text-on-accent);
+}
+
+/* Les entêtes de section deviennent des intitulés — petits, capitales, ternes
+   — mais restent des boutons. La maquette les dessine inertes ; garder le
+   `aria-expanded` conserve le repli pour un écran court et l'annonce du
+   pliage à un lecteur d'écran. */
+/* La maquette met `--learn-navy-label` (#5e6b8c) sur le navy : environ 3,3:1,
+   sous le seuil AA de 4,5:1 pour un texte de 11 px, et illisible à l'écran.
+   `--learn-on-navy-faint` monte à ~6:1 pour le même rôle visuel. */
+.sidebar .nav-section-toggle {
+  min-height: 30px;
+  margin-top: 10px;
+  padding: 0 12px;
+  color: var(--learn-on-navy-faint);
+  font-family: var(--learn-font-sans);
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.sidebar .nav-section-toggle:hover {
+  background: transparent;
+  color: var(--learn-on-navy-faint);
+}
+
+.sidebar .nav-section.active > .nav-section-toggle {
+  color: var(--learn-on-navy-faint);
+}
+
+/* L'icône de section disparaît : elle doublait un intitulé devenu une simple
+   étiquette, et alignait mal les capitales. Le chevron reste, c'est lui qui
+   porte l'affordance de repli. */
+.sidebar .nav-section-toggle > svg:first-child {
+  display: none;
+}
+
+.sidebar .nav-sub {
+  padding-left: 10px;
+}
+
+.sidebar .nav-subitem {
+  min-height: 34px;
+  font-size: 0.82rem;
+  font-weight: 500;
+}
+
+/* Le compteur de révisions dues est teal : il relève de la rétention, pas de
+   l'action. Il n'est rendu que pour un compte (voir `SidebarNav`). */
+.sidebar .nav-badge {
+  background: var(--learn-teal);
+  color: var(--text-on-accent);
+  font-family: var(--learn-font-mono);
+  font-weight: 600;
+}
+
+.sidebar .nav-admin {
+  border-top-color: var(--learn-navy-border);
+}
+
+/* Même seuil de contraste que les autres intitulés de section : « Administration »
+   n'est pas moins à lire parce qu'il ne concerne qu'un administrateur. */
+.sidebar .nav-admin-label {
+  color: var(--learn-on-navy-faint);
+  font-size: 0.68rem;
+  letter-spacing: 0.12em;
+}
+
+.sidebar-auth .primary-action {
+  border-color: transparent;
+  background: var(--learn-indigo);
+  border-radius: var(--learn-radius-control);
+  color: var(--text-on-accent);
+}
+
+.sidebar-auth .primary-action:hover {
+  background: var(--learn-indigo-strong);
+}
+
+.sidebar-auth .secondary-action {
+  border: 1.5px solid var(--learn-navy-border);
+  background: transparent;
+  border-radius: var(--learn-radius-control);
+  color: var(--learn-on-navy-muted);
+}
+
+.sidebar-auth .secondary-action:hover {
+  background: var(--learn-navy-raised);
+  color: var(--learn-on-navy);
+}
+
+/* --- Topbar --------------------------------------------------------------- */
+
+.topbar {
+  border-bottom-color: var(--learn-border);
+  background: var(--learn-surface-tinted);
+  backdrop-filter: none;
+}
+
+.topbar-context strong {
+  color: var(--learn-navy);
+  font-family: var(--learn-font-sans);
+}
+
+.topbar-section,
+.topbar-subtitle,
+.topbar-breadcrumb ol {
+  color: var(--learn-muted);
+}
+
+.topbar-search {
+  min-height: var(--learn-control);
+  border: 1.5px solid var(--learn-field-border);
+  background: var(--learn-surface);
+  border-radius: var(--learn-radius-inset);
+}
+
+.topbar-status {
+  color: var(--learn-text);
+}
+
+/* --- Drawer mobile : même chrome que la sidebar --------------------------- */
+
+.drawer-panel {
+  background: var(--learn-navy);
+}
+
+.drawer-head {
+  border-bottom-color: var(--learn-navy-border);
+  color: var(--learn-on-navy);
+}
+
+.drawer-panel .nav-item,
+.drawer-panel .nav-subitem {
+  color: var(--learn-on-navy-muted);
+}
+
+.drawer-panel .nav-item:hover,
+.drawer-panel .nav-subitem:hover {
+  background: var(--learn-navy-raised);
+  color: var(--learn-on-navy);
+}
+
+.drawer-panel .nav-item.active,
+.drawer-panel .nav-subitem.active {
+  background: var(--learn-indigo);
+  color: var(--text-on-accent);
+}
+
+/* Même correction de contraste que dans la sidebar : le drawer partage le
+   navy, donc il partageait le défaut. */
+.drawer-panel .nav-section-toggle {
+  color: var(--learn-on-navy-faint);
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.drawer-panel .nav-section-toggle > svg:first-child {
+  display: none;
+}
+
+.drawer-panel .nav-badge {
+  background: var(--learn-teal);
+  color: var(--text-on-accent);
+}
+
+.drawer-panel .mobile-menu-toggle {
+  border-color: var(--learn-navy-border);
+  background: var(--learn-navy-raised);
+  color: var(--learn-on-navy-muted);
+}
+
+.drawer-panel .drawer-foot {
+  border-top-color: var(--learn-navy-border);
+}
+
+.drawer-panel .drawer-foot a {
+  color: var(--learn-on-navy-muted);
+}
+
+.drawer-panel .drawer-foot a:hover,
+.drawer-panel .drawer-foot a:focus-visible {
+  color: var(--learn-on-navy);
+}
+
+/* L'entête compact mobile reprend le navy : sans cela, une bande claire
+   surmonterait un drawer sombre à l'ouverture. */
+.mobile-header {
+  border-bottom-color: var(--learn-navy-border);
+  background: var(--learn-navy);
+}
+
+.mobile-header .brand strong {
+  color: var(--learn-on-navy);
+}
+
+.mobile-header .brand small {
+  color: var(--learn-on-navy-faint);
+}
+
+.mobile-header .mobile-menu-toggle {
+  border-color: var(--learn-navy-border);
+  background: var(--learn-navy-raised);
+  color: var(--learn-on-navy-muted);
+}
+
+.mobile-header .mobile-menu-toggle:hover {
+  background: #1a2749;
+}
