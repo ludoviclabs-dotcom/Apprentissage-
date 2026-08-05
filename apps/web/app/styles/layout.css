@@ -589,7 +589,7 @@
   .demo-banner,
   .page-header,
   .focus-panel,
-  .generator-panel {
+  .cta-panel {
       align-items: flex-start;
       flex-direction: column;
 
