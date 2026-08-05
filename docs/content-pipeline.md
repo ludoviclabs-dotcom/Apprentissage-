@@ -101,6 +101,32 @@ traités avant génération.
 - Le workflow éditorial ne vit plus ici : il est porté par
   `@finance/content-generation` (voir `docs/content-review-workflow.md`), avec
   cinq états et sans état « publié ».
-- L'écriture en base (`documents`, `document_pages`, `chunks`) reste faite par
-  l'import de packs existant ; le branchement des artefacts page-aware sur
-  `importSourcePackFromManifest` fait partie du lot suivant.
+- L'écriture en base (`documents`, `document_pages`, `chunks`) n'est branchée
+  sur rien. La fonction existe — `recordManifest` dans
+  `packages/db/src/repository.ts` — mais **aucun appelant ne l'invoque** à ce
+  jour. Les packs affichés sur `/source-packs` proviennent du catalogue seedé
+  ou de la base ; le pipeline, lui, écrit dans `data/extracted/`. Relier les
+  deux fait partie du lot suivant.
+
+## L'interface web n'importe rien
+
+`/source-packs` affiche les packs déjà connus et propose un **assistant**
+(`apps/web/components/forms/source-pack-import-guide.tsx`) qui explique le flux
+et compose la commande à copier. Il n'y a pas de bouton « Importer », parce
+qu'il n'y a rien à importer depuis un navigateur :
+
+- le serveur web n'a pas accès au disque de l'opérateur, et une instance
+  déployée n'y aurait de toute façon aucun accès ;
+- accepter un chemin de système de fichiers envoyé par un navigateur
+  transformerait un flux local en surface de lecture côté serveur.
+
+Le champ de chemin de l'assistant **ne quitte jamais le navigateur** : il sert
+uniquement à composer une chaîne de caractères. Seuls les chemins relatifs au
+projet sont acceptés (`source-packs/mon-pack`) ; un chemin absolu, un chemin
+réseau, une URL ou une remontée `..` sont refusés avec un message explicite,
+avant même que la commande existe. La logique est pure et testée
+(`apps/web/lib/source-packs/import-command.ts`).
+
+`GET /api/source-packs` reste la lecture des packs. `POST` répond **405** avec
+`Allow: GET` : l'import n'est pas une action interdite à tel ou tel appelant,
+c'est une méthode que cette ressource n'expose pas.

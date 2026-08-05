@@ -1,7 +1,6 @@
 import type { Metadata } from "next";
 import { DomainBadge } from "@/components/domain-badge";
-import { SourcePackImportForm } from "@/components/forms/source-pack-import-form";
-import { getRuntimeFlags } from "@/lib/runtime-flags";
+import { SourcePackImportGuide } from "@/components/forms/source-pack-import-guide";
 import { statusLabel } from "@/lib/status-labels";
 import { getSourcePacks } from "@finance/db";
 import Link from "next/link";
@@ -12,7 +11,6 @@ export const metadata: Metadata = {
 };
 
 export default async function SourcePacksPage() {
-  const runtime = getRuntimeFlags();
   const sourcePacks = await getSourcePacks();
 
   return (
@@ -55,7 +53,7 @@ export default async function SourcePacksPage() {
         </p>
       </section>
 
-      <SourcePackImportForm disabled={runtime.publicDemo} />
+      <SourcePackImportGuide />
     </div>
   );
 }

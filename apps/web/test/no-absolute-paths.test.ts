@@ -60,14 +60,22 @@ describe("aucun chemin absolu dans apps/web", () => {
     });
   }
 
-  it("le formulaire d'import ne pré-remplit aucun chemin", () => {
+  it("l'assistant d'import ne pré-remplit aucun chemin", () => {
+    // Le formulaire d'import a été remplacé par un assistant : il ne poste plus
+    // rien, mais il garde un champ, donc la règle du champ vide reste la même.
     const source = readFileSync(
-      join(repoRoot, "apps/web/components/forms/source-pack-import-form.tsx"),
+      join(repoRoot, "apps/web/components/forms/source-pack-import-guide.tsx"),
       "utf8"
     );
 
     // La valeur initiale est vide : l'exemple vit dans le placeholder.
     expect(source).toMatch(/useState\(""\)/);
     expect(source).toContain("placeholder=");
+  });
+
+  it("l'exemple proposé à l'utilisateur est relatif", () => {
+    const source = readFileSync(join(repoRoot, "apps/web/lib/source-packs/import-command.ts"), "utf8");
+
+    expect(source).toContain('PATH_PLACEHOLDER = "source-packs/mon-pack"');
   });
 });
