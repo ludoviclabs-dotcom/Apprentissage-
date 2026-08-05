@@ -5,9 +5,9 @@ import { CorrectionSummary } from "@/components/correction-summary";
 import { DomainBadge } from "@/components/domain-badge";
 import { ExercisePanel } from "@/components/exercise-panel";
 import { LearningCard } from "@/components/learning-card";
+import { MasteryRing } from "@/components/mastery-ring";
 import { ProgressMeter } from "@/components/progress-meter";
 import { NextActionCard } from "@/components/ui/next-action-card";
-import { PageHeader } from "@/components/ui/page-header";
 import { getRuntimeFlags } from "@/lib/runtime-flags";
 import { getDashboardModel } from "@/lib/view-model";
 import { getCurrentUser } from "@/lib/auth/current-user";
@@ -56,36 +56,90 @@ export default async function DashboardPage() {
     );
   }
 
+  // Les compteurs de l'anneau viennent des niveaux publiés, pas des
+  // compétences seedées : un niveau acquis est un fait enregistré, une force de
+  // compétence sans compte appartiendrait à quelqu'un qui n'existe pas encore.
+  const publishedLevels = progression.tracks.flatMap((track) => track.publishedLevels);
+  const acquired = publishedLevels.filter((level) => level.snapshot.status === "passed").length;
+  const inProgress = publishedLevels.filter(
+    (level) => level.snapshot.status === "in_progress"
+  ).length;
+  const remaining = Math.max(0, publishedLevels.length - acquired - inProgress);
+  const share = (count: number) =>
+    publishedLevels.length === 0 ? 0 : (count / publishedLevels.length) * 100;
+
   return (
-    <div className="page-stack">
-      <PageHeader
-        label={personal ? "Tableau de bord" : "Démonstration"}
-        title={personal ? "Remise à niveau pilotée par compétences" : "Découvre le cockpit d'apprentissage"}
-        description={
-          personal
-            ? "Ton état vient du curriculum versionné, des corrections et des révisions réellement enregistrées."
-            : "Exemple de parcours en lecture neutre : aucun score, statut ou travail seedé n'est présenté comme personnel."
-        }
-        aside={
-          personal ? (
-            <div className="hero-score">
-              <span>Niveau global</span>
-              <strong>{Math.round(progression.score ?? 0)}%</strong>
-            </div>
-          ) : (
-            <span className="state-token">Jeu de démonstration</span>
-          )
-        }
-      >
-        {progression.nextAction ? (
-          <NextActionCard
-            href={progression.nextAction.href}
-            label={progression.nextAction.label}
-            title={progression.nextAction.title}
-            meta={personal ? "État canonique du curriculum" : "Correction sans écriture en base"}
+    <div className="page-stack home-page">
+      <div className="home-hero-grid">
+        <section className="home-hero">
+          {/* Halo décoratif : purement ornemental, donc masqué à l'assistance. */}
+          <span className="home-hero-glow" aria-hidden="true" />
+
+          <span className="section-label">{personal ? "Tableau de bord" : "Démonstration"}</span>
+          <h1>
+            {personal
+              ? "Remise à niveau pilotée par compétences"
+              : "Découvre le cockpit d'apprentissage"}
+          </h1>
+          <p>
+            {personal
+              ? "Ton état vient du curriculum versionné, des corrections et des révisions réellement enregistrées."
+              : "Exemple de parcours en lecture neutre : aucun score, statut ou travail seedé n'est présenté comme personnel."}
+          </p>
+
+          {progression.nextAction ? (
+            <NextActionCard
+              href={progression.nextAction.href}
+              label={progression.nextAction.label}
+              title={progression.nextAction.title}
+              meta={personal ? "État canonique du curriculum" : "Correction sans écriture en base"}
+            />
+          ) : null}
+
+          {personal ? null : <span className="state-token">Jeu de démonstration</span>}
+        </section>
+
+        <section className="home-ring" aria-labelledby="anneau-titre">
+          {/* « Niveau global » est le terme que le produit emploie pour ce
+              nombre depuis PR-02, et l'anneau est ce qui le porte désormais :
+              il remplace l'ancien encart chiffré, il ne le supprime pas.
+              Sans compte il n'y a pas de niveau, donc pas ce libellé. */}
+          <span className="section-label" id="anneau-titre">
+            {personal ? "Niveau global" : "Maîtrise du parcours"}
+          </span>
+
+          <MasteryRing
+            figure={personal && progression.score !== null ? `${Math.round(progression.score)}%` : null}
+            caption={personal ? "maîtrise" : "exemple neutre"}
+            segments={[
+              { tone: "acquired", percent: share(acquired) },
+              { tone: "in-progress", percent: share(inProgress) }
+            ]}
+            label={
+              personal && progression.score !== null
+                ? `Maîtrise globale ${Math.round(progression.score)} pour cent, sur ${publishedLevels.length} niveaux publiés.`
+                : `Aucun score personnel. ${publishedLevels.length} niveaux publiés au catalogue.`
+            }
           />
-        ) : null}
-      </PageHeader>
+
+          {/* La légende chiffrée porte l'information que l'anneau ne peut pas
+              porter quand il est vide, et double la couleur par un libellé. */}
+          <ul className="home-ring-legend">
+            <li>
+              <span className="home-ring-dot acquired" aria-hidden="true" />
+              Acquis <strong>{acquired}</strong>
+            </li>
+            <li>
+              <span className="home-ring-dot in-progress" aria-hidden="true" />
+              En cours <strong>{inProgress}</strong>
+            </li>
+            <li>
+              <span className="home-ring-dot remaining" aria-hidden="true" />
+              Restant <strong>{remaining}</strong>
+            </li>
+          </ul>
+        </section>
+      </div>
 
       <section className="demo-proof-grid" aria-label="Garanties de la démonstration">
         <article>
@@ -113,7 +167,8 @@ export default async function DashboardPage() {
         </article>
       </section>
 
-      <section className="panel">
+      {/* Espace pédagogique : filet teal, comme sur la page module. */}
+      <section className="panel home-review">
         <div className="panel-heading">
           <div>
             <span className="section-label">Révision active</span>
@@ -138,7 +193,7 @@ export default async function DashboardPage() {
         </p>
       </section>
 
-      <section className="panel corpus-search">
+      <section className="panel corpus-search home-search">
         <div className="panel-heading">
           <div>
             <span className="section-label">Recherche corpus</span>
