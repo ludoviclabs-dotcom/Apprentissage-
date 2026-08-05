@@ -11,5 +11,6 @@
 @import "./styles/layout.css";
 @import "./styles/components.css";
 @import "./styles/learn.css";
+@import "./styles/module.css";
 @import "./styles/utilities.css";
 @import "./styles/motion.css";
