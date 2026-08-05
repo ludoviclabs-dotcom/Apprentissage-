@@ -1,7 +1,23 @@
-import { readFileSync, writeFileSync } from "node:fs";
+import { existsSync, readFileSync, writeFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
 
-const INPUT =
-  "C:/Users/Ludo/AppData/Local/Temp/claude/C--Users-Ludo-Apprentissage--claude-worktrees-modest-kirch-d2c468/0d7ad6df-d036-480c-aab3-81644b53cb43/tasks/wc8aqrdtd.output";
+// Assembly input: CLI argument, then COMPTA_ASSEMBLY_INPUT, then the portable
+// repo-relative default. Never an absolute machine-specific path.
+const DEFAULT_INPUT = fileURLToPath(new URL("../../data/generated/compta-assembly.json", import.meta.url));
+const INPUT = process.argv[2] ?? process.env.COMPTA_ASSEMBLY_INPUT ?? DEFAULT_INPUT;
+
+if (!existsSync(INPUT)) {
+  console.error(
+    [
+      `Fichier d'assemblage introuvable : ${INPUT}`,
+      "Usage : node packages/domain/assemble-compta.mjs [chemin/vers/assemblage.json]",
+      "Défaut : data/generated/compta-assembly.json (relatif à la racine du dépôt),",
+      "ou variable d'environnement COMPTA_ASSEMBLY_INPUT."
+    ].join("\n")
+  );
+  process.exit(1);
+}
+
 const OUTPUT = new URL("./src/compta-v1.ts", import.meta.url);
 
 const PACK = "compta-master";

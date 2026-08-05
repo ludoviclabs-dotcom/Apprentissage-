@@ -4,7 +4,9 @@ import { createHash } from "node:crypto";
 import { extname, join, relative } from "node:path";
 import type { DomainId } from "@finance/domain";
 import { z } from "zod";
-import { extractDocx, extractPdf } from "./extractors";
+import { extractDocx, extractPdf, type ExtractedPageContent } from "./extractors";
+
+export type { ExtractedPageContent } from "./extractors";
 
 export const supportedExtensions = [".pdf", ".docx", ".pptx", ".xlsx", ".md"] as const;
 
@@ -30,6 +32,12 @@ export interface ExtractedDocument {
   rawText: string;
   markdownText: string;
   pages: number;
+  /**
+   * Contenu page par page avec les numéros réels du document source. Vide
+   * uniquement pour les formats non couverts (.pptx / .xlsx) ; un Markdown est
+   * une unique page logique 1.
+   */
+  pageContents: ExtractedPageContent[];
   status: "extracted" | "needs-docling";
   reason?: string;
 }
@@ -163,13 +171,17 @@ export async function extractDocument(rootPath: string, file: IngestFile): Promi
 
   if (file.extension === ".md") {
     const markdownText = await readFile(absolutePath, "utf8");
+    const rawText = markdownText.replaceAll(/[#*_`>-]/g, " ");
 
     return {
       path: file.path,
       extension: file.extension,
-      rawText: markdownText.replaceAll(/[#*_`>-]/g, " "),
+      rawText,
       markdownText,
       pages: 1,
+      // Un fichier Markdown est une page logique unique : le numéro 1 est réel,
+      // pas un défaut arbitraire.
+      pageContents: [{ pageNumber: 1, rawText, markdownText }],
       status: "extracted"
     };
   }
@@ -183,6 +195,7 @@ export async function extractDocument(rootPath: string, file: IngestFile): Promi
       rawText: extracted.rawText,
       markdownText: extracted.markdownText,
       pages: extracted.pages,
+      pageContents: extracted.pageContents,
       status: extracted.status,
       reason: extracted.reason
     };
@@ -195,42 +208,66 @@ export async function extractDocument(rootPath: string, file: IngestFile): Promi
     rawText: "",
     markdownText: "",
     pages: 0,
+    pageContents: [],
     status: "needs-docling",
     reason: "format non couvert par l'extracteur Node V1 (.pptx / .xlsx)"
   };
 }
 
 export function chunkMarkdown(document: ExtractedDocument, maxChars = 1200): TextChunk[] {
-  if (!document.markdownText.trim()) {
-    return [];
-  }
+  // Les chunks sont découpés page par page : chaque chunk porte le numéro réel
+  // de sa page source, jamais un `1` arbitraire. Le repli sur une page unique ne
+  // sert qu'aux documents sans pagination connue et non vides.
+  const pages: ExtractedPageContent[] =
+    document.pageContents.length > 0
+      ? document.pageContents
+      : document.markdownText.trim()
+        ? [{ pageNumber: 1, rawText: document.rawText, markdownText: document.markdownText }]
+        : [];
 
-  const sections = document.markdownText
-    .split(/\n(?=#{1,3}\s)/g)
-    .map((section) => section.trim())
-    .filter(Boolean);
   const chunks: TextChunk[] = [];
+  let carriedTitle = "Sans titre";
 
-  for (const section of sections.length > 0 ? sections : [document.markdownText]) {
-    const sectionTitle = section.match(/^#{1,3}\s+(.+)$/m)?.[1] ?? "Sans titre";
+  for (const page of pages) {
+    if (!page.markdownText.trim()) {
+      continue;
+    }
 
-    for (let index = 0; index < section.length; index += maxChars) {
-      const content = section.slice(index, index + maxChars).trim();
+    const sections = page.markdownText
+      .split(/\n(?=#{1,3}\s)/g)
+      .map((section) => section.trim())
+      .filter(Boolean);
 
-      if (!content) {
-        continue;
+    for (const section of sections.length > 0 ? sections : [page.markdownText]) {
+      const heading = section.match(/^#{1,3}\s+(.+)$/m)?.[1];
+
+      if (heading) {
+        // Un titre vu sur une page couvre les pages suivantes jusqu'au prochain.
+        carriedTitle = heading;
       }
 
-      const contentHash = createHash("sha256").update(`${document.path}:${content}`).digest("hex");
-      chunks.push({
-        id: `chunk-${contentHash.slice(0, 16)}`,
-        sourcePath: document.path,
-        sectionTitle,
-        content,
-        contentHash,
-        pageStart: 1,
-        pageEnd: 1
-      });
+      const sectionTitle = heading ?? carriedTitle;
+
+      for (let index = 0; index < section.length; index += maxChars) {
+        const content = section.slice(index, index + maxChars).trim();
+
+        if (!content) {
+          continue;
+        }
+
+        const contentHash = createHash("sha256")
+          .update(`${document.path}:${page.pageNumber}:${content}`)
+          .digest("hex");
+        chunks.push({
+          id: `chunk-${contentHash.slice(0, 16)}`,
+          sourcePath: document.path,
+          sectionTitle,
+          content,
+          contentHash,
+          pageStart: page.pageNumber,
+          pageEnd: page.pageNumber
+        });
+      }
     }
   }
 
