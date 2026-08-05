@@ -159,8 +159,13 @@ test("public demo disables protected CTAs before submission and rejects writes",
   await page.goto("/documents");
   await expect(page.getByRole("button", { name: "Uploader" })).toBeDisabled();
 
+  // Les source packs n'ont plus de CTA à désactiver : le formulaire d'import
+  // promettait une action qui ne pouvait pas aboutir et a été remplacé par un
+  // assistant. L'assertion devient donc plus forte — il n'y a aucun bouton
+  // d'import à protéger, en démo publique comme ailleurs.
   await page.goto("/source-packs");
-  await expect(page.getByRole("button", { name: "Analyser le pack" })).toBeDisabled();
+  await expect(page.getByRole("button", { name: /analyser le pack|importer/i })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Copier la commande" })).toBeVisible();
 
   const response = await request.post("/api/revisions/review", {
     data: { flashcardId: "fc-amort-lineaire", rating: "correct" }
