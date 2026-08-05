@@ -8,6 +8,10 @@
   },
   "scripts": {
     "ingest": "tsx src/cli.ts",
+    "content:scan": "tsx src/content-cli.ts scan",
+    "content:extract": "tsx src/content-cli.ts extract",
+    "content:pair": "tsx src/content-cli.ts pair",
+    "content:validate": "tsx src/content-cli.ts validate",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {

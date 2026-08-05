@@ -13,6 +13,18 @@ The MVP starts with seeded learning data and a navigable Next.js interface. Docu
 - `packages/ingest`: source pack and document ingestion primitives.
 - `workers/ingestion-worker`: Docker boundary for future Docling/Python ingestion.
 
+## Content Pipeline
+
+Since the « Comptabilité approfondie » preparation lot, `packages/ingest`
+carries a deterministic content pipeline (`content:scan` → `content:extract` →
+`content:pair` → `content:validate`) that turns private sources under
+`content-private/` into typed, page-aware JSON artifacts in `data/extracted/`
+— both git-ignored. No AI call, no automatic publication: the editorial
+workflow `draft → needs-review → approved → published` is typed and enforced
+by `canTransitionDraft`, but nothing walks it until the controlled-generation
+lot. See `docs/content-pipeline.md`, `docs/content-source-layout.md`,
+`docs/content-quality-gates.md` and `docs/content-pipeline-audit.md`.
+
 ## Product Rule
 
 The cockpit is organized around guided learning. Retrieval and AI features support the route, but the main user loop is:

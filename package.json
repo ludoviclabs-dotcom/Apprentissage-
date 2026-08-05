@@ -19,7 +19,11 @@
     "db:migrate": "corepack pnpm --filter @finance/db migrate",
     "db:configure-app-role": "corepack pnpm --filter @finance/db configure-app-role",
     "db:seed": "corepack pnpm --filter @finance/db seed",
-    "ingest": "corepack pnpm --filter @finance/ingest ingest"
+    "ingest": "corepack pnpm --filter @finance/ingest ingest",
+    "content:scan": "corepack pnpm --filter @finance/ingest content:scan",
+    "content:extract": "corepack pnpm --filter @finance/ingest content:extract",
+    "content:pair": "corepack pnpm --filter @finance/ingest content:pair",
+    "content:validate": "corepack pnpm --filter @finance/ingest content:validate"
   },
   "dependencies": {
     "lucide-react": "^0.468.0",

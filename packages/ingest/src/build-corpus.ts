@@ -7,7 +7,17 @@ import { chunkMarkdown, createSourcePackManifest, extractDocument, inferDomainFr
 const here = dirname(fileURLToPath(import.meta.url));
 const repoRoot = join(here, "..", "..", "..");
 
-const sourceRoot = process.argv[2] ?? "C:/Users/Ludo/Dropbox/Comptabilité Générale _ Approfondie";
+const sourceRoot = process.argv[2] ?? process.env.CONTENT_SOURCE_ROOT;
+
+if (!sourceRoot) {
+  console.error(
+    "Usage: tsx src/build-corpus.ts <racine-des-sources> [packId] [domaine]\n" +
+      "Ou définir CONTENT_SOURCE_ROOT (voir .env.example). Aucun chemin par défaut : " +
+      "les sources privées ne vivent pas dans le dépôt."
+  );
+  process.exit(1);
+}
+
 const packId = process.argv[3] ?? "compta-master";
 const fallbackDomain: DomainId = (process.argv[4] as DomainId) ?? "compta-generale";
 const outDir = join(repoRoot, "data", "processed", "corpus", packId);

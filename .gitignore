@@ -13,9 +13,18 @@ data/raw/*
 data/processed/*
 data/exports/*
 data/backups/*
+data/extracted/*
+data/generated/drafts/*
 !data/raw/.gitkeep
 !data/processed/.gitkeep
 !data/exports/.gitkeep
 !data/backups/.gitkeep
+!data/extracted/.gitkeep
+!data/generated/drafts/.gitkeep
+
+# Sources pédagogiques privées : jamais dans Git, jamais servies publiquement.
+content-private/
+# Garde-fou : aucun PDF ne doit être commité, où qu'il soit.
+*.pdf
 
 .vercel
