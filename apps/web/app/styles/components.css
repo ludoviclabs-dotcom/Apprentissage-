@@ -2585,3 +2585,192 @@
       min-width: 460px;
   }
 }
+
+/* ==========================================================================
+   PR-21 · Module — entête navy, rail de niveaux teinté par statut, espace cas
+   ========================================================================== */
+
+.module-hero {
+  align-items: flex-start;
+}
+
+.module-hero h1 {
+  margin: var(--space-2) 0;
+  font-family: var(--font-display);
+  font-size: 1.65rem;
+  font-weight: var(--font-weight-semibold);
+  line-height: 1.25;
+}
+
+.module-hero p {
+  max-width: 640px;
+}
+
+.module-stats {
+  display: grid;
+  flex: none;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--space-3);
+}
+
+.module-stats > div {
+  padding: var(--space-3) var(--space-5);
+  background: var(--navy-raised);
+  border-radius: var(--radius-lg);
+  text-align: center;
+}
+
+.module-stats strong {
+  display: block;
+  color: var(--navy-text);
+  font-family: var(--font-mono);
+  font-size: 1.3rem;
+  font-weight: var(--font-weight-semibold);
+}
+
+.module-stats span {
+  color: var(--navy-text-dim);
+  font-size: 0.72rem;
+  white-space: nowrap;
+}
+
+/* --- Rail de niveaux ------------------------------------------------------ */
+
+/* Le statut teinte la carte entière, et le libellé le répète en toutes
+   lettres : la couleur seule ne dit jamais où en est un niveau. */
+.level-row.passed {
+  border-color: var(--success-border);
+  background: var(--success-surface);
+}
+
+.level-row.passed .level-index {
+  background: var(--success);
+  border-color: var(--success);
+  color: var(--text-on-accent);
+}
+
+.level-row.passed > .level-row-head strong {
+  color: var(--success-strong);
+}
+
+.level-row.in_progress,
+.level-row.available {
+  border-color: #c9c6f7;
+  background: var(--accent-soft);
+}
+
+.level-row.in_progress .level-index,
+.level-row.available .level-index {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--text-on-accent);
+}
+
+.level-row.locked .level-index,
+.level-row.planned .level-index {
+  background: var(--surface-locked);
+  border-color: var(--surface-locked);
+  color: var(--muted);
+}
+
+.level-index {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 36px;
+  min-height: 36px;
+  font-family: var(--font-mono);
+  border-radius: var(--radius);
+}
+
+.level-meta {
+  margin: var(--space-2) 0 0;
+  color: var(--text-secondary);
+  font-size: 0.78rem;
+}
+
+.level-meta strong {
+  font-family: var(--font-mono);
+  font-weight: var(--font-weight-medium);
+}
+
+.level-row-head .primary-action {
+  flex: none;
+  align-self: center;
+}
+
+/* --- Espace pédagogique : mini-cas et case studies ------------------------ */
+
+.section-label--teal {
+  color: var(--secondary);
+}
+
+.case-panel {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-6);
+  flex-wrap: wrap;
+  padding: var(--space-6) var(--space-7);
+  border-left: 4px solid var(--secondary);
+  border-radius: var(--radius-panel);
+}
+
+.case-panel-body {
+  flex: 1;
+  min-width: 280px;
+}
+
+.case-panel h2 {
+  margin: var(--space-1) 0 var(--space-2);
+  font-size: 1.25rem;
+}
+
+.case-panel p {
+  max-width: 720px;
+  margin: 0;
+}
+
+.case-meta {
+  margin-top: var(--space-3) !important;
+  color: var(--text-tertiary);
+  font-size: 0.78rem;
+}
+
+.case-meta strong {
+  font-family: var(--font-mono);
+  font-weight: var(--font-weight-medium);
+}
+
+/* Le CTA d'un espace pédagogique est teal, pas indigo : il ouvre une lecture
+   longue, il ne concurrence pas l'action dominante de l'écran. */
+.case-panel .secondary-action {
+  flex: none;
+  border-color: var(--secondary);
+  color: var(--secondary);
+}
+
+.case-panel .secondary-action:hover {
+  background: var(--secondary-soft);
+}
+
+@media (max-width: 900px) {
+  .module-hero {
+      flex-direction: column;
+  }
+
+  .module-stats {
+      width: 100%;
+  }
+}
+
+@media (max-width: 560px) {
+  .module-stats {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .case-panel .secondary-action {
+      width: 100%;
+      justify-content: center;
+  }
+}

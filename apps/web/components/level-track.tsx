@@ -1,3 +1,4 @@
+import Link from "next/link";
 import type { LevelSnapshot, ModuleLevelDefinition } from "@finance/domain";
 import { ACTIVITY_KINDS, getLevelStatusLabel } from "@finance/domain";
 import { ProgressMeter } from "@/components/progress-meter";
@@ -25,16 +26,30 @@ const STATUS_TOKEN: Record<LevelSnapshot["status"], string> = {
   planned: "processing"
 };
 
+/**
+ * PR-21 fusionne dans cette liste ce que la page module affichait deux fois :
+ * le rail de niveaux et, plus bas, une seconde liste portant le bouton
+ * d'ouverture et le volume d'exercices. Deux listes des mêmes niveaux, dans un
+ * ordre identique, obligeaient le lecteur à faire le rapprochement lui-même.
+ *
+ * `openHrefs` et `exerciseCounts` sont OPTIONNELS : /parcours et le lab Excel
+ * appellent ce composant sans eux et doivent rendre exactement comme avant.
+ */
 export function LevelTrack({
   levels,
   snapshots,
   passingScore,
-  rulesLabel
+  rulesLabel,
+  openHrefs,
+  exerciseCounts
 }: {
   levels: ModuleLevelDefinition[];
   snapshots: LevelSnapshot[];
   passingScore: number;
   rulesLabel: string;
+  /** `levelId` → route d'ouverture. Absent = niveau non ouvrable. */
+  openHrefs?: Map<string, string | null>;
+  exerciseCounts?: Map<string, number>;
 }) {
   const byLevelId = new Map(snapshots.map((snapshot) => [snapshot.levelId, snapshot]));
 
@@ -53,6 +68,8 @@ export function LevelTrack({
           const snapshot = byLevelId.get(level.id);
           const status = snapshot?.status ?? "locked";
           const score = snapshot?.score ?? 0;
+          const openHref = openHrefs?.get(level.id) ?? null;
+          const exercises = exerciseCounts?.get(level.id);
 
           return (
             <li key={level.id} className={`level-row ${status}`} data-level-status={status}>
@@ -63,8 +80,28 @@ export function LevelTrack({
                 <div>
                   <strong>{level.title}</strong>
                   <p className="muted">{level.objective}</p>
+                  {exercises === undefined ? null : (
+                    <p className="level-meta">
+                      <strong>{exercises}</strong> exercice{exercises > 1 ? "s" : ""} ·{" "}
+                      <strong>{level.estimatedMinutes}</strong> min
+                      {level.criticalCompetencyIds.length > 0
+                        ? ` · critique : ${level.criticalCompetencyIds.join(", ")}`
+                        : ""}
+                    </p>
+                  )}
                 </div>
-                <span className={`state-token ${STATUS_TOKEN[status]}`}>{getLevelStatusLabel(status)}</span>
+                {/* Le bouton n'apparaît que si le serveur a réellement ouvert le
+                    niveau : `openHrefs` vient de `evaluateTrack`, jamais d'une
+                    décision prise ici. */}
+                {openHref ? (
+                  <Link className="primary-action action-sm inline-link" href={openHref}>
+                    Ouvrir le niveau {level.level}
+                  </Link>
+                ) : (
+                  <span className={`state-token ${STATUS_TOKEN[status]}`}>
+                    {getLevelStatusLabel(status)}
+                  </span>
+                )}
               </div>
 
               {status === "locked" || status === "planned" ? (
@@ -96,13 +133,27 @@ export function LevelTrack({
                 </>
               )}
 
-              {/* A learner must never have to guess what is missing. */}
-              {snapshot && snapshot.blockers.length > 0 && status !== "passed" ? (
-                <ul className="level-blockers">
-                  {snapshot.blockers.map((blocker) => (
-                    <li key={blocker.code}>{blocker.detail}</li>
-                  ))}
-                </ul>
+              {/* A learner must never have to guess what is missing.
+                  `LockedState` affiche déjà le blocage principal ; le répéter
+                  juste en dessous faisait lire deux fois la même phrase, ce que
+                  les cartes teintées de PR-21 rendent flagrant. */}
+              {snapshot && status !== "passed" ? (
+                (() => {
+                  const shown =
+                    status === "locked" || status === "planned"
+                      ? snapshot.blockers.filter(
+                          (blocker) => blocker.code !== "previous-level-not-acquired"
+                        )
+                      : snapshot.blockers;
+
+                  return shown.length > 0 ? (
+                    <ul className="level-blockers">
+                      {shown.map((blocker) => (
+                        <li key={blocker.code}>{blocker.detail}</li>
+                      ))}
+                    </ul>
+                  ) : null;
+                })()
               ) : null}
 
               {status === "passed" ? (

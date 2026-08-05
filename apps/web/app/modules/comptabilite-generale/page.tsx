@@ -12,6 +12,11 @@ import { comptaGeneraleV1Sources } from "@finance/domain";
  * component rather than by a second implementation: the unlock decision is taken
  * server-side by `evaluateTrack`, and a page that decided it again in the browser
  * could show a level as open that the server would refuse.
+ *
+ * PR-21 : la seconde liste de niveaux — celle qui portait le bouton
+ * d'ouverture et le volume d'exercices — est repliée dans `LevelTrack`. Deux
+ * listes des mêmes niveaux, dans le même ordre, laissaient au lecteur le soin
+ * de faire le rapprochement.
  */
 export default async function ComptaGeneraleModulePage() {
   const user = await getCurrentUser();
@@ -21,44 +26,45 @@ export default async function ComptaGeneraleModulePage() {
     0
   );
 
+  const openHrefs = new Map(model.levelStates.map((state) => [state.definition.id, state.href]));
+  const exerciseCounts = new Map(
+    [...model.exercisesByLevel].map(([levelId, list]) => [levelId, list.length])
+  );
+
   return (
     <div className="page-stack">
-      <section className="page-header">
+      <section
+        className="cta-panel module-hero"
+        data-canonical-track="track-compta-generale-v1"
+        data-canonical-score={model.score ?? "neutral"}
+      >
         <div>
           <span className="section-label">Module</span>
           <h1>Comptabilité générale — parcours v1</h1>
           <p>
-            Le cycle complet d'une facture, de l'achat au règlement : {totalExercises} exercices
-            corrigés automatiquement, un journal interactif et un mini-cas de fin de mois.
+            Le cycle complet d&apos;une facture, de l&apos;achat au règlement : {totalExercises}{" "}
+            exercices corrigés automatiquement, un journal interactif et un mini-cas de fin de mois.
           </p>
         </div>
-        <div
-          className="hero-score"
-          data-canonical-track="track-compta-generale-v1"
-          data-canonical-score={model.score ?? "neutral"}
-        >
-          <span>{model.score === null ? "Exemple de parcours" : "Progression"}</span>
-          <strong>{model.score === null ? "État neutre" : `${Math.round(model.score)}%`}</strong>
-        </div>
-      </section>
 
-      <section className="metric-strip">
-        <article>
-          <span>Niveaux</span>
-          <strong>{model.levels.length}</strong>
-        </article>
-        <article>
-          <span>Exercices</span>
-          <strong>{totalExercises}</strong>
-        </article>
-        <article>
-          <span>Étapes du cas</span>
-          <strong>{model.miniCase.steps.length}</strong>
-        </article>
-        <article>
-          <span>Seuil</span>
-          <strong>{model.passingScore}%</strong>
-        </article>
+        <div className="module-stats">
+          <div>
+            <strong>{model.levels.length}</strong>
+            <span>niveaux</span>
+          </div>
+          <div>
+            <strong>{totalExercises}</strong>
+            <span>exercices</span>
+          </div>
+          <div>
+            <strong>{model.miniCase.steps.length}</strong>
+            <span>étapes du cas</span>
+          </div>
+          <div>
+            <strong>{model.passingScore} %</strong>
+            <span>seuil</span>
+          </div>
+        </div>
       </section>
 
       {model.progressionTracked ? null : (
@@ -73,77 +79,49 @@ export default async function ComptaGeneraleModulePage() {
         snapshots={model.snapshots}
         passingScore={model.passingScore}
         rulesLabel={model.rulesLabel}
+        openHrefs={openHrefs}
+        exerciseCounts={exerciseCounts}
       />
 
-      <section className="course-list">
-        {model.levels.map((level) => {
-          const exercises = model.exercisesByLevel.get(level.id) ?? [];
-          const state = model.levelStates.find((candidate) => candidate.definition.id === level.id);
-
-          return (
-            <article key={level.id} className="panel">
-              <div className="panel-heading">
-                <div>
-                  <span className="section-label">Niveau {level.level}</span>
-                  <h2>{level.title}</h2>
-                  <p>{level.objective}</p>
-                </div>
-                {state?.href ? (
-                  <Link className="primary-action" href={state.href}>
-                    Ouvrir le niveau {level.level}
-                  </Link>
-                ) : (
-                  <span className="secondary-action" aria-disabled="true">
-                    Niveau verrouillé
-                  </span>
-                )}
-              </div>
-              <div className="module-meta">
-                <span>{exercises.length} exercices</span>
-                <span>{level.estimatedMinutes} min</span>
-                {level.criticalCompetencyIds.map((competencyId) => (
-                  <span key={competencyId}>Critique : {competencyId}</span>
-                ))}
-              </div>
-            </article>
-          );
-        })}
-      </section>
-
-      <section className="panel">
-        <div className="panel-heading">
-          <div>
-            <span className="section-label">Mini-cas</span>
-            <h2>{model.miniCase.title}</h2>
-            <p>{model.miniCase.context}</p>
-          </div>
-          <Link className="primary-action" href={`${COMPTA_MODULE_BASE}/cas-pratique`}>
-            Ouvrir le cas
-          </Link>
+      {/* Espace pédagogique : filet teal, fond blanc — la famille de surfaces
+          qui se lit, par opposition au navy qui appelle à agir. */}
+      <section className="panel case-panel">
+        <div className="case-panel-body">
+          <span className="section-label section-label--teal">Mini-cas · espace pédagogique</span>
+          <h2>{model.miniCase.title}</h2>
+          <p>{model.miniCase.context}</p>
+          <p className="case-meta">
+            <strong>{model.miniCase.steps.length}</strong> étapes ·{" "}
+            <strong>{model.miniCase.documents.length}</strong> pièces · corrigées avec preuves citées
+          </p>
         </div>
-        <SourceReference sources={comptaGeneraleV1Sources} />
+        <Link className="secondary-action action-lg inline-link" href={`${COMPTA_MODULE_BASE}/cas-pratique`}>
+          Ouvrir le cas
+        </Link>
       </section>
+
+      <SourceReference sources={comptaGeneraleV1Sources} />
 
       {/* PR-12a : les deux case studies des niveaux 3 et 4 — la clôture
           mensuelle, puis l'arrêté annuel avec grand livre, balance, feuille de
           contrôle et export du dossier. */}
       {model.caseStudies.map((caseStudy) => (
-        <section key={caseStudy.id} className="panel">
-          <div className="panel-heading">
-            <div>
-              <span className="section-label">Case study</span>
-              <h2>{caseStudy.title}</h2>
-              <p>{caseStudy.context}</p>
-            </div>
-            <Link className="primary-action" href={`${COMPTA_MODULE_BASE}/cas/${caseStudy.slug}`}>
-              Ouvrir le cas
-            </Link>
+        <section key={caseStudy.id} className="panel case-panel">
+          <div className="case-panel-body">
+            <span className="section-label section-label--teal">Case study</span>
+            <h2>{caseStudy.title}</h2>
+            <p>{caseStudy.context}</p>
+            <p className="case-meta">
+              <strong>{caseStudy.steps.length}</strong> étapes ·{" "}
+              <strong>{caseStudy.documents.length}</strong> pièces · checklist de clôture incluse
+            </p>
           </div>
-          <div className="module-meta">
-            <span>{caseStudy.steps.length} étapes</span>
-            <span>{caseStudy.documents.length} pièces</span>
-            <span>Checklist de clôture incluse</span>
-          </div>
+          <Link
+            className="secondary-action action-lg inline-link"
+            href={`${COMPTA_MODULE_BASE}/cas/${caseStudy.slug}`}
+          >
+            Ouvrir le cas
+          </Link>
         </section>
       ))}
     </div>
