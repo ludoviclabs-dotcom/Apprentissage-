@@ -56,7 +56,9 @@ approfondie » sans dupliquer l'existant.
    chunks bornés par page, `needs-review` sur pages dégradées ou tableaux suspectés.
 4. **Rapprochement par chapitre** : groupes course/exercise/correction déterministes
    (normalisation des accents, clé de variante « Application 1 » ↔ « Application 1 - Corrigé »).
-5. **Workflow éditorial** : les statuts `draft → needs-review → approved → published`
+5. **Workflow éditorial** (première ébauche ; remplacée depuis par la machine à
+   cinq états de `@finance/content-generation` — voir
+   `docs/content-factory-preflight.md` §2.1) : les statuts `draft → needs-review → approved → published`
    n'existaient nulle part. Le type `ContentDraftStatus` et ses transitions autorisées sont
    définis dans ce lot ; la génération et la publication restent hors périmètre.
 

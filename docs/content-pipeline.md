@@ -98,9 +98,9 @@ traités avant génération.
 
 - `content:generate` et `content:publish` n'existent pas encore : aucun appel
   IA, aucun contenu inventé, aucune publication automatique.
-- Le workflow éditorial est défini (`draft → needs-review → approved →
-  published`, `canTransitionDraft` dans `types.ts`) mais rien ne le parcourt :
-  la génération contrôlée est le lot suivant.
+- Le workflow éditorial ne vit plus ici : il est porté par
+  `@finance/content-generation` (voir `docs/content-review-workflow.md`), avec
+  cinq états et sans état « publié ».
 - L'écriture en base (`documents`, `document_pages`, `chunks`) reste faite par
   l'import de packs existant ; le branchement des artefacts page-aware sur
   `importSourcePackFromManifest` fait partie du lot suivant.

@@ -74,7 +74,12 @@ export default defineConfig({
             FINANCE_HUB_USE_DATABASE: "false",
             FINANCE_HUB_PUBLIC_DEMO: "false",
             LEARNING_HUB_AUTH_ENABLED: "false",
-            AI_PROVIDER: "none"
+            AI_PROVIDER: "none",
+            // Ouvre l'espace de relecture pour l'exercer en e2e. Sans comptes,
+            // le propriétaire de l'installation privée est administrateur : le
+            // serveur public-demo, lui, laisse le drapeau absent, ce qui permet
+            // de vérifier que l'espace est fermé par défaut.
+            CONTENT_REVIEW_ENABLED: "true"
           }
         },
         {

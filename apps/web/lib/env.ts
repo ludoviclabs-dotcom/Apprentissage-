@@ -64,6 +64,12 @@ const envSchema = z
     // (Documents, Source packs) when accounts are enabled. Absent, every
     // account of the private install administers — the pre-PR-09 behavior.
     LEARNING_HUB_ADMIN_EMAILS: z.string().min(1).optional(),
+    // Turns on the private content review area (/admin/content-review). Off by
+    // default, and refused outright in production unless accounts are on: the
+    // area shows the text of private course material, so an unauthenticated
+    // production deployment must not be able to open it by mistake.
+    CONTENT_REVIEW_ENABLED: booleanFlag(),
+
     // Retired in PR-01. Kept in the schema only so a stale `.env` fails loudly
     // instead of quietly losing its protection: someone who still sets these
     // would otherwise believe the app is gated when it is not.
@@ -128,6 +134,23 @@ const envSchema = z
         path: ["FINANCE_HUB_USE_DATABASE"],
         message:
           "LEARNING_HUB_AUTH_ENABLED=true requires FINANCE_HUB_USE_DATABASE=true — accounts and sessions are stored in PostgreSQL"
+      });
+    }
+
+    // The review area displays the extracted text of private course material.
+    // In production, "who is looking" must be answerable, and without accounts
+    // it is not: refuse to boot rather than serve private sources to anyone who
+    // guesses the URL.
+    if (
+      value.CONTENT_REVIEW_ENABLED &&
+      value.VERCEL_ENV === "production" &&
+      !value.LEARNING_HUB_AUTH_ENABLED
+    ) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["LEARNING_HUB_AUTH_ENABLED"],
+        message:
+          "CONTENT_REVIEW_ENABLED=true in production requires LEARNING_HUB_AUTH_ENABLED=true — the review area shows private source material and must know who is reading"
       });
     }
 

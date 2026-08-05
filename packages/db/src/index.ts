@@ -10,3 +10,4 @@ export * from "./review-repository";
 export * from "./billing-repository";
 export * from "./workbook-repository";
 export * from "./certificate-repository";
+export * from "./content-draft-repository";

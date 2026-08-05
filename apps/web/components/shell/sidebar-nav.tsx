@@ -6,6 +6,7 @@ import { useEffect, useState } from "react";
 import {
   ChevronDown,
   ClipboardCheck,
+  FileCheck,
   FolderOpen,
   GraduationCap,
   Home,
@@ -30,7 +31,7 @@ const SECTION_ICONS: Record<NavSectionKey, typeof GraduationCap> = {
   progression: LineChart
 };
 
-const ADMIN_ITEM_ICONS = [FolderOpen, PackageOpen];
+const ADMIN_ITEM_ICONS = [FolderOpen, PackageOpen, FileCheck];
 
 /**
  * Navigation groupée : cinq destinations principales, sous-sections pliables.

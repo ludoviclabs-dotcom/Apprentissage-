@@ -15,7 +15,8 @@ export const migrationFiles = [
   "migrations/0009_billing_entitlements.sql",
   "migrations/0010_canonical_learning_progression.sql",
   "migrations/0011_excel_formula_engine.sql",
-  "migrations/0012_certificate_verification.sql"
+  "migrations/0012_certificate_verification.sql",
+  "migrations/0013_content_drafts.sql"
 ] as const;
 
 /** Tables protected by row level security, keyed on `user_id`. */
@@ -110,7 +111,13 @@ export const tables = [
   // has a `user_id` to police, and the opaque verification id is what guards
   // the projection. See migration 0012.
   "certificate_verifications",
-  "certificate_revocations"
+  "certificate_revocations",
+  // PR-14: the content factory's drafts and the trail of what was decided about
+  // them. Absent from `userOwnedTables` on purpose — a draft is shared
+  // administration content with no owner to police, and it carries no personal
+  // data for a policy to protect. See migration 0013.
+  "content_drafts",
+  "content_draft_transitions"
 ] as const;
 
 export type TableName = (typeof tables)[number];

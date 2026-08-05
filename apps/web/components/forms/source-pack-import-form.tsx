@@ -14,7 +14,11 @@ interface ImportResult {
 }
 
 export function SourcePackImportForm({ disabled = false }: { disabled?: boolean }) {
-  const [path, setPath] = useState("C:\\Users\\Ludo\\Apprentissage\\source-packs");
+  // Champ vide au départ : ce composant s'exécute dans le navigateur, et une
+  // valeur par défaut codée en dur y expédierait l'arborescence — nom
+  // d'utilisateur compris — du poste de celui qui a écrit le code. L'exemple
+  // vit dans le `placeholder`, qui n'est qu'une indication.
+  const [path, setPath] = useState("");
   const [isPending, setIsPending] = useState(false);
   const [result, setResult] = useState<ImportResult | null>(null);
 
@@ -24,11 +28,21 @@ export function SourcePackImportForm({ disabled = false }: { disabled?: boolean 
       return;
     }
 
+    const trimmed = path.trim();
+
+    if (trimmed === "") {
+      setResult({
+        error: "Chemin manquant",
+        details: "Indique le dossier à analyser, par exemple source-packs\\mon-pack."
+      });
+      return;
+    }
+
     setIsPending(true);
     setResult(null);
 
     try {
-      const outcome = await postJson<ImportResult>("/api/source-packs", { path });
+      const outcome = await postJson<ImportResult>("/api/source-packs", { path: trimmed });
 
       setResult(outcome.ok ? outcome.data : { error: outcome.error });
     } finally {
@@ -46,7 +60,12 @@ export function SourcePackImportForm({ disabled = false }: { disabled?: boolean 
       </div>
       <label>
         Chemin du dossier
-        <input value={path} disabled={disabled} onChange={(event) => setPath(event.target.value)} />
+        <input
+          value={path}
+          disabled={disabled}
+          placeholder="source-packs\mon-pack"
+          onChange={(event) => setPath(event.target.value)}
+        />
       </label>
       <button type="button" className="primary-action" onClick={submitImport} disabled={isPending || disabled}>
         {isPending ? "Analyse..." : "Analyser le pack"}

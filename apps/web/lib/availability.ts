@@ -30,7 +30,12 @@ export type AvailabilityReasonCode =
    * promettrait une fonctionnalité à venir là où il s'agit d'un choix
    * d'installation — l'inverse de l'honnêteté que ces messages doivent avoir.
    */
-  | "ai-disabled";
+  | "ai-disabled"
+  /**
+   * Septième code, même raisonnement : un espace d'administration volontairement
+   * fermé n'est ni « prévu », ni indisponible faute de base. Il est éteint.
+   */
+  | "feature-disabled";
 
 /** Une porte de sortie réelle, jamais un bouton mort. */
 export interface AvailabilityAction {

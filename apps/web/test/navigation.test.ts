@@ -31,10 +31,16 @@ describe("architecture de navigation", () => {
     }
   });
 
-  it("garde Documents et Source packs accessibles via la section Administration", () => {
+  it("garde Documents, Source packs et Relecture accessibles via la section Administration", () => {
     const hrefs = ADMIN_NAV_SECTION.items.map((item) => item.href);
 
-    expect(hrefs).toEqual(["/documents", "/source-packs"]);
+    expect(hrefs).toEqual(["/documents", "/source-packs", "/admin/content-review"]);
+  });
+
+  it("tient la navigation principale à l'écart de l'espace de relecture", () => {
+    const hrefs = PRIMARY_NAV_SECTIONS.flatMap((section) => section.items.map((item) => item.href));
+
+    expect(hrefs).not.toContain("/admin/content-review");
   });
 });
 

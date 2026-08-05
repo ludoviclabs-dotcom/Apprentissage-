@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { supportedExtensions } from "../index";
+import { supportedExtensions } from "../supported-extensions";
 
 /**
  * Schémas et types du pipeline de contenu (scan → extract → pair → validate).
@@ -27,27 +27,13 @@ export type ExtractionStatus = (typeof extractionStatuses)[number];
 export const extractionStatusSchema = z.enum(extractionStatuses);
 
 /**
- * Workflow éditorial des contenus générés. Défini dès ce lot pour que la
- * génération (lot suivant) n'invente pas ses statuts : rien n'est publié sans
- * passer par une revue humaine, et un contenu publié ne redevient draft qu'en
- * repassant par la revue.
+ * Le workflow éditorial vivait ici à titre préparatoire. Il a été remplacé par
+ * la machine à états de `@finance/content-generation`
+ * (`draft → validation_failed | needs_review → approved | rejected`), qui ajoute
+ * les deux états que celui-ci ignorait — l'échec des contrôles et le refus
+ * humain — et retire `published`, hors périmètre. Voir
+ * `docs/content-factory-preflight.md` §2.1.
  */
-export const contentDraftStatuses = ["draft", "needs-review", "approved", "published"] as const;
-
-export type ContentDraftStatus = (typeof contentDraftStatuses)[number];
-
-export const contentDraftStatusSchema = z.enum(contentDraftStatuses);
-
-export const allowedDraftTransitions: Record<ContentDraftStatus, readonly ContentDraftStatus[]> = {
-  draft: ["needs-review"],
-  "needs-review": ["approved", "draft"],
-  approved: ["published", "needs-review"],
-  published: ["needs-review"]
-};
-
-export function canTransitionDraft(from: ContentDraftStatus, to: ContentDraftStatus): boolean {
-  return allowedDraftTransitions[from].includes(to);
-}
 
 /** Un chemin persisté est toujours relatif, en séparateurs `/`, sans remontée. */
 export function isPortableRelativePath(value: string): boolean {

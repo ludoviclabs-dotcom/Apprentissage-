@@ -23,7 +23,10 @@
     "content:scan": "corepack pnpm --filter @finance/ingest content:scan",
     "content:extract": "corepack pnpm --filter @finance/ingest content:extract",
     "content:pair": "corepack pnpm --filter @finance/ingest content:pair",
-    "content:validate": "corepack pnpm --filter @finance/ingest content:validate"
+    "content:validate": "corepack pnpm --filter @finance/ingest content:validate",
+    "content:generate": "corepack pnpm --filter @finance/content-generation content:generate",
+    "content:validate-generated": "corepack pnpm --filter @finance/content-generation content:validate-generated",
+    "content:report": "corepack pnpm --filter @finance/content-generation content:report"
   },
   "dependencies": {
     "lucide-react": "^0.468.0",

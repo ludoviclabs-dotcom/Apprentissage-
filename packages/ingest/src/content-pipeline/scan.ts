@@ -1,7 +1,8 @@
 import { createHash } from "node:crypto";
 import { readdir, readFile, stat } from "node:fs/promises";
 import { basename, extname, join, relative } from "node:path";
-import { inferDomainFromPath, isSupportedExtension } from "../index";
+import { inferDomainFromPath } from "../index";
+import { isSupportedExtension } from "../supported-extensions";
 import { classifyDocumentCategory, detectChapter, variantKey } from "./classify";
 import { contentManifestSchema, type ContentManifest, type ContentManifestEntry, type SkippedFile } from "./types";
 
