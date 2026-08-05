@@ -100,8 +100,12 @@ export default async function DashboardPage() {
         </section>
 
         <section className="home-ring" aria-labelledby="anneau-titre">
+          {/* « Niveau global » est le terme que le produit emploie pour ce
+              nombre depuis PR-02, et l'anneau est ce qui le porte désormais :
+              il remplace l'ancien encart chiffré, il ne le supprime pas.
+              Sans compte il n'y a pas de niveau, donc pas ce libellé. */}
           <span className="section-label" id="anneau-titre">
-            Maîtrise du parcours
+            {personal ? "Niveau global" : "Maîtrise du parcours"}
           </span>
 
           <MasteryRing
