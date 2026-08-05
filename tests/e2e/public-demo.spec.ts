@@ -143,14 +143,14 @@ test.describe("/exercices : plus de faux point d'entrée", () => {
     await expect(page.getByText("Bientôt disponible")).toHaveCount(0);
 
     // Aucun bouton désactivé ne subsiste dans le bandeau d'entrée de la page.
-    const generator = page.locator("section.generator-panel");
+    const generator = page.locator("section.cta-panel");
     await expect(generator.locator("button:disabled")).toHaveCount(0);
   });
 
   test("annonce la session découverte et y mène", async ({ page }) => {
     await page.goto("/exercices");
 
-    const panel = page.locator("section.generator-panel");
+    const panel = page.locator("section.cta-panel");
 
     await expect(panel.getByRole("heading", { name: "Session découverte" })).toBeVisible();
     await expect(panel).toContainText("5 exercices guidés");
