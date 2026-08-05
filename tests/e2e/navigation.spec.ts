@@ -54,19 +54,40 @@ test.describe("sidebar desktop", () => {
     await expect(exercicesLink).toHaveAttribute("aria-current", "page");
   });
 
-  test("replie les sections inactives et les déplie au clic", async ({ page }) => {
+  /**
+   * Le défaut s'est inversé avec la refonte du chrome : l'arborescence entière
+   * est visible à l'arrivée. Ce que ce test protège n'a pas changé — le repli
+   * existe toujours, et il reste actionnable au clavier comme à la souris. Une
+   * sidebar dont les entêtes seraient de simples libellés, comme la maquette
+   * les dessine, ferait échouer ceci.
+   */
+  test("déplie les sections par défaut et les replie au clic", async ({ page }) => {
     await page.goto("/");
 
     const sidebar = page.locator("aside.sidebar");
     const entrainerToggle = sidebar.getByRole("button", { name: "S'entraîner" });
 
-    await expect(entrainerToggle).toHaveAttribute("aria-expanded", "false");
-    await expect(sidebar.getByRole("link", { name: "Exercices" })).toBeHidden();
+    await expect(entrainerToggle).toHaveAttribute("aria-expanded", "true");
+    await expect(sidebar.getByRole("link", { name: "Exercices" })).toBeVisible();
 
     await entrainerToggle.click();
 
-    await expect(entrainerToggle).toHaveAttribute("aria-expanded", "true");
-    await expect(sidebar.getByRole("link", { name: "Exercices" })).toBeVisible();
+    await expect(entrainerToggle).toHaveAttribute("aria-expanded", "false");
+    await expect(sidebar.getByRole("link", { name: "Exercices" })).toBeHidden();
+  });
+
+  /**
+   * Les cinq destinations principales de PR-09 survivent à la refonte : les
+   * entêtes de section ressemblent à des intitulés, mais ce sont toujours cinq
+   * cibles — Accueil plus quatre groupes — pas dix-huit liens de même rang.
+   */
+  test("garde cinq cibles de premier rang malgré l'arborescence ouverte", async ({ page }) => {
+    await page.goto("/");
+
+    const sidebar = page.locator("aside.sidebar");
+
+    await expect(sidebar.locator(".nav-item, .nav-section-toggle")).toHaveCount(5);
+    await expect(sidebar.locator(".nav-section-toggle[aria-expanded]")).toHaveCount(4);
   });
 });
 
@@ -174,7 +195,9 @@ test.describe("drawer mobile", () => {
     await openDrawer(page);
 
     const drawer = page.getByRole("dialog", { name: "Menu de navigation" });
-    await drawer.getByRole("button", { name: "S'entraîner" }).click();
+    // Plus de dépliage préalable : le drawer partage `SidebarNav`, donc il
+    // ouvre lui aussi ses sections par défaut. Le lien est atteignable
+    // directement.
     await drawer.getByRole("link", { name: "Exercices" }).click();
 
     await expect(page).toHaveURL(/\/exercices/);

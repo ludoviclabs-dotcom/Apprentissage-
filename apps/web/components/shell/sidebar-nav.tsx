@@ -55,11 +55,24 @@ export function SidebarNav({
   onNavigate?: () => void;
 }) {
   const pathname = usePathname();
+  /**
+   * Dépliées par défaut (refonte du chrome).
+   *
+   * La règle d'origine ouvrait la seule section porteuse de la route : cinq
+   * cibles à l'arrivée, le reste à un clic. La refonte montre l'arborescence
+   * entière, ce qui rend visible d'un coup ce que le produit sait faire.
+   *
+   * Le repli n'est PAS supprimé pour autant : les entêtes restent des boutons
+   * `aria-expanded`, et un écran court peut refermer ce qui ne sert pas. C'est
+   * la différence entre « tout est montré » et « tout est imposé » — la
+   * maquette dessine des libellés inertes, ce qui aurait retiré l'affordance
+   * en même temps que le repli.
+   */
   const [expanded, setExpanded] = useState<Record<NavSectionKey, boolean>>(() => {
     const initial = {} as Record<NavSectionKey, boolean>;
 
     for (const section of PRIMARY_NAV_SECTIONS) {
-      initial[section.key] = isSectionActive(pathname, section);
+      initial[section.key] = true;
     }
 
     return initial;
