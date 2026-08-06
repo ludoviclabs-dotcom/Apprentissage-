@@ -14,5 +14,9 @@
 @import "./styles/module.css";
 @import "./styles/home.css";
 @import "./styles/content-review.css";
+@import "./styles/compta-approfondie.css";
 @import "./styles/utilities.css";
 @import "./styles/motion.css";
+/* L'impression en dernier : sa media query doit pouvoir défaire ce que les
+   feuilles précédentes ont posé. */
+@import "./styles/print.css";

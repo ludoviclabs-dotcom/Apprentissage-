@@ -1,6 +1,20 @@
+import { resolve } from "node:path";
 import { defineConfig, devices } from "@playwright/test";
 
 const PORT = Number(process.env.PLAYWRIGHT_PORT ?? 3100);
+
+/**
+ * Magasin publié jetable du serveur principal.
+ *
+ * `scripts/seed-published-content.ts` y publie le chapitre pilote avant le
+ * démarrage, ce qui donne à la suite un chapitre réellement consultable sans
+ * jamais écrire dans `content/published/` — le magasin du dépôt reste ce qui est
+ * servi en production, et une exécution de tests ne peut pas le modifier.
+ */
+// Résolu depuis le répertoire courant, comme `testDir: "./tests/e2e"` juste en
+// dessous : ce fichier est chargé en CommonJS par Playwright, où `import.meta`
+// n'existe pas.
+const SEEDED_PUBLISHED_ROOT = resolve("test-results", "published-content");
 const PUBLIC_DEMO_PORT = PORT + 1;
 const AUTH_PORT = PORT + 2;
 const externallyManagedBaseURL = process.env.PLAYWRIGHT_BASE_URL;
@@ -22,6 +36,33 @@ const authDatabaseUrl = process.env.PLAYWRIGHT_AUTH_DATABASE_URL;
  */
 const AUTH_ENABLED_SPEC = /-enabled\.spec\.ts$/;
 
+/**
+ * Specs that need a *seeded publication store*.
+ *
+ * Only the private-install server gets one — `scripts/seed-published-content.ts`
+ * runs before it, into a throwaway directory. The public-demo server
+ * deliberately gets neither `PUBLISHED_CONTENT_ROOT` nor
+ * `ALLOW_FILE_PUBLICATION_STORE`, which is exactly the production posture: no
+ * database, no file store, therefore no published content. Running these specs
+ * there would assert the presence of a chapter that must be absent.
+ *
+ * `public-demo-publication.spec.ts` covers the other half — that the demo
+ * server serves nothing rather than falling back to fixtures.
+ */
+const SEEDED_STORE_SPEC = /compta-approfondie\.spec\.ts$/;
+
+/**
+ * Ce que le serveur de démonstration publique ignore : les specs à comptes, et
+ * celles qui exigent un magasin publié.
+ *
+ * Une seule expression plutôt qu'un tableau, pour que tous les projets gardent
+ * le même type de `testIgnore` — c'est ce qui permet à `projects` d'être inféré
+ * sans transtypage supplémentaire.
+ */
+const PUBLIC_DEMO_IGNORED_SPEC = new RegExp(
+  `(?:${AUTH_ENABLED_SPEC.source})|(?:${SEEDED_STORE_SPEC.source})`
+);
+
 const projects = [
   {
     name: "chromium",
@@ -33,7 +74,7 @@ const projects = [
 if (!externallyManagedBaseURL) {
   projects.push({
     name: "public-demo",
-    testIgnore: AUTH_ENABLED_SPEC,
+    testIgnore: PUBLIC_DEMO_IGNORED_SPEC,
     use: { ...devices["Desktop Chrome"], baseURL: publicDemoBaseURL }
   });
 
@@ -66,11 +107,20 @@ export default defineConfig({
     ? undefined
     : [
         {
-          command: `corepack pnpm --filter @finance/web start --port ${PORT}`,
+          command: `corepack pnpm exec tsx scripts/seed-published-content.ts && corepack pnpm --filter @finance/web start --port ${PORT}`,
           url: baseURL,
           reuseExistingServer: !process.env.CI,
           timeout: 120_000,
           env: {
+            // Le script d'amorçage refuse de tourner sans cet aveu ; le poser
+            // ici est ce qui le limite à ce serveur-là.
+            ALLOW_TEST_CONTENT_SEED: "true",
+            PUBLISHED_CONTENT_ROOT: SEEDED_PUBLISHED_ROOT,
+            // `next start` tourne en NODE_ENV=production : sans cet aveu, le
+            // magasin de fichiers serait refusé et le chapitre répondrait
+            // « indisponible ». La production réelle sert la base et n'a pas
+            // cette variable.
+            ALLOW_FILE_PUBLICATION_STORE: "true",
             FINANCE_HUB_USE_DATABASE: "false",
             FINANCE_HUB_PUBLIC_DEMO: "false",
             LEARNING_HUB_AUTH_ENABLED: "false",

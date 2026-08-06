@@ -124,7 +124,8 @@ export function ReviewActions({
 
       {status === "approved" ? (
         <p className="muted">
-          Contenu approuvé. Il n&apos;est pas publié : la publication fera l&apos;objet d&apos;un lot ultérieur.
+          Contenu approuvé. L&apos;approbation ne publie rien : la publication est une action distincte,
+          déclenchée explicitement plus bas.
         </p>
       ) : null}
 

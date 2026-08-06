@@ -26,7 +26,7 @@ test.describe("relecture des contenus", () => {
     expect(response?.status()).toBe(404);
   });
 
-  test("s'ouvre sur l'installation privée et annonce qu'aucun contenu n'est publié", async ({
+  test("s'ouvre sur l'installation privée et sépare relecture et publication", async ({
     page
   }, testInfo) => {
     test.skip(testInfo.project.name !== "chromium", "exige le serveur de l'installation privée");
@@ -34,10 +34,14 @@ test.describe("relecture des contenus", () => {
     await page.goto("/admin/content-review");
 
     await expect(page.getByRole("heading", { level: 1 })).toContainText("Relecture des contenus");
-    await expect(page.locator(".page-header")).toContainText("Aucun de ces contenus n'est publié");
+    // Depuis PR-15 la publication existe, mais elle reste une action distincte :
+    // l'entête le dit, et c'est la propriété qui compte — approuver ne publie
+    // pas.
+    await expect(page.locator(".page-header")).toContainText("elle ne publie rien");
     await expect(page.locator(".topbar-breadcrumb")).toContainText("Administration");
 
-    // Aucune action de publication n'existe dans ce lot.
+    // La file elle-même ne publie pas : la publication se déclenche contenu par
+    // contenu, depuis sa fiche, après une confirmation.
     await expect(page.getByRole("button", { name: /publier/i })).toHaveCount(0);
   });
 

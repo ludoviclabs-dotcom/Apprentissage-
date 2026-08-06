@@ -16,7 +16,8 @@ export const migrationFiles = [
   "migrations/0010_canonical_learning_progression.sql",
   "migrations/0011_excel_formula_engine.sql",
   "migrations/0012_certificate_verification.sql",
-  "migrations/0013_content_drafts.sql"
+  "migrations/0013_content_drafts.sql",
+  "migrations/0014_content_publication.sql"
 ] as const;
 
 /** Tables protected by row level security, keyed on `user_id`. */
@@ -45,7 +46,11 @@ export const userOwnedTables = [
   "entitlements",
   "certificates",
   // PR-12b: the learner's saved grid drafts — the most ordinary owned data.
-  "lab_workbooks"
+  "lab_workbooks",
+  // PR-15: what a learner did on a published chapter. The published content
+  // itself is shared and carries no policy; only the evidence of working on it
+  // is personal.
+  "chapter_activity_events"
 ] as const;
 
 export type UserOwnedTable = (typeof userOwnedTables)[number];
@@ -117,7 +122,14 @@ export const tables = [
   // administration content with no owner to police, and it carries no personal
   // data for a policy to protect. See migration 0013.
   "content_drafts",
-  "content_draft_transitions"
+  "content_draft_transitions",
+  // PR-15: the publication registry and its audit trail. Both shared, both
+  // without a `user_id`, for the same reason as the drafts above. The learner's
+  // own activity on a published chapter is the one personal table of this lot,
+  // and it *is* in `userOwnedTables`. See migration 0014.
+  "published_content_versions",
+  "content_publication_audit",
+  "chapter_activity_events"
 ] as const;
 
 export type TableName = (typeof tables)[number];

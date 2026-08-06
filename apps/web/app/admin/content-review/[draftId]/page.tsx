@@ -2,9 +2,12 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { contentTypeLabels } from "@finance/content-generation";
+import { resolvePublicChapter, resolveSlug } from "@finance/content-publication";
 import { findDraft, loadCorpusIndex, requireReviewAccess, resolveExcerpts } from "@/lib/content-review/service";
+import { findActive, loadHistory } from "@/lib/publication/store";
 import { ContentPreview } from "@/components/content-review/content-preview";
 import { DraftEditor } from "@/components/content-review/draft-editor";
+import { PublicationActions } from "@/components/content-review/publication-actions";
 import { ReviewActions } from "@/components/content-review/review-actions";
 import { ModeBadge, StatusToken, statusLabelFor } from "@/components/content-review/status-token";
 
@@ -37,6 +40,16 @@ export default async function ContentReviewDetailPage({
   // dégradée. Le bouton ne fait que refléter la décision du serveur.
   const citesDegradedPage = (validation?.warnings ?? []).some((issue) => issue.code === "page-degradee");
   const canApprove = validation?.passed === true && !citesDegradedPage;
+
+  // L'identité logique du contenu côté public. `undefined` quand le chapitre
+  // n'est pas au programme : la publication est alors impossible, et l'écran le
+  // dit plutôt que d'offrir un bouton qui échouerait.
+  const publicChapter = resolvePublicChapter(draft.chapterSlug);
+  const publicationKey = publicChapter
+    ? { artifactType: draft.contentType, chapter: publicChapter.slug, slug: resolveSlug(draft) }
+    : null;
+  const activeVersion = publicationKey ? ((await findActive(publicationKey)) ?? null) : null;
+  const publicationHistory = publicationKey ? await loadHistory(publicationKey) : [];
 
   return (
     <div className="page-stack">
@@ -165,6 +178,61 @@ export default async function ContentReviewDetailPage({
             <h2 className="panel-heading">Décision</h2>
             <ReviewActions draftId={draft.id} status={draft.status} canApprove={canApprove} />
           </section>
+
+          <section className="panel">
+            <h2 className="panel-heading">Publication</h2>
+
+            {publicChapter ? (
+              <PublicationActions
+                draftId={draft.id}
+                status={draft.status}
+                mode={draft.generationMetadata.mode}
+                activeVersionId={activeVersion?.id ?? null}
+                activePublicationVersion={activeVersion?.publicationVersion ?? null}
+              />
+            ) : (
+              <p className="muted">
+                Le chapitre «&nbsp;{draft.chapterLabel}&nbsp;» n&apos;appartient à aucun module public :
+                ce contenu ne peut pas être publié tant que le chapitre n&apos;est pas inscrit à la
+                taxonomie.
+              </p>
+            )}
+          </section>
+
+          {publicationHistory.length > 0 ? (
+            <section className="panel">
+              <h2 className="panel-heading">Historique des versions publiées</h2>
+              <div className="table-scroll">
+                <table className="review-table">
+                  <thead>
+                    <tr>
+                      <th scope="col">Version</th>
+                      <th scope="col">État</th>
+                      <th scope="col">Publiée le</th>
+                      <th scope="col">Par</th>
+                      <th scope="col">Empreinte</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {publicationHistory.map((version) => (
+                      <tr key={version.id}>
+                        <td>{version.publicationVersion}</td>
+                        <td>{version.status === "published" ? "Active" : "Archivée"}</td>
+                        <td>{new Date(version.publishedAt).toLocaleString("fr-FR")}</td>
+                        <td>{version.publishedBy}</td>
+                        <td>
+                          <code>{version.contentHash.slice(0, 12)}</code>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              <p className="muted">
+                Aucune version n&apos;est supprimée : archiver retire du site public, jamais du dépôt.
+              </p>
+            </section>
+          ) : null}
 
           <section className="panel">
             <h2 className="panel-heading">Historique</h2>

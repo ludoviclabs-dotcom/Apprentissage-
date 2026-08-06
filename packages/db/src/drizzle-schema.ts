@@ -730,3 +730,68 @@ export const contentDraftTransitionsTable = pgTable("content_draft_transitions",
   comment: text("comment"),
   occurredAt: timestamp("occurred_at", { mode: "string" }).notNull().defaultNow()
 });
+
+// --- PR-15: publication ----------------------------------------------------
+//
+// The published snapshots themselves live in `content/published/`, a committed
+// directory the public site reads without a database. These tables are the
+// registry of publication *acts* on an install that persists: which version is
+// current, who made it so, and in place of what. See migration 0014.
+
+export const publishedContentVersionsTable = pgTable("published_content_versions", {
+  id: text("id").primaryKey(),
+  // Traceability only, and deliberately not a foreign key: published course
+  // material must outlive the draft that produced it.
+  sourceArtifactId: text("source_artifact_id").notNull(),
+  artifactType: text("artifact_type").notNull(),
+  title: text("title").notNull(),
+  slug: text("slug").notNull(),
+  domain: text("domain").notNull(),
+  module: text("module").notNull(),
+  chapter: text("chapter").notNull(),
+  chapterLabel: text("chapter_label").notNull(),
+  contentSnapshot: jsonb("content_snapshot").notNull(),
+  sourceReferencesSnapshot: jsonb("source_references_snapshot").notNull(),
+  publicationVersion: integer("publication_version").notNull(),
+  publishedAt: timestamp("published_at", { mode: "string" }).notNull().defaultNow(),
+  publishedBy: text("published_by").notNull(),
+  generationMetadataSnapshot: jsonb("generation_metadata_snapshot").notNull(),
+  validationMetadataSnapshot: jsonb("validation_metadata_snapshot").notNull(),
+  reviewMetadataSnapshot: jsonb("review_metadata_snapshot").notNull(),
+  contentHash: text("content_hash").notNull(),
+  status: text("status").notNull().default("published"),
+  previousPublishedVersionId: text("previous_published_version_id"),
+  archivedAt: timestamp("archived_at", { mode: "string" })
+});
+
+// Append-only, and — unlike the draft trail — it does not cascade: it records
+// that material was made public, which stays true after the version row is gone.
+export const contentPublicationAuditTable = pgTable("content_publication_audit", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  action: text("action").notNull(),
+  versionId: text("version_id").notNull(),
+  previousVersionId: text("previous_version_id"),
+  artifactType: text("artifact_type").notNull(),
+  chapter: text("chapter").notNull(),
+  slug: text("slug").notNull(),
+  publicationVersion: integer("publication_version").notNull(),
+  actor: text("actor").notNull(),
+  comment: text("comment"),
+  contentHash: text("content_hash").notNull(),
+  occurredAt: timestamp("occurred_at", { mode: "string" }).notNull().defaultNow()
+});
+
+// The one personal table of this lot: the evidence a chapter's progression is
+// computed from. Under RLS, and listed in `userOwnedTables`.
+export const chapterActivityEventsTable = pgTable("chapter_activity_events", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  userId: uuid("user_id").notNull(),
+  module: text("module").notNull(),
+  chapter: text("chapter").notNull(),
+  kind: text("kind").notNull(),
+  artifactId: text("artifact_id").notNull(),
+  succeeded: boolean("succeeded").notNull(),
+  // Null for a consultation; 0–20 for a graded activity.
+  score: numeric("score", { precision: 5, scale: 2 }),
+  occurredAt: timestamp("occurred_at", { mode: "string" }).notNull().defaultNow()
+});

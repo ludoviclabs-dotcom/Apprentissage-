@@ -58,7 +58,7 @@ export default async function ContentReviewPage({
       <PageHeader
         label="Administration"
         title="Relecture des contenus générés"
-        description="Aucun de ces contenus n'est publié. L'approbation enregistre une décision de relecture ; la publication fera l'objet d'un lot ultérieur."
+        description="L'approbation enregistre une décision de relecture ; elle ne publie rien. La publication est une action distincte, déclenchée contenu par contenu depuis sa fiche."
       />
 
       <section className="panel">
