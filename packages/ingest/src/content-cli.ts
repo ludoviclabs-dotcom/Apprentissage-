@@ -5,6 +5,7 @@ import { fileURLToPath } from "node:url";
 import { artifactFileName, artifactPath, extractManifestEntry } from "./content-pipeline/extract";
 import { pairManifest } from "./content-pipeline/pair";
 import { scanContentSources } from "./content-pipeline/scan";
+import { loadLocalEnv } from "./local-config";
 import {
   contentManifestSchema,
   type ContentIssue,
@@ -31,6 +32,11 @@ import {
 
 const here = dirname(fileURLToPath(import.meta.url));
 const repoRoot = join(here, "..", "..", "..");
+
+// Avant toute lecture d'environnement : `tsx` ne charge pas `.env`, et
+// `CONTENT_SOURCE_ROOT` y est documenté comme la racine de ce scan. Sans cela la
+// commande retombait sur `content-private/` sans le dire.
+const envFile = loadLocalEnv(repoRoot);
 
 interface CliOptions {
   command: string;
@@ -87,6 +93,12 @@ async function writeJson(path: string, value: unknown): Promise<void> {
 }
 
 async function runScan(options: CliOptions): Promise<void> {
+  console.log(
+    envFile.found
+      ? `Configuration      : .env lu (${envFile.applied.length} variable(s) appliquée(s))`
+      : "Configuration      : aucun .env — seules les variables du shell sont lues"
+  );
+
   if (!existsSync(options.rootPath)) {
     console.error(
       `Racine des sources introuvable : ${options.rootPath}\n` +

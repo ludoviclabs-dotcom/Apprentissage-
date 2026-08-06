@@ -14,12 +14,19 @@ data/processed/*
 data/exports/*
 data/backups/*
 data/extracted/*
-data/generated/drafts/*
+# TOUT `data/generated/`, pas seulement `drafts/`. La règle ne visait que le
+# dossier des brouillons, si bien qu'un dossier voisin — les charges utiles
+# rédigées du mode manual-assisted, un export de travail — se serait retrouvé
+# suivi par Git sans que personne l'ait décidé. Ce qui dérive du corpus privé
+# n'est pas commité, quel que soit le sous-dossier où on le range.
+data/generated/*
 !data/raw/.gitkeep
 !data/processed/.gitkeep
 !data/exports/.gitkeep
 !data/backups/.gitkeep
 !data/extracted/.gitkeep
+!data/generated/drafts/
+data/generated/drafts/*
 !data/generated/drafts/.gitkeep
 
 # Sources pédagogiques privées : jamais dans Git, jamais servies publiquement.

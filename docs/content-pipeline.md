@@ -20,14 +20,14 @@ Déposer les sources dans le dossier privé (jamais commité) :
 ```powershell
 # PowerShell — depuis la racine du dépôt
 New-Item -ItemType Directory -Force content-private\comptabilite
-Copy-Item "C:\Users\Ludo\Dropbox\Comptabilité Générale _ Approfondie\Comptabilité Approfondie\*" content-private\comptabilite\
+Copy-Item "<racine de vos sources privées>\*" content-private\comptabilite\
 ```
 
 Ou pointer directement la racine ailleurs (ex. Dropbox) via `.env` /
 variable d'environnement :
 
 ```powershell
-$env:CONTENT_SOURCE_ROOT = "C:\Users\Ludo\Dropbox\Comptabilité Générale _ Approfondie\Comptabilité Approfondie"
+$env:CONTENT_SOURCE_ROOT = "<racine de vos sources privées>"
 ```
 
 Sans variable, la racine par défaut est `content-private/` (relative au dépôt).
@@ -45,7 +45,7 @@ Chaque commande accepte `--root <chemin>` et `--pack <id>` (défaut :
 `comptabilite`). Exemple ciblé :
 
 ```powershell
-corepack pnpm content:scan -- --root "C:\Users\Ludo\Dropbox\Comptabilité Générale _ Approfondie\Comptabilité Approfondie" --pack compta-approfondie
+corepack pnpm content:scan -- --root "<racine de vos sources privées>" --pack compta-approfondie
 ```
 
 ### content:scan

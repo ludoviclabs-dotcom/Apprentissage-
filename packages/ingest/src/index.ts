@@ -9,6 +9,7 @@ import { extractDocx, extractPdf, type ExtractedPageContent } from "./extractors
 export type { ExtractedPageContent } from "./extractors";
 export * from "./supported-extensions";
 export * from "./content-pipeline";
+export * from "./local-config";
 
 import { isSupportedExtension, supportedExtensions, type SupportedExtension } from "./supported-extensions";
 
