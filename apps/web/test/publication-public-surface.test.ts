@@ -9,6 +9,7 @@ import {
   toPublicCalculationExercise,
   toPublicSourceReferences
 } from "@finance/content-publication";
+import { isPublishableGenerationMode } from "@finance/content-generation";
 import {
   approvedCalculationDraft,
   approvedSheetDraft
@@ -215,14 +216,25 @@ describe("la lecture publique ignore le contenu de démonstration", () => {
     "utf8"
   );
 
-  it("filtre le mode mock à la lecture, en plus des refus d'écriture", () => {
-    expect(store).toContain('generationMetadataSnapshot.mode === "live"');
-    expect(store).toContain("isLiveVersion");
+  it("filtre à la lecture par la liste blanche des modes, en plus des refus d'écriture", () => {
+    // La liste blanche vient du paquet de génération : une copie locale de la
+    // règle finirait par diverger des deux autres barrières.
+    expect(store).toContain("isPublishableGenerationMode");
+    expect(store).toContain("isPublishableVersion");
   });
 
-  it("ne rend une version que si elle est active et live", () => {
+  it("ne rend une version que si elle est active et d'un mode publiable", () => {
     expect(store).toMatch(
-      /version\.status !== "published" \|\| !isLiveVersion\(version\)/
+      /version\.status !== "published" \|\| !isPublishableVersion\(version\)/
     );
+  });
+
+  it("la liste blanche accepte live et manual-assisted, jamais mock", () => {
+    // Le contrôle qui compte vraiment : la fonction elle-même, pas le texte du
+    // fichier qui l'appelle.
+    expect(isPublishableGenerationMode("live")).toBe(true);
+    expect(isPublishableGenerationMode("manual-assisted")).toBe(true);
+    expect(isPublishableGenerationMode("mock")).toBe(false);
+    expect(isPublishableGenerationMode("inconnu")).toBe(false);
   });
 });

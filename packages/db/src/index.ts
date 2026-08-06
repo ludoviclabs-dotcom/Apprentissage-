@@ -12,3 +12,4 @@ export * from "./workbook-repository";
 export * from "./certificate-repository";
 export * from "./content-draft-repository";
 export * from "./publication-repository";
+export * from "./preflight";

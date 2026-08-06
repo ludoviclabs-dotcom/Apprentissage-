@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { contentTypeLabels } from "@finance/content-generation";
+import { contentTypeLabels, isPublishableGenerationMode } from "@finance/content-generation";
 import { resolvePublicChapter, resolveSlug } from "@finance/content-publication";
 import { findDraft, loadCorpusIndex, requireReviewAccess, resolveExcerpts } from "@/lib/content-review/service";
 import { findActive, loadHistory } from "@/lib/publication/store";
@@ -186,7 +186,7 @@ export default async function ContentReviewDetailPage({
               <PublicationActions
                 draftId={draft.id}
                 status={draft.status}
-                mode={draft.generationMetadata.mode}
+                modePublishable={isPublishableGenerationMode(draft.generationMetadata.mode)}
                 activeVersionId={activeVersion?.id ?? null}
                 activePublicationVersion={activeVersion?.publicationVersion ?? null}
               />

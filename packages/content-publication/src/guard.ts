@@ -2,6 +2,7 @@ import {
   collectSourceReferences,
   contentPayloadSchema,
   contentTypes,
+  isPublishableGenerationMode,
   runTemplate,
   sourceReferenceSchema,
   validateContent,
@@ -408,11 +409,23 @@ export function inspectForPublication(input: PublicationGuardInput): Publication
   }
 
   // --- 3. Mode de génération ----------------------------------------------
-  if (draft.generationMetadata.mode === "mock") {
+  //
+  // La règle est énoncée par ce qui est ACCEPTÉ, pas par ce qui est refusé.
+  // Tester `=== "mock"` laissait passer tout mode ajouté plus tard sans que
+  // personne n'ait décidé qu'il était publiable ; une liste blanche oblige la
+  // décision à être prise au moment où le mode est créé.
+  //
+  // `manual-assisted` est accepté ici parce qu'il a franchi exactement les mêmes
+  // contrôles que `live` et attend la même approbation humaine. `mock` ne l'est
+  // pas et ne le sera pas : une fixture n'est pas du contenu pédagogique, quelle
+  // que soit la personne qui cliquerait « approuver ».
+  if (!isPublishableGenerationMode(draft.generationMetadata.mode)) {
     errors.push(
       issue(
-        "mode-mock",
-        "ce contenu vient d'une fixture de démonstration (mode mock) : il ne peut pas être publié"
+        "mode-non-publiable",
+        draft.generationMetadata.mode === "mock"
+          ? "ce contenu vient d'une fixture de démonstration (mode mock) : il ne peut pas être publié"
+          : `mode de génération « ${draft.generationMetadata.mode} » non publiable`
       )
     );
   }

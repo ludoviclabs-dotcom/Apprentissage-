@@ -2,6 +2,7 @@ import { existsSync } from "node:fs";
 import { mkdir, readFile, rename, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { z } from "zod";
+import { isPublishableGenerationMode } from "@finance/content-generation";
 import { assertSnapshotPublishable } from "./guard";
 import { contentHash } from "./hash";
 import {
@@ -194,9 +195,13 @@ export class UnpublishableSnapshotError extends Error {
  * interdit.
  */
 function assertPublishableSnapshot(version: PublishedContentVersion): void {
-  if (version.generationMetadataSnapshot.mode !== "live") {
+  if (!isPublishableGenerationMode(version.generationMetadataSnapshot.mode)) {
+    const mode = version.generationMetadataSnapshot.mode;
+
     throw new UnpublishableSnapshotError(
-      `« ${version.id} » vient d'une fixture (mode « ${version.generationMetadataSnapshot.mode} ») : un contenu de démonstration ne s'écrit pas dans le magasin publié`
+      mode === "mock"
+        ? `« ${version.id} » vient d'une fixture (mode « mock ») : un contenu de démonstration ne s'écrit pas dans le magasin publié`
+        : `« ${version.id} » vient d'un mode impubliable (« ${mode} ») : seuls « live » et « manual-assisted » s'écrivent dans le magasin publié`
     );
   }
 

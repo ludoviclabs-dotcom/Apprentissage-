@@ -34,12 +34,40 @@ export function statusLabelFor(status: ContentDraftStatus): string {
   return STATUS_LABELS[status];
 }
 
+/**
+ * L'origine, dite en toutes lettres.
+ *
+ * Trois origines, trois étiquettes distinctes : un relecteur qui approuve engage
+ * sa signature, et « rédigé à partir des sources » n'est pas la même information
+ * que « écrit par un modèle » ni que « fixture de démonstration ». Une étiquette
+ * commune aux deux dernières laisserait croire qu'une fixture peut être relue
+ * comme du cours.
+ */
+const MODE_BADGES: Record<GenerationMode, { label: string; tone: string; title: string }> = {
+  mock: {
+    label: "Fixture (mock)",
+    tone: "needs-review",
+    title: "Fixture technique, pas une génération réelle — impubliable"
+  },
+  live: {
+    label: "Génération IA",
+    tone: "ready",
+    title: "Rédigé par un modèle à partir des sources du chapitre"
+  },
+  "manual-assisted": {
+    label: "Rédaction assistée",
+    tone: "processing",
+    title:
+      "Rédigé à partir des extraits validés, sans appel à un fournisseur — mêmes contrôles, même approbation humaine"
+  }
+};
+
 export function ModeBadge({ mode }: { mode: GenerationMode }) {
-  return mode === "mock" ? (
-    <span className="state-token needs-review" title="Fixture technique, pas une génération réelle">
-      Fixture (mock)
+  const badge = MODE_BADGES[mode];
+
+  return (
+    <span className={`state-token ${badge.tone}`} title={badge.title}>
+      {badge.label}
     </span>
-  ) : (
-    <span className="state-token ready">Génération IA</span>
   );
 }
