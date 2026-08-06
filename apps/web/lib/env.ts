@@ -74,6 +74,20 @@ const envSchema = z
     // name, that serving private course material without accounts is intended
     // here. Rejected outright on a production Vercel deployment.
     CONTENT_REVIEW_ALLOW_UNAUTHENTICATED: booleanFlag(),
+    // Racine du magasin de contenus publiés. Par défaut `<dépôt>/content/published`,
+    // qui est commité. La variable existe pour que les tests end-to-end pointent
+    // vers un magasin jetable au lieu d'écrire dans celui du dépôt : publier
+    // pendant un test ne doit pas laisser un chapitre derrière lui.
+    PUBLISHED_CONTENT_ROOT: z.string().min(1).optional(),
+    // Autorise le magasin de fichiers dans un processus en production. Réservé
+    // au serveur end-to-end et à une installation privée que personne d'autre
+    // ne joint — même idiome, même raison que
+    // CONTENT_REVIEW_ALLOW_UNAUTHENTICATED. En production réelle la source de
+    // vérité est la base, et cette variable reste absente.
+    ALLOW_FILE_PUBLICATION_STORE: booleanFlag(),
+    // Tient le magasin de fichiers à jour en plus de la base, pour garder les
+    // publications relisibles en diff sur une installation locale.
+    MIRROR_PUBLICATION_TO_FILES: booleanFlag(),
 
     // Retired in PR-01. Kept in the schema only so a stale `.env` fails loudly
     // instead of quietly losing its protection: someone who still sets these

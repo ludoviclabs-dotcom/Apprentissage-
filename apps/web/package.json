@@ -12,6 +12,7 @@
   "dependencies": {
     "@finance/ai": "workspace:*",
     "@finance/content-generation": "workspace:*",
+    "@finance/content-publication": "workspace:*",
     "@finance/db": "workspace:*",
     "@finance/domain": "workspace:*",
     "@finance/ingest": "workspace:*",

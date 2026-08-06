@@ -51,6 +51,68 @@ refuses to boot in production without accounts. See
 `docs/content-generation.md`, `docs/content-validation-rules.md`,
 `docs/content-review-workflow.md` and `docs/content-factory-preflight.md`.
 
+## Content Publication
+
+The factory produces drafts; `packages/content-publication` is what turns one
+into a public page, and — mostly — what stops it. The editorial state machine
+still has no `published`: publication is a separate layer, a separate route and a
+separate button, so approving cannot publish by accident.
+
+Published snapshots live in `content/published/`, **committed**. That is not a
+relaxation of the rule that keeps `data/generated/drafts/` out of git: the rule
+exists because nobody knows what a draft contains, and `inspectForPublication`
+proves a snapshot carries no private path, no secret, no mock fixture, no dead
+source reference and no figure the code cannot recompute. With the proof made,
+the prohibition has no object — and three properties follow that no database
+could give: the chapter works with no database at all, a publication is reviewed
+as a diff before it reaches production, and `pnpm build` touches neither network
+nor private file. A version file is never rewritten; `readVersion` recomputes its
+hash on every read, so a hand edit fails the read instead of reaching a visitor.
+
+The guard does not trust the stored verdict. `validationMetadata` says what the
+checks concluded the day they ran; the guard reloads the corpus and replays
+everything at the exact moment of publication — every figure through
+`runTemplate`, every entry's balance, every reference against the extracted
+corpus. An absent corpus is a refusal, never a default pass, because not being
+able to verify is not verifying.
+
+Migration 0014 records the *acts* rather than the content:
+`published_content_versions` (one active version per artifact type, chapter and
+slug, enforced by a partial unique index rather than by discipline),
+`content_publication_audit` (append-only, and deliberately not cascading — an
+audit that disappears with what it audits is not an audit), and
+`chapter_activity_events`, the one personal table of the lot, under RLS.
+
+Source excerpts do not survive into a snapshot. The published reference names a
+document, its nature, its section and its pages — enough to find the passage in
+your own copy, and nothing that publishes somebody's PDF. See
+`docs/content-publication.md`.
+
+## Comptabilité approfondie
+
+The first public track fed by the factory, under `/modules/comptabilite-approfondie`
+— the existing Modules entry, not a second navigation tree. A chapter is five
+tabs resolved from a search parameter, so every sub-section is shareable and
+survives a reload: Comprendre, Fiche 2.0, S'entraîner, Réviser, Sources.
+
+Nothing is added to what was validated. A section the snapshot does not fill is a
+section that does not render, because inventing a timeline step the sources do
+not carry is inventing course material.
+
+Every graded activity is corrected server-side by the PR-03 evaluators — no
+second engine, no model call. The public projections strip the expected answer
+from the payload, so grading *cannot* happen in the browser and a learner cannot
+read the answer in the page source. A test asserts no component under
+`components/compta-approfondie/` imports a grader.
+
+Progression is computed from `chapter_activity_events` and nothing else, by a
+pure function over seven dimensions. Opening the sheet is one dimension out of
+seven and can never on its own exceed "en cours" — reducing mastery to a page
+view is exactly what the public-demo audit reproached the older screens with. A
+dimension the chapter publishes nothing for is neutral rather than missing. See
+`docs/compta-public-learning-experience.md`, `docs/compta-user-progress.md` and
+`docs/compta-deterministic-grading.md`.
+
 ## Product Rule
 
 The cockpit is organized around guided learning. Retrieval and AI features support the route, but the main user loop is:

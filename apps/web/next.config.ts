@@ -7,7 +7,22 @@ const repoRoot = fileURLToPath(new URL("../../", import.meta.url));
 
 const nextConfig: NextConfig = {
   outputFileTracingRoot: repoRoot,
-  transpilePackages: ["@finance/domain", "@finance/db", "@finance/ai", "@finance/ingest"],
+  transpilePackages: [
+    "@finance/domain",
+    "@finance/db",
+    "@finance/ai",
+    "@finance/ingest",
+    "@finance/content-generation",
+    "@finance/content-publication"
+  ],
+  // Le magasin publié est lu au moment du rendu, pas importé statiquement : sans
+  // cette inclusion, le traçage de Next.js ne l'emporterait pas dans le bundle
+  // serveur et le chapitre répondrait « aucun contenu publié » en production
+  // alors qu'il est publié dans le dépôt.
+  outputFileTracingIncludes: {
+    "/modules/comptabilite-approfondie/**": ["../../content/published/**/*.json"],
+    "/api/apprentissage/**": ["../../content/published/**/*.json"]
+  },
   async headers() {
     return [
       {

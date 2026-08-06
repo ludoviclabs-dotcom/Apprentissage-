@@ -1,0 +1,148 @@
+/* Impression — ciblée sur la fiche de révision.
+
+   LE PAPIER N'EST PAS L'ÉCRAN. Une fiche imprimée n'a ni sidebar, ni onglets,
+   ni bouton ; elle a en revanche besoin de ce que l'écran replie — la réponse
+   d'un rappel actif est sans intérêt sur une feuille où l'on ne peut pas
+   cliquer. Ce fichier ne fait donc pas que masquer : il déplie aussi.
+
+   Aucun PDF n'est produit dans ce lot. `pdf-lib` sert les attestations, dont la
+   mise en page est fixe et connue à l'avance ; porter une fiche de longueur
+   variable, avec ses tableaux et ses frises, sur la même infrastructure serait
+   un lot en soi. L'impression du navigateur fait le travail, et elle le fait
+   avec la mise en page ci-dessous. */
+
+@media print {
+  @page {
+    margin: 14mm;
+  }
+
+  html,
+  body {
+    background: #fff;
+    color: #000;
+    font-size: 11pt;
+  }
+
+  /* Le chrome applicatif entier disparaît : navigation latérale, barre
+     supérieure, drawer mobile, onglets du chapitre, fil d'ariane. */
+  .app-sidebar,
+  .app-topbar,
+  .mobile-nav,
+  .mobile-drawer,
+  .skip-link,
+  .chapter-tabs,
+  .chapter-toc,
+  .page-header .hero-score,
+  .no-print,
+  button,
+  .feedback {
+    display: none !important;
+  }
+
+  .app-shell,
+  .app-main,
+  .page-stack,
+  .chapter-page {
+    display: block;
+    margin: 0;
+    padding: 0;
+    max-width: none;
+  }
+
+  /* Les panneaux perdent leur habillage : bordures et fonds coûtent de l'encre
+     sans rien apporter à la lecture. Les titres, eux, restent. */
+  .panel,
+  .activity-card,
+  .formula-card,
+  .source-card,
+  .revision-sheet {
+    border: none;
+    background: transparent;
+    box-shadow: none;
+    padding: 0;
+    margin: 0 0 10pt;
+  }
+
+  .revision-sheet-header h2 {
+    font-size: 18pt;
+    margin-bottom: 2pt;
+  }
+
+  .panel-heading {
+    font-size: 13pt;
+    margin: 10pt 0 4pt;
+  }
+
+  /* Ce que l'écran replie, le papier le déplie. */
+  details,
+  details[open] {
+    display: block;
+  }
+
+  details > summary {
+    list-style: none;
+    font-weight: 700;
+  }
+
+  .recall-answer,
+  .print-only {
+    display: block !important;
+  }
+
+  /* Rien d'illisible à cheval sur deux pages : une règle, une formule, une
+     étape de frise et une ligne de tableau restent d'un seul tenant. */
+  .rule-list li,
+  .mistake-list li,
+  .recall-list li,
+  .timeline-step,
+  .formula-card,
+  .source-card,
+  .worked-example li,
+  tr {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+
+  h1,
+  h2,
+  h3,
+  h4 {
+    break-after: avoid;
+    page-break-after: avoid;
+  }
+
+  /* Les tableaux répètent leur en-tête sur chaque page. */
+  thead {
+    display: table-header-group;
+  }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+  }
+
+  th,
+  td {
+    border: 0.5pt solid #999;
+    padding: 3pt 5pt;
+  }
+
+  /* Les références restent : une fiche sans ses sources n'est plus citable. */
+  .source-citation {
+    color: #333;
+    font-size: 9pt;
+  }
+
+  .source-citation cite {
+    font-style: normal;
+    font-weight: 700;
+  }
+
+  /* Le fond des encarts d'indice et d'erreur devient un liseré. */
+  .case-hint,
+  .proposed-answer {
+    background: transparent;
+    border-left: 2pt solid #666;
+    padding-left: 6pt;
+  }
+}

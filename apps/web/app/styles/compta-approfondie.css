@@ -1,0 +1,652 @@
+/* Comptabilité approfondie — parcours public issu de la fabrique éditoriale.
+
+   Aucune valeur de couleur brute : tout passe par les tokens, pour que le
+   chapitre suive le thème comme le reste du cockpit. Aucun état n'est porté par
+   la seule couleur — chaque marqueur double la teinte d'un libellé ou d'une
+   icône. */
+
+/* --- Cartes de chapitre ---------------------------------------------------- */
+
+.chapter-list {
+  list-style: none;
+  margin: 16px 0 0;
+  padding: 0;
+  display: grid;
+  gap: 14px;
+}
+
+.chapter-card {
+  padding: 16px 18px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface-raised);
+}
+
+.chapter-card h3 {
+  margin: 0 0 6px;
+  font-size: 1.05rem;
+}
+
+.chapter-card p {
+  margin: 0 0 6px;
+}
+
+.chapter-card-upcoming {
+  background: var(--surface-muted);
+  border-style: dashed;
+}
+
+.chapter-progress {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 6px;
+}
+
+/* Le statut porte son libellé : la couleur n'est jamais la seule information. */
+.status-token {
+  display: inline-block;
+  padding: 2px 10px;
+  border-radius: 999px;
+  border: 1px solid var(--border-strong);
+  background: var(--surface-muted);
+  font-size: 0.82rem;
+  font-weight: 600;
+}
+
+.status-not-started {
+  color: var(--text-tertiary);
+}
+
+.status-in-progress {
+  color: var(--accent-strong);
+  border-color: var(--accent);
+  background: var(--accent-softer);
+}
+
+.status-to-review {
+  color: var(--warning-strong);
+  border-color: var(--warning);
+  background: var(--warning-surface);
+}
+
+.status-mastered {
+  color: var(--success-strong);
+  border-color: var(--success);
+  background: var(--success-surface);
+}
+
+/* --- Onglets du chapitre --------------------------------------------------- */
+
+.chapter-tabs ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  border-bottom: 1px solid var(--border);
+}
+
+.chapter-tab {
+  display: inline-block;
+  padding: 9px 14px;
+  border: 1px solid transparent;
+  border-bottom: none;
+  border-radius: var(--radius) var(--radius) 0 0;
+  color: var(--text-secondary);
+  text-decoration: none;
+  font-weight: 600;
+}
+
+.chapter-tab:hover {
+  background: var(--surface-muted);
+}
+
+/* L'onglet courant est aussi `aria-current="page"` : le soulignement double
+   l'information pour qui ne distingue pas la nuance de fond. */
+.chapter-tab--active {
+  background: var(--surface);
+  border-color: var(--border);
+  color: var(--text-strong);
+  box-shadow: inset 0 3px 0 var(--accent);
+}
+
+/* --- Onglet « Comprendre » ------------------------------------------------- */
+
+.understand-layout {
+  display: grid;
+  gap: 20px;
+  grid-template-columns: minmax(0, 1fr);
+}
+
+@media (min-width: 1000px) {
+  .understand-layout {
+    grid-template-columns: 240px minmax(0, 1fr);
+    align-items: start;
+  }
+
+  .chapter-toc {
+    position: sticky;
+    top: 16px;
+  }
+}
+
+.chapter-toc {
+  padding: 14px 16px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface-raised);
+}
+
+.chapter-toc h2 {
+  margin: 0 0 8px;
+  font-size: 0.9rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--muted);
+}
+
+.chapter-toc ol {
+  margin: 0;
+  padding-left: 18px;
+  display: grid;
+  gap: 4px;
+}
+
+.understand-main {
+  display: grid;
+  gap: 18px;
+  min-width: 0;
+}
+
+/* --- Éléments pédagogiques ------------------------------------------------- */
+
+.bullet-list,
+.rule-list,
+.mistake-list,
+.recall-list,
+.worked-example {
+  margin: 8px 0;
+  padding-left: 20px;
+  display: grid;
+  gap: 10px;
+}
+
+.rule-list li,
+.mistake-list li,
+.recall-list li {
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--border);
+}
+
+.rule-list li:last-child,
+.mistake-list li:last-child,
+.recall-list li:last-child {
+  border-bottom: none;
+}
+
+.rule-understood {
+  opacity: 0.75;
+}
+
+.rule-check {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.9rem;
+  color: var(--text-tertiary);
+}
+
+.vocabulary-list {
+  margin: 8px 0;
+  display: grid;
+  gap: 8px;
+}
+
+.vocabulary-list > div {
+  display: grid;
+  grid-template-columns: minmax(120px, 200px) minmax(0, 1fr);
+  gap: 10px;
+}
+
+.vocabulary-list dt {
+  font-weight: 600;
+}
+
+.vocabulary-list dd {
+  margin: 0;
+}
+
+@media (max-width: 640px) {
+  .vocabulary-list > div {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 2px;
+  }
+}
+
+.timeline {
+  list-style: none;
+  margin: 10px 0;
+  padding: 0;
+  display: grid;
+  gap: 12px;
+}
+
+.timeline-step {
+  padding-left: 40px;
+  position: relative;
+}
+
+.timeline-step h3,
+.timeline-step h4 {
+  margin: 0 0 4px;
+  font-size: 1rem;
+}
+
+.timeline-rank {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 28px;
+  height: 28px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  background: var(--accent-soft);
+  color: var(--accent-strong);
+  font-weight: 700;
+  font-size: 0.85rem;
+}
+
+.formula-card {
+  margin: 10px 0;
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface-subtle);
+}
+
+.formula-card h3,
+.formula-card h4 {
+  margin: 0 0 6px;
+}
+
+.formula-expression {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin: 6px 0;
+}
+
+.formula-expression code {
+  padding: 4px 8px;
+  border-radius: var(--radius);
+  background: var(--surface-muted);
+  font-size: 0.98rem;
+}
+
+.icon-action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+
+.icon-action:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.mistake-list .mistake {
+  margin: 0 0 4px;
+  font-weight: 600;
+}
+
+.mistake-list .correction {
+  margin: 0;
+  color: var(--text-secondary);
+}
+
+.source-citation {
+  margin: 6px 0 0;
+  font-size: 0.86rem;
+  color: var(--muted);
+}
+
+.source-citation cite {
+  font-style: normal;
+  font-weight: 600;
+}
+
+/* --- Tableaux -------------------------------------------------------------- */
+
+.account-table,
+.variable-table,
+.journal-table,
+.criteria-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.94rem;
+}
+
+.account-table th,
+.account-table td,
+.variable-table th,
+.variable-table td,
+.journal-table th,
+.journal-table td,
+.criteria-table th,
+.criteria-table td {
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--border);
+  text-align: left;
+  vertical-align: top;
+}
+
+.journal-table td:nth-child(3),
+.journal-table td:nth-child(4),
+.journal-table tfoot td {
+  text-align: right;
+}
+
+.journal-table tfoot th,
+.journal-table tfoot td {
+  border-top: 2px solid var(--border-strong);
+  font-weight: 700;
+}
+
+/* L'issue d'un critère est lisible sans la couleur : un libellé masqué
+   l'annonce, et l'épaisseur du liseré gauche la double visuellement. */
+.criterion-met {
+  border-left: 3px solid var(--success);
+}
+
+.criterion-partial {
+  border-left: 3px solid var(--warning);
+}
+
+.criterion-missed {
+  border-left: 3px solid var(--danger);
+}
+
+/* --- Activités ------------------------------------------------------------- */
+
+.training-stack {
+  display: grid;
+  gap: 20px;
+}
+
+.activity-card {
+  padding: 16px 18px;
+  margin: 14px 0;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface-raised);
+}
+
+.activity-card h3 {
+  margin: 0 0 8px;
+}
+
+.activity-statement {
+  white-space: pre-line;
+}
+
+.activity-form {
+  display: grid;
+  gap: 8px;
+  margin: 12px 0;
+}
+
+.activity-input-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.activity-input-row input {
+  min-width: 160px;
+}
+
+.journal-editor input {
+  width: 100%;
+  min-width: 80px;
+}
+
+.journal-row-actions {
+  display: flex;
+  gap: 4px;
+}
+
+.journal-balance {
+  margin: 8px 0;
+  font-weight: 600;
+}
+
+.choice-list {
+  display: grid;
+  gap: 6px;
+  margin: 8px 0;
+}
+
+.choice-option {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  cursor: pointer;
+}
+
+.proposed-answer {
+  margin: 10px 0;
+  padding: 10px 14px;
+  border-left: 3px solid var(--warning);
+  background: var(--warning-surface);
+}
+
+.correction-panel {
+  margin: 12px 0;
+  padding: 10px 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface-subtle);
+}
+
+.correction-panel > summary {
+  cursor: pointer;
+  font-weight: 700;
+}
+
+.correction-panel h4 {
+  margin: 12px 0 4px;
+}
+
+/* --- Flashcards en mode focus ---------------------------------------------- */
+
+.flashcard-focus {
+  max-width: 720px;
+}
+
+.flashcard-progress {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 10px 0;
+}
+
+.flashcard-progress progress {
+  flex: 1;
+  height: 8px;
+}
+
+.flashcard-card {
+  padding: 20px;
+  margin: 12px 0;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  min-height: 160px;
+}
+
+.flashcard-front {
+  font-size: 1.15rem;
+  font-weight: 600;
+  margin: 8px 0;
+}
+
+.flashcard-back {
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 1px solid var(--border);
+}
+
+.flashcard-actions {
+  display: grid;
+  gap: 8px;
+}
+
+.flashcard-ratings {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+/* --- Mini-cas -------------------------------------------------------------- */
+
+.case-steps {
+  list-style: none;
+  margin: 14px 0;
+  padding: 0;
+  display: grid;
+  gap: 14px;
+}
+
+.case-step {
+  padding: 14px 16px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+}
+
+.case-step h4 {
+  margin: 0 0 8px;
+}
+
+.case-step--locked {
+  background: var(--surface-muted);
+  border-style: dashed;
+}
+
+.case-hints {
+  margin: 10px 0;
+  display: grid;
+  gap: 6px;
+}
+
+.case-hint {
+  margin: 0;
+  padding: 8px 10px;
+  border-left: 3px solid var(--accent);
+  background: var(--accent-softer);
+}
+
+.case-synthesis {
+  margin-top: 16px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+}
+
+/* --- Sources --------------------------------------------------------------- */
+
+.source-grid {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  margin: 14px 0;
+}
+
+.source-card {
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface-raised);
+}
+
+.source-card h3 {
+  margin: 0 0 8px;
+  font-size: 1rem;
+}
+
+.source-meta {
+  margin: 0;
+  display: grid;
+  gap: 4px;
+}
+
+.source-meta > div {
+  display: grid;
+  grid-template-columns: 110px minmax(0, 1fr);
+  gap: 8px;
+  font-size: 0.9rem;
+}
+
+.source-meta dt {
+  color: var(--muted);
+}
+
+.source-meta dd {
+  margin: 0;
+}
+
+/* --- Confirmation de publication (administration) -------------------------- */
+
+.publication-confirm {
+  margin: 14px 0;
+  padding: 14px 16px;
+  border: 2px solid var(--accent);
+  border-radius: var(--radius);
+  background: var(--accent-softer);
+}
+
+.publication-confirm h3 {
+  margin: 0 0 10px;
+}
+
+.publication-summary {
+  margin: 0 0 12px;
+  display: grid;
+  gap: 6px;
+}
+
+.publication-summary > div {
+  display: grid;
+  grid-template-columns: minmax(120px, 180px) minmax(0, 1fr);
+  gap: 10px;
+}
+
+.publication-summary dt {
+  color: var(--text-tertiary);
+}
+
+.publication-summary dd {
+  margin: 0;
+  font-weight: 600;
+}
+
+/* Visible seulement à l'impression : la réponse d'un rappel actif doit figurer
+   sur la fiche papier même si elle est repliée à l'écran. */
+.print-only {
+  display: none;
+}
