@@ -668,3 +668,65 @@ export const certificateRevocationsTable = pgTable("certificate_revocations", {
   revokedBy: text("revoked_by").notNull(),
   revokedAt: timestamp("revoked_at", { mode: "string" }).notNull().defaultNow()
 });
+
+// --- Content factory drafts (PR-14) ---------------------------------------
+//
+// Mirrors migration 0013. No `user_id` and no row level security: a draft is
+// shared administration content with no owner to police, and it carries nothing
+// personal for a policy to protect — the access control is `requireAdmin` on the
+// routes, plus the absence of any learner datum in these columns.
+//
+// Three things drizzle cannot express here, all enforced by migration 0013:
+//   * the CHECK on `contentType`, mirroring `contentTypes` in
+//     packages/content-generation/src/types/artifact.ts;
+//   * the CHECK on `status`, mirroring `contentDraftStatuses` — which has no
+//     `published` value, deliberately, so a draft cannot be marked public by any
+//     write at all;
+//   * the CHECKs bounding `difficulty` to 1–5 and `revision` to 1 or more, and
+//     the indexes on `(chapter_slug, status)` and `(status, updated_at)`.
+//
+// The four JSONB columns are deliberately untyped here, like `specJson` on
+// `exercise_versions`: their shapes belong to the Zod schemas of
+// packages/content-generation, and `content-draft-repository.ts` is the boundary
+// that hands them over to be validated. Restating those shapes in this package
+// would only create a second copy to drift.
+
+export const contentDraftsTable = pgTable("content_drafts", {
+  // Deterministic, `draft-<hex>`: regenerating the same chapter from the same
+  // sources addresses the same row rather than forking a copy of it.
+  id: text("id").primaryKey(),
+  contentType: text("content_type").notNull(),
+  status: text("status").notNull(),
+  chapterSlug: text("chapter_slug").notNull(),
+  chapterLabel: text("chapter_label").notNull(),
+  domain: text("domain").notNull(),
+  title: text("title").notNull(),
+  difficulty: integer("difficulty").notNull(),
+  payload: jsonb("payload").notNull(),
+  generationMetadata: jsonb("generation_metadata").notNull(),
+  // Nullable on purpose: "not checked yet" is not "checked, nothing to report".
+  validationMetadata: jsonb("validation_metadata"),
+  reviewMetadata: jsonb("review_metadata").notNull().default({}),
+  sourcePackId: text("source_pack_id").notNull(),
+  revision: integer("revision").notNull().default(1),
+  createdAt: timestamp("created_at", { mode: "string" }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { mode: "string" }).notNull().defaultNow()
+});
+
+// Append-only: `content_drafts` holds what a draft is now, this holds how it got
+// there. Separate from the draft because a draft is rewritten on every
+// regeneration and the record of who approved what must survive that.
+//
+// `draftId` carries no `references()` here — the same convention as
+// `certificate_revocations` — but the foreign key and its ON DELETE CASCADE are
+// real, and declared in migration 0013. `fromStatus` is null on the first
+// transition: a freshly generated draft comes from nowhere.
+export const contentDraftTransitionsTable = pgTable("content_draft_transitions", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  draftId: text("draft_id").notNull(),
+  fromStatus: text("from_status"),
+  toStatus: text("to_status").notNull(),
+  actor: text("actor").notNull(),
+  comment: text("comment"),
+  occurredAt: timestamp("occurred_at", { mode: "string" }).notNull().defaultNow()
+});

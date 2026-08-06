@@ -51,6 +51,9 @@ importers:
       '@finance/ai':
         specifier: workspace:*
         version: link:../../packages/ai
+      '@finance/content-generation':
+        specifier: workspace:*
+        version: link:../../packages/content-generation
       '@finance/db':
         specifier: workspace:*
         version: link:../../packages/db
@@ -106,6 +109,21 @@ importers:
       '@finance/domain':
         specifier: workspace:*
         version: link:../domain
+
+  packages/content-generation:
+    dependencies:
+      '@finance/ai':
+        specifier: workspace:*
+        version: link:../ai
+      '@finance/domain':
+        specifier: workspace:*
+        version: link:../domain
+      '@finance/ingest':
+        specifier: workspace:*
+        version: link:../ingest
+      zod:
+        specifier: ^4.4.3
+        version: 4.4.3
 
   packages/db:
     dependencies:

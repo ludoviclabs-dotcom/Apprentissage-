@@ -207,6 +207,15 @@ const RULES: readonly TopbarRule[] = [
     }
   },
   {
+    prefix: "/admin/content-review",
+    config: {
+      section: "Administration",
+      title: "Relecture des contenus",
+      subtitle: "Contenus générés en attente de décision. Rien n'est publié.",
+      breadcrumb: [crumb("Administration"), crumb("Relecture")]
+    }
+  },
+  {
     prefix: "/documents",
     config: {
       section: "Administration",

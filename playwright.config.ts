@@ -74,7 +74,16 @@ export default defineConfig({
             FINANCE_HUB_USE_DATABASE: "false",
             FINANCE_HUB_PUBLIC_DEMO: "false",
             LEARNING_HUB_AUTH_ENABLED: "false",
-            AI_PROVIDER: "none"
+            AI_PROVIDER: "none",
+            // Ouvre l'espace de relecture pour l'exercer en e2e. Sans comptes,
+            // le propriétaire de l'installation privée est administrateur : le
+            // serveur public-demo, lui, laisse le drapeau absent, ce qui permet
+            // de vérifier que l'espace est fermé par défaut.
+            CONTENT_REVIEW_ENABLED: "true",
+            // `next start` tourne en NODE_ENV=production : sans cet aveu
+            // explicite, le garde de `lib/env.ts` refuserait de démarrer — ce
+            // qui est précisément son rôle sur un hôte joignable par d'autres.
+            CONTENT_REVIEW_ALLOW_UNAUTHENTICATED: "true"
           }
         },
         {

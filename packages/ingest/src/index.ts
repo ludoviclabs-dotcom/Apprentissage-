@@ -7,10 +7,10 @@ import { z } from "zod";
 import { extractDocx, extractPdf, type ExtractedPageContent } from "./extractors";
 
 export type { ExtractedPageContent } from "./extractors";
+export * from "./supported-extensions";
+export * from "./content-pipeline";
 
-export const supportedExtensions = [".pdf", ".docx", ".pptx", ".xlsx", ".md"] as const;
-
-export type SupportedExtension = (typeof supportedExtensions)[number];
+import { isSupportedExtension, supportedExtensions, type SupportedExtension } from "./supported-extensions";
 
 export interface IngestFile {
   path: string;
@@ -65,10 +65,6 @@ export const sourcePackManifestSchema = z.object({
   ),
   skippedCount: z.number().nonnegative()
 });
-
-export function isSupportedExtension(extension: string): extension is SupportedExtension {
-  return supportedExtensions.includes(extension.toLowerCase() as SupportedExtension);
-}
 
 export function inferDomainFromPath(path: string): DomainId | "unknown" {
   const normalized = path.toLowerCase();

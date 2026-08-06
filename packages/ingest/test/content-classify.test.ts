@@ -1,6 +1,5 @@
 import { describe, expect, it } from "vitest";
 import {
-  canTransitionDraft,
   classifyDocumentCategory,
   detectChapter,
   normalizeForMatching,
@@ -70,13 +69,6 @@ describe("classification documentaire", () => {
   });
 });
 
-describe("workflow éditorial draft → published", () => {
-  it("interdit toute publication sans revue", () => {
-    expect(canTransitionDraft("draft", "needs-review")).toBe(true);
-    expect(canTransitionDraft("needs-review", "approved")).toBe(true);
-    expect(canTransitionDraft("approved", "published")).toBe(true);
-    expect(canTransitionDraft("draft", "published")).toBe(false);
-    expect(canTransitionDraft("draft", "approved")).toBe(false);
-    expect(canTransitionDraft("published", "draft")).toBe(false);
-  });
-});
+// Le workflow éditorial a quitté ce package pour @finance/content-generation,
+// où il gagne les états validation_failed et rejected. Ses tests vivent
+// désormais dans packages/content-generation/test/status.test.ts.

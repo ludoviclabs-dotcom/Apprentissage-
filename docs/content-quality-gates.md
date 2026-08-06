@@ -37,20 +37,21 @@ de génération.
 | `artefact-orphelin` | Artefact sur disque sans entrée au manifeste (document retiré des sources). |
 | `doublon-probable` | Deux fichiers de même SHA-256 dans les sources. |
 
-## Workflow éditorial (préparé, non actif)
+## Workflow éditorial
 
-Les contenus générés du lot suivant naîtront `draft` et suivront :
+Ces portes-ci contrôlent les **sources**. Les contenus *générés* à partir
+d'elles ont leurs propres portes et leur propre machine à états, portées par
+`@finance/content-generation` :
 
 ```text
-draft → needs-review → approved → published
-          ↑     |            |         |
-          └─────┴────────────┴─────────┘  (toute régression repasse par la revue)
+draft → validation_failed → draft
+      ↘ needs_review → approved
+                     ↘ rejected → draft
 ```
 
-Transitions codées dans `canTransitionDraft`
-(`packages/ingest/src/content-pipeline/types.ts`) et testées :
-**aucun chemin ne mène de `draft` à `published` sans passer par `needs-review`
-puis `approved`** — la publication automatique est structurellement impossible.
+Il n'existe pas d'état « publié » : son absence rend la publication accidentelle
+impossible plutôt que simplement interdite. Voir
+`docs/content-review-workflow.md` et `docs/content-validation-rules.md`.
 
 ## Garanties d'hygiène (testées à chaque `pnpm test`)
 

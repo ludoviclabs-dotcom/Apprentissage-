@@ -31,6 +31,8 @@ export interface FeatureSet {
   aiTutor: FeatureState;
   /** Attempts, corrections and revisions survive a restart. */
   persistence: FeatureState;
+  /** Private review area for AI-generated content drafts. */
+  contentReview: FeatureState;
   /**
    * Stripe checkout, webhook-driven entitlements and the premium gate.
    *
@@ -133,6 +135,12 @@ export function resolveFeatures(env: Env): FeatureSet {
     persistence: databaseActive
       ? AVAILABLE
       : unavailable("persistence-unavailable", NO_PERSISTENCE_MESSAGE),
+    contentReview: env.CONTENT_REVIEW_ENABLED
+      ? AVAILABLE
+      : unavailable(
+          "feature-disabled",
+          "L'espace de relecture des contenus n'est pas ouvert sur cette instance."
+        ),
     billing: isBillingActive(env)
       ? AVAILABLE
       : unavailable(

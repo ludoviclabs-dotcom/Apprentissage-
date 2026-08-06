@@ -64,6 +64,17 @@ const envSchema = z
     // (Documents, Source packs) when accounts are enabled. Absent, every
     // account of the private install administers — the pre-PR-09 behavior.
     LEARNING_HUB_ADMIN_EMAILS: z.string().min(1).optional(),
+    // Turns on the private content review area (/admin/content-review). Off by
+    // default, and refused outright in production unless accounts are on: the
+    // area shows the text of private course material, so an unauthenticated
+    // production deployment must not be able to open it by mistake.
+    CONTENT_REVIEW_ENABLED: booleanFlag(),
+    // Only for a production build running on a machine nobody else reaches —
+    // a local `pnpm build && pnpm start`, or the e2e server. It states, by
+    // name, that serving private course material without accounts is intended
+    // here. Rejected outright on a production Vercel deployment.
+    CONTENT_REVIEW_ALLOW_UNAUTHENTICATED: booleanFlag(),
+
     // Retired in PR-01. Kept in the schema only so a stale `.env` fails loudly
     // instead of quietly losing its protection: someone who still sets these
     // would otherwise believe the app is gated when it is not.
@@ -128,6 +139,42 @@ const envSchema = z
         path: ["FINANCE_HUB_USE_DATABASE"],
         message:
           "LEARNING_HUB_AUTH_ENABLED=true requires FINANCE_HUB_USE_DATABASE=true — accounts and sessions are stored in PostgreSQL"
+      });
+    }
+
+    // The review area displays the extracted text of private course material.
+    // In production, "who is looking" must be answerable, and without accounts
+    // it is not — `resolveViewerRole` hands the admin role to any anonymous
+    // visitor once auth is off. Refuse to boot rather than serve private
+    // sources to whoever guesses the URL.
+    //
+    // NODE_ENV counts as much as VERCEL_ENV: a self-hosted `next start` has no
+    // VERCEL_ENV at all, and checking only the latter left exactly the
+    // deployment shape this guard exists to stop. The escape hatch below is for
+    // a private machine, and it has to be asked for by name.
+    if (
+      value.CONTENT_REVIEW_ENABLED &&
+      (value.VERCEL_ENV === "production" || value.NODE_ENV === "production") &&
+      !value.LEARNING_HUB_AUTH_ENABLED &&
+      !value.CONTENT_REVIEW_ALLOW_UNAUTHENTICATED
+    ) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["LEARNING_HUB_AUTH_ENABLED"],
+        message:
+          "CONTENT_REVIEW_ENABLED=true in a production build requires LEARNING_HUB_AUTH_ENABLED=true — the review area shows private source material and must know who is reading. On a machine only you can reach, set CONTENT_REVIEW_ALLOW_UNAUTHENTICATED=true to state that explicitly."
+      });
+    }
+
+    // Naming the danger is the point: this flag only makes sense on a host that
+    // nobody else can reach, and it is meaningless — so refused — on Vercel,
+    // where the deployment is reachable by definition.
+    if (value.CONTENT_REVIEW_ALLOW_UNAUTHENTICATED && value.VERCEL_ENV === "production") {
+      ctx.addIssue({
+        code: "custom",
+        path: ["CONTENT_REVIEW_ALLOW_UNAUTHENTICATED"],
+        message:
+          "CONTENT_REVIEW_ALLOW_UNAUTHENTICATED cannot be used on a production Vercel deployment — it exists for a private machine, not for a hosted one"
       });
     }
 

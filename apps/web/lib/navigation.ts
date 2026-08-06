@@ -81,7 +81,8 @@ export const ADMIN_NAV_SECTION = {
   label: "Administration",
   items: [
     { href: "/documents", label: "Documents" },
-    { href: "/source-packs", label: "Source packs" }
+    { href: "/source-packs", label: "Source packs" },
+    { href: "/admin/content-review", label: "Relecture" }
   ]
 } as const;
 

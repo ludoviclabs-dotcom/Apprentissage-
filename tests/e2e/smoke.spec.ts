@@ -42,13 +42,26 @@ test("the health endpoint answers", async ({ request }) => {
   expect(response.ok()).toBeTruthy();
 });
 
-test("source-pack ingestion never accepts a server filesystem path over HTTP", async ({ request }) => {
+test("source-pack ingestion is not exposed as an HTTP method", async ({ request }) => {
   const response = await request.post("/api/source-packs", {
     data: { path: "C:\\private\\course-pack" }
   });
 
-  expect(response.status()).toBe(403);
-  await expect(response.json()).resolves.toMatchObject({ error: "Import indisponible via HTTP" });
+  // 405 plutôt que 403 : l'import n'est pas une action interdite à cet
+  // appelant, c'est une méthode que la ressource n'expose pas. L'en-tête
+  // `Allow` dit ce qu'elle expose réellement.
+  expect(response.status()).toBe(405);
+  expect(response.headers()["allow"]).toBe("GET");
+  await expect(response.json()).resolves.toMatchObject({
+    error: { code: "METHOD_NOT_ALLOWED" }
+  });
+});
+
+test("source packs stay readable over GET", async ({ request }) => {
+  const response = await request.get("/api/source-packs");
+
+  expect(response.status()).toBe(200);
+  expect(await response.json()).toHaveProperty("sourcePacks");
 });
 
 for (const destination of ROUTES) {
@@ -146,8 +159,13 @@ test("public demo disables protected CTAs before submission and rejects writes",
   await page.goto("/documents");
   await expect(page.getByRole("button", { name: "Uploader" })).toBeDisabled();
 
+  // Les source packs n'ont plus de CTA à désactiver : le formulaire d'import
+  // promettait une action qui ne pouvait pas aboutir et a été remplacé par un
+  // assistant. L'assertion devient donc plus forte — il n'y a aucun bouton
+  // d'import à protéger, en démo publique comme ailleurs.
   await page.goto("/source-packs");
-  await expect(page.getByRole("button", { name: "Analyser le pack" })).toBeDisabled();
+  await expect(page.getByRole("button", { name: /analyser le pack|importer/i })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Copier la commande" })).toBeVisible();
 
   const response = await request.post("/api/revisions/review", {
     data: { flashcardId: "fc-amort-lineaire", rating: "correct" }

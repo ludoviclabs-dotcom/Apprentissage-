@@ -55,6 +55,26 @@ un corrigé).
   scannée**, en séparateurs `/`. Le même manifeste est donc identique qu'il ait
   été produit sous Windows ou Linux, et ne révèle jamais l'arborescence machine.
 
+## L'import se lance depuis le terminal
+
+Aucun import ne part du navigateur. La page `/source-packs` fournit un assistant
+qui rappelle les étapes et compose la commande, mais c'est vous qui l'exécutez
+dans le terminal du projet — les documents sont sur votre machine, pas sur le
+serveur.
+
+```powershell
+corepack pnpm content:scan --root "content-private/comptabilite"
+```
+
+Le chemin saisi dans l'interface reste **relatif au projet** et ne quitte jamais
+le navigateur. Un chemin absolu, réseau ou une URL sont refusés : ils
+n'auraient aucun sens pour un serveur, et les afficher laisserait croire qu'il
+peut les lire.
+
+Après le scan, enchaînez `content:extract`, `content:pair` et
+`content:validate`, puis revenez actualiser la page pour voir les packs
+détectés.
+
 ## Règles non négociables
 
 1. Aucun PDF ni document source dans Git — ni dans `apps/web/public`.

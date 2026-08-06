@@ -43,6 +43,9 @@ export function resolveDiagnostics(env: Env): Record<FeatureKey, string | null> 
     writes: publicDemo ? demoDiagnostic : null,
     uploads: publicDemo ? demoDiagnostic : null,
     sourcePackImport: publicDemo ? demoDiagnostic : null,
+    contentReview: env.CONTENT_REVIEW_ENABLED
+      ? null
+      : "CONTENT_REVIEW_ENABLED=true ouvre l'espace de relecture des contenus générés (réservé aux administrateurs, et exigeant des comptes en production).",
     aiTutor:
       env.AI_PROVIDER === "none"
         ? "AI_PROVIDER=none : aucun modèle configuré, les réponses viennent du corpus seedé."

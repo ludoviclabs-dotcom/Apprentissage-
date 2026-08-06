@@ -1,0 +1,21 @@
+{
+  "name": "@finance/content-generation",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "content:generate": "tsx src/cli/generate.ts",
+    "content:validate-generated": "tsx src/cli/validate-generated.ts",
+    "content:report": "tsx src/cli/report.ts",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "@finance/ai": "workspace:*",
+    "@finance/domain": "workspace:*",
+    "@finance/ingest": "workspace:*",
+    "zod": "^4.4.3"
+  }
+}

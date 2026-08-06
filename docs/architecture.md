@@ -19,11 +19,37 @@ Since the « Comptabilité approfondie » preparation lot, `packages/ingest`
 carries a deterministic content pipeline (`content:scan` → `content:extract` →
 `content:pair` → `content:validate`) that turns private sources under
 `content-private/` into typed, page-aware JSON artifacts in `data/extracted/`
-— both git-ignored. No AI call, no automatic publication: the editorial
-workflow `draft → needs-review → approved → published` is typed and enforced
-by `canTransitionDraft`, but nothing walks it until the controlled-generation
-lot. See `docs/content-pipeline.md`, `docs/content-source-layout.md`,
+— both git-ignored. No AI call, no automatic publication. See
+`docs/content-pipeline.md`, `docs/content-source-layout.md`,
 `docs/content-quality-gates.md` and `docs/content-pipeline-audit.md`.
+
+## Content Factory
+
+`packages/content-generation` turns a validated chapter into *drafts* —
+revision sheets, flashcards, calculation and journal-entry exercises, error
+diagnoses, progressive cases — and never into published content. The division
+of labour is the whole point: the model proposes, Zod enforces the shape, the
+code recomputes every figure and every debit/credit balance, and a human
+approves. Numbers are never written by the model in a form the code cannot
+check: a calculation exercise names a template from a closed, versioned
+registry (`src/calc/templates.ts`) and supplies named inputs, so there is no
+expression to parse and no `eval` to sandbox.
+
+The editorial machine has five states — `draft`, `validation_failed`,
+`needs_review`, `approved`, `rejected` — and deliberately no `published`: the
+absence of the state is what makes an accidental publication impossible rather
+than merely forbidden. Approving is refused outright while the deterministic
+checks fail, and an approved draft is terminal, so regenerating with `--force`
+revises everything except what a human already accepted.
+
+Generation runs in `mock` mode by default — fixtures anchored on the real
+corpus, needing no API key — so `pnpm test` and `pnpm build` never reach a
+network. `/admin/content-review` shows each draft beside the source text it
+cites, its failed checks and its history; it is gated by
+`CONTENT_REVIEW_ENABLED` plus the admin role, answers 404 otherwise, and
+refuses to boot in production without accounts. See
+`docs/content-generation.md`, `docs/content-validation-rules.md`,
+`docs/content-review-workflow.md` and `docs/content-factory-preflight.md`.
 
 ## Product Rule
 
