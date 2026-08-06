@@ -2,7 +2,7 @@
 
 import { useId, useMemo, useState } from "react";
 import { ArrowDown, ArrowUp, Trash2 } from "lucide-react";
-import type { PublicJournalEntryExercise } from "@finance/content-publication";
+import type { PublicJournalEntryExercise } from "@finance/content-publication/public";
 import { CorrectionPanel } from "@/components/compta-approfondie/correction-panel";
 import { SourceCitation } from "@/components/compta-approfondie/source-list";
 import { Feedback } from "@/components/ui/feedback";

@@ -2,7 +2,7 @@
 
 import { useEffect, useId, useState } from "react";
 import { Check, Copy, Printer } from "lucide-react";
-import type { PublicSourceReference } from "@finance/content-publication";
+import type { PublicSourceReference } from "@finance/content-publication/public";
 import { SourceCitation } from "@/components/compta-approfondie/source-list";
 import { postJson } from "@/lib/api-client";
 

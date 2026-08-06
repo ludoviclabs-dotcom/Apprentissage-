@@ -1,7 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type { PublicFlashcardFront, PublicSourceReference } from "@finance/content-publication";
+import type { PublicSourceReference } from "@finance/content-publication/public";
+import type { ScheduledFlashcard } from "@/lib/publication/chapter";
 import { SourceCitation } from "@/components/compta-approfondie/source-list";
 import { Feedback } from "@/components/ui/feedback";
 import { postJson } from "@/lib/api-client";
@@ -33,6 +34,8 @@ interface RatingResponse {
   intervalDays: number;
   nextDueAt: string;
   recorded: boolean;
+  /** Vrai quand la planification a réellement été écrite. */
+  scheduled: boolean;
 }
 
 type Rating = "forgotten" | "partial" | "correct" | "mastered";
@@ -44,7 +47,7 @@ const RATINGS: Array<{ value: Rating; label: string; key: string }> = [
   { value: "mastered", label: "Très facile", key: "4" }
 ];
 
-const CARD_TYPE_LABELS: Record<PublicFlashcardFront["type"], string> = {
+const CARD_TYPE_LABELS: Record<ScheduledFlashcard["type"], string> = {
   concept: "Concept",
   formula: "Formule",
   account: "Compte",
@@ -60,7 +63,7 @@ export function ChapterFlashcards({
   cards
 }: {
   chapter: string;
-  cards: readonly PublicFlashcardFront[];
+  cards: readonly ScheduledFlashcard[];
 }) {
   const storageKey = `${STORAGE_PREFIX}${chapter}`;
   const [index, setIndex] = useState(0);
@@ -68,6 +71,7 @@ export function ChapterFlashcards({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [lastInterval, setLastInterval] = useState<number | null>(null);
+  const [lastScheduled, setLastScheduled] = useState(false);
   const [ratedCount, setRatedCount] = useState(0);
   const [resumed, setResumed] = useState(false);
   const revealButton = useRef<HTMLButtonElement>(null);
@@ -149,6 +153,7 @@ export function ChapterFlashcards({
       }
 
       setLastInterval(result.data.intervalDays);
+      setLastScheduled(result.data.scheduled);
       setRatedCount((count) => count + 1);
       setRevealed(null);
       setIndex((current) => current + 1);
@@ -220,7 +225,9 @@ export function ChapterFlashcards({
             part. */}
         {lastInterval !== null ? (
           <Feedback tone="info" prefix={null}>
-            Dernière carte reprogrammée dans {lastInterval} jour{lastInterval > 1 ? "s" : ""}.
+            {lastScheduled
+              ? `Dernière carte reprogrammée dans ${lastInterval} jour${lastInterval > 1 ? "s" : ""}.`
+              : `La dernière carte reviendrait dans ${lastInterval} jour${lastInterval > 1 ? "s" : ""} — se connecter pour que la planification soit conservée.`}
           </Feedback>
         ) : null}
         <p className="muted">
@@ -254,6 +261,9 @@ export function ChapterFlashcards({
       <div aria-live="polite" aria-atomic="true" className="flashcard-card">
         <p className="muted">
           {CARD_TYPE_LABELS[card.type]} · difficulté {card.difficulty}/5
+          {card.dueAt !== null && !card.due
+            ? ` · revue d'avance, due le ${new Date(card.dueAt).toLocaleDateString("fr-FR")}`
+            : ""}
         </p>
 
         <p className="flashcard-front">{card.front}</p>
@@ -303,7 +313,9 @@ export function ChapterFlashcards({
 
       {lastInterval !== null ? (
         <Feedback tone="info" prefix={null}>
-          Carte précédente reprogrammée dans {lastInterval} jour{lastInterval > 1 ? "s" : ""}.
+          {lastScheduled
+            ? `Carte précédente reprogrammée dans ${lastInterval} jour${lastInterval > 1 ? "s" : ""}.`
+            : `Cette carte reviendrait dans ${lastInterval} jour${lastInterval > 1 ? "s" : ""} — se connecter pour que la planification soit conservée.`}
         </Feedback>
       ) : null}
 

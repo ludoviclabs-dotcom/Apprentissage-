@@ -22,7 +22,7 @@ import {
   type PublicSourceReference
 } from "@finance/content-publication";
 import type { SmartRevisionSheet } from "@finance/content-generation";
-import { getChapterActivity } from "@finance/db";
+import { getChapterActivity, getChapterCardSchedules } from "@finance/db";
 import { getCurrentUser } from "@/lib/auth/current-user";
 import {
   listChapterEntries,
@@ -238,10 +238,66 @@ export async function loadChapterSheet(chapterSlug: string): Promise<PublicSheet
   };
 }
 
-export async function loadChapterFlashcards(chapterSlug: string): Promise<PublicFlashcardFront[]> {
-  const versions = await loadChapterVersionsOfType(COMPTA_APPROFONDIE_MODULE, chapterSlug, "flashcard");
+/** Une carte, augmentée de sa planification quand le lecteur en a une. */
+export interface ScheduledFlashcard extends PublicFlashcardFront {
+  /** Date de retour, ou null pour une carte jamais travaillée. */
+  dueAt: string | null;
+  /** Vrai quand la carte est à revoir maintenant, ou jamais vue. */
+  due: boolean;
+}
 
-  return versions.map(toPublicFlashcardFront);
+/**
+ * Les cartes du chapitre, dans l'ordre où elles doivent être travaillées.
+ *
+ * LA PLANIFICATION EST RELUE, PAS SEULEMENT ÉCRITE. Une carte notée « très
+ * facile » revient dans quatorze jours ; la reproposer le lendemain rendrait
+ * l'annonce mensongère et la répétition espacée décorative. Les cartes dues
+ * viennent donc en premier, les autres suivent avec leur date — un apprenant qui
+ * veut réviser d'avance le peut, il sait simplement que ce n'est pas dû.
+ *
+ * Sans compte, tout est « dû » : il n'y a pas d'historique à respecter.
+ */
+export async function loadChapterFlashcards(chapterSlug: string): Promise<ScheduledFlashcard[]> {
+  const versions = await loadChapterVersionsOfType(COMPTA_APPROFONDIE_MODULE, chapterSlug, "flashcard");
+  const cards = versions.map(toPublicFlashcardFront);
+  const user = await getCurrentUser();
+
+  if (!user || cards.length === 0) {
+    return cards.map((card) => ({ ...card, dueAt: null, due: true }));
+  }
+
+  let schedules: Awaited<ReturnType<typeof getChapterCardSchedules>> = [];
+
+  try {
+    schedules = await getChapterCardSchedules(user.id, cards.map((card) => card.cardId));
+  } catch (error) {
+    // Une planification illisible ne doit pas empêcher de réviser : on retombe
+    // sur « tout est dû », qui est le comportement d'un compte neuf.
+    console.error("[chapter-flashcards] planification illisible", error);
+  }
+
+  const byId = new Map(schedules.map((schedule) => [schedule.artifactId, schedule]));
+  const now = Date.now();
+
+  return cards
+    .map((card) => {
+      const schedule = byId.get(card.cardId);
+
+      return {
+        ...card,
+        dueAt: schedule?.dueAt ?? null,
+        due: schedule === undefined || Date.parse(schedule.dueAt) <= now
+      };
+    })
+    .sort((left, right) => {
+      if (left.due !== right.due) {
+        return left.due ? -1 : 1;
+      }
+
+      // À statut égal, la plus anciennement due d'abord — l'ordre total de
+      // `compareReviewQueueItems`, appliqué ici aux cartes publiées.
+      return (left.dueAt ?? "").localeCompare(right.dueAt ?? "");
+    });
 }
 
 export interface ChapterTrainingSet {
@@ -316,6 +372,52 @@ export async function loadChapterSources(chapterSlug: string): Promise<ChapterSo
 
 // --- Progression -----------------------------------------------------------
 
+/**
+ * Le catalogue de progression du chapitre, adossé à ce qui est **actif**.
+ *
+ * Deux renseignements que `counts` seul ne porte pas :
+ *
+ * - la liste des identifiants encore publiés, pour qu'un échec sur une version
+ *   archivée cesse de compter — sinon l'apprenant reste « à revoir » sur un
+ *   contenu que la route refuse désormais d'ouvrir ;
+ * - les étapes attendues de chaque mini-cas, pour que « Mini-cas terminé »
+ *   exige le cas entier et non sa première question.
+ *
+ * Les mini-cas sont les seuls instantanés ouverts ici, et seulement quand le
+ * chapitre en publie.
+ */
+async function loadChapterCatalogue(
+  chapterSlug: string,
+  overview: ChapterOverview | null
+): Promise<ReturnType<typeof catalogueFromArtifactTypes>> {
+  const types = Object.keys(overview?.counts ?? {});
+
+  if (!overview?.published) {
+    return catalogueFromArtifactTypes(types);
+  }
+
+  const { entries } = await readEntries(chapterSlug);
+  const activeArtifactIds = new Set(entries.map((entry) => entry.id));
+  const caseStepIds = new Map<string, ReadonlySet<string>>();
+
+  if (types.includes("progressive_case")) {
+    for (const version of await loadChapterVersionsOfType(
+      COMPTA_APPROFONDIE_MODULE,
+      chapterSlug,
+      "progressive_case"
+    )) {
+      if (version.contentSnapshot.contentType === "progressive_case") {
+        caseStepIds.set(
+          version.id,
+          new Set(version.contentSnapshot.content.steps.map((step) => step.id))
+        );
+      }
+    }
+  }
+
+  return catalogueFromArtifactTypes(types, { activeArtifactIds, caseStepIds });
+}
+
 export interface ChapterProgressView {
   progress: ChapterProgress;
   /** Vrai quand un compte identifié porte cette progression. */
@@ -335,7 +437,7 @@ export interface ChapterProgressView {
  */
 export async function loadChapterProgress(chapterSlug: string): Promise<ChapterProgressView> {
   const overview = await loadChapterOverview(chapterSlug);
-  const catalogue = catalogueFromArtifactTypes(Object.keys(overview?.counts ?? {}));
+  const catalogue = await loadChapterCatalogue(chapterSlug, overview);
   const empty = computeChapterProgress([], catalogue);
   const user = await getCurrentUser();
 

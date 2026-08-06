@@ -4,11 +4,13 @@ import { join } from "node:path";
 import { cache } from "react";
 import {
   activeEntriesForChapter,
+  contentHash,
   findActiveEntry,
   findHistory,
   publishedContentVersionSchema,
   readIndex,
   readVersion,
+  SnapshotIntegrityError,
   type PublicationIndexEntry,
   type PublicationKey,
   type PublishedContentVersion
@@ -268,7 +270,7 @@ async function loadFromDatabase(id: string): Promise<PublishedContentVersion | u
     return undefined;
   }
 
-  return publishedContentVersionSchema.parse({
+  const version = publishedContentVersionSchema.parse({
     ...row,
     contentSnapshot: row.contentSnapshot,
     sourceReferencesSnapshot: row.sourceReferencesSnapshot,
@@ -276,6 +278,19 @@ async function loadFromDatabase(id: string): Promise<PublishedContentVersion | u
     validationMetadataSnapshot: row.validationMetadataSnapshot,
     reviewMetadataSnapshot: row.reviewMetadataSnapshot
   });
+
+  // L'EMPREINTE EST VÉRIFIÉE ICI AUSSI, PAS SEULEMENT SUR LE MAGASIN DE
+  // FICHIERS. `readVersion` recalcule le hash parce qu'un fichier commité peut
+  // être retouché à la main ; une ligne de base peut l'être tout autant — par
+  // une migration de données, une restauration partielle, un `UPDATE` en
+  // console. N'avoir vérifié que le chemin de développement aurait laissé le
+  // chemin de *production* seul sans contrôle, ce qui est l'inverse de la
+  // priorité voulue.
+  if (contentHash(version.contentSnapshot) !== version.contentHash) {
+    throw new SnapshotIntegrityError(id);
+  }
+
+  return version;
 }
 
 export async function listChapterEntriesOfType(

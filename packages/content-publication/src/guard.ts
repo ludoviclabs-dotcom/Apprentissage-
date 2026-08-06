@@ -11,6 +11,7 @@ import {
   type CorpusIndex
 } from "@finance/content-generation";
 import { contentHash } from "./hash";
+import { stripSourceExcerpts } from "./sanitize";
 
 /**
  * Le garde de publication.
@@ -385,7 +386,11 @@ export function inspectForPublication(input: PublicationGuardInput): Publication
   }
 
   const payload = parsed.data;
-  const hash = contentHash(payload);
+  // L'empreinte porte sur ce qui sera *publié*, donc sur la charge utile
+  // débarrassée du texte des sources. La calculer sur la charge brute la ferait
+  // diverger de celle de l'instantané, et le contrôle de cohérence de
+  // `publishDraft` refuserait toute publication.
+  const hash = contentHash(stripSourceExcerpts(payload));
 
   // --- 1. Statut éditorial -------------------------------------------------
   if (draft.status !== "approved") {

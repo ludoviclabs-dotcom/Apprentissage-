@@ -104,7 +104,13 @@ test("une carte se révèle et s'auto-évalue", async ({ page }) => {
 
   // L'intervalle vient de `REVIEW_INTERVAL_DAYS` du domaine — 7 jours pour
   // « Su » — et non d'un second algorithme propre à cet écran.
-  await expect(page.getByText(/reprogrammée dans 7 jours/)).toBeVisible();
+  //
+  // CE SERVEUR N'A NI BASE NI COMPTES : rien n'est persisté, et l'écran ne
+  // prétend donc pas que la carte a été reprogrammée. Il dit ce qu'il *ferait*
+  // et invite à se connecter. C'est la propriété qui compte — annoncer une
+  // planification qui n'a pas eu lieu était précisément le défaut corrigé.
+  await expect(page.getByText(/reviendrait dans 7 jours/)).toBeVisible();
+  await expect(page.getByText(/se connecter pour que la planification soit conservée/)).toBeVisible();
   await expect(page.getByRole("heading", { name: "Session terminée" })).toBeVisible();
 });
 

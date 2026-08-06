@@ -4,7 +4,8 @@ import {
   addErrorJournalEntry,
   hasChapterActivity,
   openChapterRemediation,
-  recordChapterActivity
+  recordChapterActivity,
+  recordChapterCardReview
 } from "@finance/db";
 import { REVIEW_INTERVAL_DAYS, addDays, type ErrorCategory } from "@finance/domain";
 
@@ -69,6 +70,46 @@ export async function recordActivity(input: RecordActivityInput): Promise<boolea
     // Une progression non enregistrée ne doit pas faire échouer une correction :
     // l'apprenant a droit à son retour même si la base est indisponible.
     console.error("[chapter-activity]", error);
+    return false;
+  }
+}
+
+export interface RecordCardReviewInput {
+  userId: string | null;
+  artifactId: string;
+  rating: string;
+  reviewedAt: string;
+  dueAt: string;
+  intervalDays: number;
+}
+
+/**
+ * Enregistre la *planification* d'une carte, pas seulement le fait de l'avoir vue.
+ *
+ * `recordActivity` note qu'une carte a été traitée — de quoi nourrir la
+ * progression. Il ne dit rien de quand elle revient. Sans cette écriture-ci,
+ * l'intervalle affiché après l'auto-évaluation n'était qu'un calcul jeté :
+ * rouvrir la session reproposait toutes les cartes, y compris celles annoncées
+ * « revues dans 14 jours ».
+ */
+export async function recordCardReview(input: RecordCardReviewInput): Promise<boolean> {
+  if (!input.userId) {
+    return false;
+  }
+
+  try {
+    const result = await recordChapterCardReview(input.userId, {
+      artifactId: input.artifactId,
+      rating: input.rating,
+      reviewedAt: input.reviewedAt,
+      dueAt: input.dueAt,
+      intervalDays: input.intervalDays,
+      lapsed: input.rating === "forgotten"
+    });
+
+    return result.status === "written";
+  } catch (error) {
+    console.error("[chapter-card-review]", error);
     return false;
   }
 }

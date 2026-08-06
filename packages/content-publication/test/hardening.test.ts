@@ -9,6 +9,8 @@ import {
   scanForForbiddenStrings,
   SnapshotRefusedError
 } from "../src/guard";
+import { contentHash } from "../src/hash";
+import { findRemainingExcerptPaths, stripSourceExcerpts } from "../src/sanitize";
 import { buildPublishedVersion } from "../src/snapshot";
 import { publishVersion, UnpublishableSnapshotError } from "../src/store";
 import { approvedSheetDraft, draftFor, sheetContent } from "./fixtures";
@@ -179,5 +181,50 @@ describe("le magasin refuse ce qui ne doit jamais y entrer", () => {
     const result = await publishVersion(options, version());
 
     expect(result.version.id).toBe(version().id);
+  });
+});
+
+describe("le texte des sources ne franchit pas la frontière", () => {
+  it("le contenu publié ne porte plus les extraits de ses références imbriquées", () => {
+    // LE PIÈGE ÉTAIT LÀ. `collectPublishedReferences` nettoyait la liste
+    // agrégée, mais chaque règle, formule et étape porte ses *propres*
+    // `sourceReferences` — et celles-là partaient avec leur `excerpt` dans le
+    // fichier commité, dans la base, et dans la charge utile RSC de la fiche.
+    const built = version();
+    const serialized = JSON.stringify(built.contentSnapshot);
+
+    expect(serialized).not.toContain("excerpt");
+    expect(serialized).not.toContain("Le compte 163 est crédité du prix de remboursement.");
+    expect(findRemainingExcerptPaths(built.contentSnapshot)).toEqual([]);
+  });
+
+  it("nettoie à n'importe quelle profondeur", () => {
+    const cleaned = stripSourceExcerpts({
+      steps: [{ sourceReferences: [{ documentId: "d", excerpt: "texte privé", excerptHash: "a" }] }]
+    });
+
+    expect(findRemainingExcerptPaths(cleaned)).toEqual([]);
+    expect(JSON.stringify(cleaned)).not.toContain("texte privé");
+  });
+
+  it("laisse intact tout ce qui n'est pas un extrait", () => {
+    const cleaned = stripSourceExcerpts({
+      statement: "Le compte 163 est crédité.",
+      sourceReferences: [{ documentId: "d", pack: "p", pageStart: 2, excerpt: "x" }]
+    });
+
+    expect(cleaned).toEqual({
+      statement: "Le compte 163 est crédité.",
+      sourceReferences: [{ documentId: "d", pack: "p", pageStart: 2 }]
+    });
+  });
+
+  it("l'empreinte porte sur le contenu nettoyé, donc reste vérifiable", async () => {
+    // Si le garde hachait la charge brute et l'instantané la charge nettoyée,
+    // `publishDraft` refuserait toute publication sur une incohérence interne.
+    const built = version();
+
+    expect(contentHash(built.contentSnapshot)).toBe(built.contentHash);
+    await expect(publishVersion(options, built)).resolves.toMatchObject({ version: { id: built.id } });
   });
 });

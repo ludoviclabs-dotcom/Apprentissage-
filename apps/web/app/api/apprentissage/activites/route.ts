@@ -14,7 +14,7 @@ import {
 import { REVIEW_INTERVAL_DAYS, addDays, type ReviewRating } from "@finance/domain";
 import { z } from "zod";
 import { getCurrentUser } from "@/lib/auth/current-user";
-import { recordActivity, recordFailure } from "@/lib/publication/activity";
+import { recordActivity, recordCardReview, recordFailure } from "@/lib/publication/activity";
 import {
   loadPublishedVersion,
   PublicationStoreUnavailableError,
@@ -184,15 +184,28 @@ async function loadActive(
   return { outcome: "found", version };
 }
 
-const NOT_FOUND = Response.json({ error: "Contenu introuvable ou retiré" }, { status: 404 });
+/**
+ * Des fabriques, pas des constantes.
+ *
+ * Une `Response` porte un corps qui est un flux **à usage unique** : renvoyer la
+ * même instance à deux requêtes fait lire un flux déjà consommé à la seconde,
+ * qui reçoit alors un corps vide ou une erreur d'envoi. Le coût d'une nouvelle
+ * instance par requête est nul ; celui du partage est un bogue qui n'apparaît
+ * qu'en charge.
+ */
+function notFound(): Response {
+  return Response.json({ error: "Contenu introuvable ou retiré" }, { status: 404 });
+}
 
-const UNAVAILABLE = Response.json(
-  {
-    error: "Contenu momentanément indisponible",
-    details: "Le contenu publié n'est pas joignable pour l'instant. Réessayez dans quelques instants."
-  },
-  { status: 503 }
-);
+function unavailable(): Response {
+  return Response.json(
+    {
+      error: "Contenu momentanément indisponible",
+      details: "Le contenu publié n'est pas joignable pour l'instant. Réessayez dans quelques instants."
+    },
+    { status: 503 }
+  );
+}
 
 export async function POST(request: Request) {
   let raw: unknown;
@@ -215,11 +228,11 @@ export async function POST(request: Request) {
   const loaded = await loadActive(body.data.chapter, body.data.artifactId);
 
   if (loaded.outcome === "unavailable") {
-    return UNAVAILABLE;
+    return unavailable();
   }
 
   if (loaded.outcome === "missing") {
-    return NOT_FOUND;
+    return notFound();
   }
 
   const version = loaded.version;
@@ -250,6 +263,18 @@ export async function POST(request: Request) {
         const rating = body.data.rating as ReviewRating;
         const intervalDays = REVIEW_INTERVAL_DAYS[rating];
         const reviewedAt = new Date();
+        const nextDueAt = addDays(reviewedAt, intervalDays);
+
+        // La planification est *écrite*, pas seulement calculée : c'est elle qui
+        // décide de ce que la prochaine session propose.
+        const scheduled = await recordCardReview({
+          userId: user?.id ?? null,
+          artifactId: body.data.artifactId,
+          rating,
+          reviewedAt: reviewedAt.toISOString(),
+          dueAt: nextDueAt,
+          intervalDays
+        });
 
         const recorded = await recordActivity({
           userId: user?.id ?? null,
@@ -277,8 +302,12 @@ export async function POST(request: Request) {
 
         return Response.json({
           intervalDays,
-          nextDueAt: addDays(reviewedAt, intervalDays),
-          recorded
+          nextDueAt,
+          // Distingue « noté et planifié » de « noté sans compte » : l'écran ne
+          // doit annoncer une reprogrammation que lorsqu'elle a réellement eu
+          // lieu.
+          recorded,
+          scheduled
         });
       }
 

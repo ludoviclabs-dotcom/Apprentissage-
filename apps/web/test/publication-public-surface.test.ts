@@ -5,6 +5,7 @@ import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import {
   buildPublishedVersion,
+  SOURCE_TYPE_LABELS,
   toPublicCalculationExercise,
   toPublicSourceReferences
 } from "@finance/content-publication";
@@ -73,12 +74,36 @@ describe("les DTO publics retirent les champs internes", () => {
     }
   });
 
-  it("une source publiée ne porte ni extrait, ni empreinte, ni pack", () => {
+  it("une source publiée ne porte ni extrait, ni empreinte, ni identifiant de fragment", () => {
     const serialized = JSON.stringify(toPublicSourceReferences(version.sourceReferencesSnapshot));
 
-    for (const forbidden of ["excerpt", "excerptHash", "chunkIds", '"pack"']) {
+    for (const forbidden of ["excerpt", "excerptHash", "chunkIds"]) {
       expect(serialized, `la source expose ${forbidden}`).not.toContain(forbidden);
     }
+  });
+
+  it("cite les quatre champs qu'AGENTS.md exige", () => {
+    // « Every sourced answer must cite document, page, pack and date when
+    // available. » Le pack avait été retiré par prudence ; il ne dit rien de
+    // l'arborescence — il nomme un lot d'import — et son absence privait chaque
+    // règle d'un des quatre champs exigés.
+    const [source] = toPublicSourceReferences(version.sourceReferencesSnapshot);
+
+    expect(source.documentTitle).not.toHaveLength(0);
+    expect(source.pack).not.toHaveLength(0);
+    expect(source.pageStart).toBeGreaterThan(0);
+    // La date d'effet est « when available » : le schéma la rend optionnelle, et
+    // la fixture n'en porte pas. Ce qui compte est que le champ traverse.
+    expect("effectiveDate" in source).toBe(true);
+  });
+
+  it("nomme la nature du matériau, jamais son identifiant brut", () => {
+    // AGENTS.md : « Never mix course content and official reference content
+    // without saying so. » Le dire suppose de l'afficher.
+    const [source] = toPublicSourceReferences(version.sourceReferencesSnapshot);
+
+    expect(SOURCE_TYPE_LABELS[source.sourceType]).not.toMatch(/[_-]/);
+    expect(Object.keys(SOURCE_TYPE_LABELS)).toHaveLength(4);
   });
 
   it("le DTO de fiche ne transporte que la fiche, sa version et ses sources", () => {
@@ -127,6 +152,21 @@ describe("aucune entité complète n'atteint un composant", () => {
 
       expect(source, `${file} manipule l'entité complète`).not.toMatch(
         /PublishedContentVersion/
+      );
+    }
+  });
+
+  it("aucun composant n'importe la racine du paquet de publication", () => {
+    // La racine exporte le magasin, qui importe `node:fs/promises`. Ces
+    // composants sont rendus côté serveur *et* importés par des îlots clients :
+    // passer par la racine tire `node:fs` dans le bundle navigateur et fait
+    // échouer le build. Le sous-chemin « public » n'expose que des projections
+    // et des types.
+    for (const file of componentFiles) {
+      const source = readFileSync(join(repoRoot, file), "utf8");
+
+      expect(source, `${file} importe la racine du paquet`).not.toMatch(
+        /from "@finance\/content-publication"/
       );
     }
   });

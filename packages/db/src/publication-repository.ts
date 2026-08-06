@@ -1,11 +1,12 @@
-import { and, asc, desc, eq, sql } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, sql } from "drizzle-orm";
 import { canUseDatabase, createDb } from "./client";
 import {
   chapterActivityEventsTable,
   contentPublicationAuditTable,
   errorJournalTable,
   publishedContentVersionsTable,
-  remediationTasksTable
+  remediationTasksTable,
+  reviewQueueTable
 } from "./drizzle-schema";
 import { withUserContext } from "./user-context";
 
@@ -452,6 +453,127 @@ export async function openChapterRemediation(
   });
 
   return true;
+}
+
+// --- Spaced repetition for published flashcards ----------------------------
+//
+// The schedule lives in `review_queue`, the PR-04 table, keyed on the published
+// version id. It is not a second queue: `(item_type, item_ref)` is exactly the
+// shape that table was built for, and `source` distinguishes where an entry came
+// from. A published card and a catalogue card are scheduled by the same ladder,
+// stored in the same place, and readable by the same query.
+//
+// Without this, the interval shown after a self-assessment was theatre: the
+// number came from `REVIEW_INTERVAL_DAYS` and was never written anywhere, so
+// reopening the session offered every card again as if nothing had been rated.
+
+export interface ChapterCardReviewInput {
+  /** The published version id of the card. */
+  artifactId: string;
+  rating: string;
+  reviewedAt: string;
+  dueAt: string;
+  intervalDays: number;
+  /** True when the learner rated `forgotten`. */
+  lapsed: boolean;
+}
+
+/**
+ * Records one self-assessment of a published card.
+ *
+ * `onConflictDoUpdate` on the table's own unique key: one row per (learner,
+ * card), updated in place. The counters only ever move forward — a re-review
+ * must not reset the history it is part of.
+ */
+export async function recordChapterCardReview(
+  userId: string,
+  input: ChapterCardReviewInput
+): Promise<PublicationWriteResult> {
+  if (!canUseDatabase()) {
+    return { status: "unavailable", reason: DATABASE_DISABLED };
+  }
+
+  await withUserContext(userId, async (tx) => {
+    await tx
+      .insert(reviewQueueTable)
+      .values({
+        userId,
+        itemType: "flashcard",
+        itemRef: input.artifactId,
+        dueAt: input.dueAt,
+        intervalDays: input.intervalDays,
+        lastRating: input.rating,
+        lastReviewedAt: input.reviewedAt,
+        reviewCount: 1,
+        lapseCount: input.lapsed ? 1 : 0,
+        source: "published"
+      })
+      .onConflictDoUpdate({
+        target: [reviewQueueTable.userId, reviewQueueTable.itemType, reviewQueueTable.itemRef],
+        set: {
+          dueAt: input.dueAt,
+          intervalDays: input.intervalDays,
+          lastRating: input.rating,
+          lastReviewedAt: input.reviewedAt,
+          reviewCount: sql`${reviewQueueTable.reviewCount} + 1`,
+          lapseCount: input.lapsed
+            ? sql`${reviewQueueTable.lapseCount} + 1`
+            : reviewQueueTable.lapseCount
+        }
+      });
+  });
+
+  return { status: "written" };
+}
+
+export interface ChapterCardSchedule {
+  artifactId: string;
+  dueAt: string;
+  intervalDays: number;
+  lastRating: string | null;
+  reviewCount: number;
+}
+
+/**
+ * The schedule of the cards this learner has already rated, among those given.
+ *
+ * Scoped to the ids the chapter actually publishes: a learner who worked on a
+ * card that has since been archived should not have it resurface, and querying
+ * the whole queue to filter in memory would return every card of every module.
+ */
+export async function getChapterCardSchedules(
+  userId: string,
+  artifactIds: readonly string[]
+): Promise<ChapterCardSchedule[]> {
+  if (!canUseDatabase() || artifactIds.length === 0) {
+    return [];
+  }
+
+  return withUserContext(userId, async (tx) => {
+    const rows = await tx
+      .select({
+        itemRef: reviewQueueTable.itemRef,
+        dueAt: reviewQueueTable.dueAt,
+        intervalDays: reviewQueueTable.intervalDays,
+        lastRating: reviewQueueTable.lastRating,
+        reviewCount: reviewQueueTable.reviewCount
+      })
+      .from(reviewQueueTable)
+      .where(
+        and(
+          eq(reviewQueueTable.itemType, "flashcard"),
+          inArray(reviewQueueTable.itemRef, [...artifactIds])
+        )
+      );
+
+    return rows.map((row) => ({
+      artifactId: row.itemRef,
+      dueAt: toIso(row.dueAt),
+      intervalDays: row.intervalDays,
+      lastRating: row.lastRating,
+      reviewCount: row.reviewCount
+    }));
+  });
 }
 
 // --- Reading published content ---------------------------------------------

@@ -107,6 +107,23 @@ const REQUIRED_SUCCESSES: Record<ChapterActivityKind, number> = {
 export interface ChapterCatalogue {
   /** Les types d'activité que le chapitre publie réellement. */
   availableKinds: ReadonlySet<ChapterActivityKind>;
+  /**
+   * Les artefacts encore actifs, s'ils sont connus.
+   *
+   * `undefined` veut dire « on ne filtre pas » : c'est le comportement des
+   * appelants qui n'ont pas la liste sous la main, et il ne change rien pour un
+   * chapitre dont rien n'a été archivé.
+   */
+  activeArtifactIds?: ReadonlySet<string>;
+  /**
+   * Les étapes que chaque mini-cas publié attend, par identifiant de cas.
+   *
+   * Sans cette table, « Mini-cas terminé » s'acquérait sur *une* étape réussie :
+   * un apprenant qui traite la première question d'un cas qui en compte six
+   * décrochait la dimension, et pouvait afficher un chapitre « maîtrisé » sans
+   * avoir fini le cas.
+   */
+  caseStepIds?: ReadonlyMap<string, ReadonlySet<string>>;
 }
 
 /**
@@ -114,7 +131,11 @@ export interface ChapterCatalogue {
  * publie. Un chapitre sans exercice de calcul ne réclame pas de calcul.
  */
 export function catalogueFromArtifactTypes(
-  artifactTypes: readonly string[]
+  artifactTypes: readonly string[],
+  options: {
+    activeArtifactIds?: ReadonlySet<string>;
+    caseStepIds?: ReadonlyMap<string, ReadonlySet<string>>;
+  } = {}
 ): ChapterCatalogue {
   const kinds = new Set<ChapterActivityKind>();
 
@@ -143,24 +164,110 @@ export function catalogueFromArtifactTypes(
     kinds.add("case_step_attempt");
   }
 
-  return { availableKinds: kinds };
+  return {
+    availableKinds: kinds,
+    activeArtifactIds: options.activeArtifactIds,
+    caseStepIds: options.caseStepIds
+  };
+}
+
+/**
+ * L'identifiant du cas dont vient un événement d'étape.
+ *
+ * La route enregistre `<idDuCas>#<idDeLÉtape>` : le cas et l'étape sont donc
+ * tous deux récupérables, ce qui permet d'exiger la complétion du cas entier
+ * plutôt que d'une étape quelconque.
+ */
+function splitCaseStep(artifactId: string): { caseId: string; stepId: string } | null {
+  const separator = artifactId.indexOf("#");
+
+  return separator === -1
+    ? null
+    : { caseId: artifactId.slice(0, separator), stepId: artifactId.slice(separator + 1) };
+}
+
+/**
+ * Un mini-cas est terminé quand **toutes** ses étapes ont été réussies.
+ *
+ * Le compte de réussites ne suffisait pas : six étapes réussies pouvaient être
+ * six fois la première. On regarde donc quelles étapes distinctes ont été
+ * réussies, et on les compare à celles que le cas publie.
+ *
+ * Sans table d'étapes — un appelant qui ne l'a pas sous la main — on retombe sur
+ * l'ancien comportement plutôt que de bloquer la dimension pour toujours.
+ */
+function completedCases(
+  events: readonly ChapterActivityEvent[],
+  caseStepIds: ReadonlyMap<string, ReadonlySet<string>> | undefined
+): number {
+  const succeededSteps = new Map<string, Set<string>>();
+
+  for (const event of events) {
+    if (event.kind !== "case_step_attempt" || !event.succeeded) {
+      continue;
+    }
+
+    const parts = splitCaseStep(event.artifactId);
+
+    if (!parts) {
+      continue;
+    }
+
+    const set = succeededSteps.get(parts.caseId) ?? new Set<string>();
+    set.add(parts.stepId);
+    succeededSteps.set(parts.caseId, set);
+  }
+
+  if (!caseStepIds) {
+    return succeededSteps.size;
+  }
+
+  let complete = 0;
+
+  for (const [caseId, expected] of caseStepIds) {
+    const done = succeededSteps.get(caseId);
+
+    if (done && [...expected].every((stepId) => done.has(stepId))) {
+      complete += 1;
+    }
+  }
+
+  return complete;
 }
 
 export function computeChapterProgress(
   events: readonly ChapterActivityEvent[],
   catalogue: ChapterCatalogue
 ): ChapterProgress {
+  // LES ÉVÉNEMENTS D'ARTEFACTS RETIRÉS SONT ÉCARTÉS.
+  //
+  // Après un archivage ou une republication, l'ancien identifiant n'existe plus
+  // : la route le refuse, et la réussite sur son remplaçant porte un identifiant
+  // différent. Un échec sur l'ancienne version restait donc dans les échecs non
+  // rattrapés pour toujours, et l'apprenant demeurait « à revoir » sur un
+  // contenu qu'il ne pouvait plus ouvrir.
+  const active = catalogue.activeArtifactIds;
+  const relevant =
+    active === undefined
+      ? events
+      : events.filter((event) => active.has(event.artifactId.split("#")[0]));
+
+  const casesDone = completedCases(relevant, catalogue.caseStepIds);
+
   const dimensions: ChapterDimension[] = CHAPTER_ACTIVITY_KINDS.map((kind) => {
-    const own = events.filter((event) => event.kind === kind);
+    const own = relevant.filter((event) => event.kind === kind);
     const successes = own.filter((event) => event.succeeded).length;
+
+    // Le mini-cas se compte en *cas terminés*, pas en étapes réussies.
+    const effectiveSuccesses = kind === "case_step_attempt" ? casesDone : successes;
 
     return {
       kind,
       label: DIMENSION_LABELS[kind],
       available: catalogue.availableKinds.has(kind),
       attempts: own.length,
-      successes,
-      acquired: successes >= REQUIRED_SUCCESSES[kind]
+      successes: effectiveSuccesses,
+      acquired: effectiveSuccesses >= REQUIRED_SUCCESSES[kind]
     };
   });
 
@@ -172,20 +279,23 @@ export function computeChapterProgress(
   // maîtrisée resterait à revoir indéfiniment.
   const lastOutcomeByArtifact = new Map<string, boolean>();
 
-  for (const event of [...events].sort((left, right) => left.occurredAt.localeCompare(right.occurredAt))) {
+  for (const event of [...relevant].sort((left, right) => left.occurredAt.localeCompare(right.occurredAt))) {
     lastOutcomeByArtifact.set(event.artifactId, event.succeeded);
   }
 
   const outstandingFailures = [...lastOutcomeByArtifact.values()].filter((succeeded) => !succeeded).length;
 
   const lastActivityAt =
-    events.length === 0
+    relevant.length === 0
       ? null
-      : events.reduce((latest, event) => (event.occurredAt > latest ? event.occurredAt : latest), events[0].occurredAt);
+      : relevant.reduce(
+          (latest, event) => (event.occurredAt > latest ? event.occurredAt : latest),
+          relevant[0].occurredAt
+        );
 
   return {
     status: resolveStatus({
-      totalAttempts: events.length,
+      totalAttempts: relevant.length,
       acquired: acquired.length,
       available: available.length,
       outstandingFailures
@@ -193,7 +303,7 @@ export function computeChapterProgress(
     acquiredDimensions: acquired.length,
     availableDimensions: available.length,
     dimensions,
-    totalAttempts: events.length,
+    totalAttempts: relevant.length,
     outstandingFailures,
     lastActivityAt
   };

@@ -30,10 +30,18 @@ import type { PublishedContentVersion, PublishedSourceReference } from "../types
  * Ni chemin, ni nom de fichier, ni lien : de quoi identifier un document et la
  * page qui porte la règle, et rien de plus. `documentId` est conservé comme
  * identifiant interne opaque — il ne désigne aucun emplacement.
+ *
+ * `pack` EST PUBLIÉ, ET C'EST UNE EXIGENCE, PAS UN CHOIX. `AGENTS.md` demande
+ * que toute réponse sourcée cite « document, page, pack et date lorsqu'elle est
+ * disponible ». Le retirer par prudence privait chaque règle d'un des quatre
+ * champs exigés — et un identifiant de pack ne dit rien de l'arborescence : il
+ * nomme un lot d'import, pas un emplacement.
  */
 export interface PublicSourceReference {
   documentTitle: string;
   sourceType: PublishedSourceReference["sourceType"];
+  /** Lot d'import d'où vient le document. Exigé par AGENTS.md. */
+  pack: string;
   sectionTitle?: string;
   pageStart: number;
   pageEnd: number;
@@ -45,6 +53,7 @@ export function toPublicSourceReference(reference: PublishedSourceReference): Pu
   return {
     documentTitle: reference.documentTitle,
     sourceType: reference.sourceType,
+    pack: reference.pack,
     sectionTitle: reference.sectionTitle,
     pageStart: reference.pageStart,
     pageEnd: reference.pageEnd,
@@ -52,6 +61,14 @@ export function toPublicSourceReference(reference: PublishedSourceReference): Pu
     documentId: reference.documentId
   };
 }
+
+/** Libellés de nature du matériau, jamais l'identifiant brut à l'écran. */
+export const SOURCE_TYPE_LABELS: Record<PublishedSourceReference["sourceType"], string> = {
+  course: "Support de cours",
+  "official-reference": "Référence officielle",
+  "personal-note": "Note personnelle",
+  exercise: "Énoncé ou corrigé"
+};
 
 export function toPublicSourceReferences(
   references: readonly PublishedSourceReference[]

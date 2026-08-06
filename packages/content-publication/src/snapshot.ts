@@ -5,6 +5,7 @@ import {
   type ContentDraft
 } from "@finance/content-generation";
 import { contentHash } from "./hash";
+import { findRemainingExcerptPaths, stripSourceExcerpts } from "./sanitize";
 import { COMPTA_APPROFONDIE_MODULE, resolvePublicChapter } from "./taxonomy";
 import {
   publicationVersionId,
@@ -115,10 +116,21 @@ export function buildPublishedVersion(input: BuildSnapshotInput): PublishedConte
     throw new UnknownChapterError(draft.chapterSlug);
   }
 
-  const payload = contentPayloadSchema.parse({
-    contentType: draft.contentType,
-    content: draft.content
-  });
+  // LE CONTENU EST NETTOYE AVANT D'ETRE RECOPIE. Les references imbriquees du
+  // contenu — sur chaque regle, chaque formule, chaque etape — portent leur
+  // propre `excerpt`. Sans ce retrait, le texte des PDF prives partait dans le
+  // fichier commite, dans la base, et dans la charge utile RSC de la fiche.
+  const payload = contentPayloadSchema.parse(
+    stripSourceExcerpts({ contentType: draft.contentType, content: draft.content })
+  );
+
+  const remaining = findRemainingExcerptPaths(payload, "content");
+
+  if (remaining.length > 0) {
+    throw new Error(
+      `nettoyage incomplet : ${remaining.join(", ")} porte encore du texte de source`
+    );
+  }
 
   const key: PublicationKey = {
     artifactType: draft.contentType,

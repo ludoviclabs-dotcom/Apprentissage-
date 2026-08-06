@@ -179,3 +179,77 @@ describe("exigences par dimension", () => {
     expect(progress.lastActivityAt).toBe("2026-08-05T18:30:00.000Z");
   });
 });
+
+describe("artefacts retirés et mini-cas complets", () => {
+  const CASE_ID = "pub-progressive-case-x";
+
+  it("écarte un échec porté par un artefact qui n'est plus publié", () => {
+    // Après un archivage, la route refuse l'ancien identifiant et la réussite
+    // sur le remplaçant en porte un autre : sans ce filtre, l'apprenant restait
+    // « à revoir » pour toujours sur un contenu qu'il ne pouvait plus ouvrir.
+    const catalogue = catalogueFromArtifactTypes(["calculation_exercise"], {
+      activeArtifactIds: new Set(["calc-v2"])
+    });
+
+    const progress = computeChapterProgress(
+      [event("calculation_attempt", false, "calc-v1"), event("calculation_attempt", true, "calc-v2")],
+      catalogue
+    );
+
+    expect(progress.outstandingFailures).toBe(0);
+    expect(progress.totalAttempts).toBe(1);
+    expect(progress.status).toBe("mastered");
+  });
+
+  it("ne filtre rien quand la liste active n'est pas connue", () => {
+    const progress = computeChapterProgress(
+      [event("calculation_attempt", false, "calc-v1")],
+      catalogueFromArtifactTypes(["calculation_exercise"])
+    );
+
+    expect(progress.outstandingFailures).toBe(1);
+  });
+
+  it("n'acquiert « mini-cas terminé » qu'une fois toutes les étapes réussies", () => {
+    const catalogue = catalogueFromArtifactTypes(["progressive_case"], {
+      activeArtifactIds: new Set([CASE_ID]),
+      caseStepIds: new Map([[CASE_ID, new Set(["prime", "ecriture"])]])
+    });
+
+    const onlyFirst = computeChapterProgress(
+      [event("case_step_attempt", true, `${CASE_ID}#prime`)],
+      catalogue
+    );
+
+    expect(onlyFirst.dimensions.find((d) => d.kind === "case_step_attempt")?.acquired).toBe(false);
+    expect(onlyFirst.status).toBe("in-progress");
+
+    const both = computeChapterProgress(
+      [
+        event("case_step_attempt", true, `${CASE_ID}#prime`),
+        event("case_step_attempt", true, `${CASE_ID}#ecriture`)
+      ],
+      catalogue
+    );
+
+    expect(both.dimensions.find((d) => d.kind === "case_step_attempt")?.acquired).toBe(true);
+    expect(both.status).toBe("mastered");
+  });
+
+  it("ne prend pas la même étape réussie deux fois pour deux étapes", () => {
+    const catalogue = catalogueFromArtifactTypes(["progressive_case"], {
+      activeArtifactIds: new Set([CASE_ID]),
+      caseStepIds: new Map([[CASE_ID, new Set(["prime", "ecriture"])]])
+    });
+
+    const progress = computeChapterProgress(
+      [
+        event("case_step_attempt", true, `${CASE_ID}#prime`, "2026-08-01T10:00:00.000Z"),
+        event("case_step_attempt", true, `${CASE_ID}#prime`, "2026-08-02T10:00:00.000Z")
+      ],
+      catalogue
+    );
+
+    expect(progress.dimensions.find((d) => d.kind === "case_step_attempt")?.acquired).toBe(false);
+  });
+});

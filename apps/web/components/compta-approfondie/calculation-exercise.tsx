@@ -1,7 +1,7 @@
 "use client";
 
 import { useId, useState } from "react";
-import type { PublicCalculationExercise } from "@finance/content-publication";
+import type { PublicCalculationExercise } from "@finance/content-publication/public";
 import { CorrectionPanel } from "@/components/compta-approfondie/correction-panel";
 import { SourceCitation } from "@/components/compta-approfondie/source-list";
 import { Feedback } from "@/components/ui/feedback";
