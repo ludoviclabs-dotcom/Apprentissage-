@@ -358,5 +358,25 @@ export async function renderCertificatePdf(input: CertificatePdfInput): Promise<
   doc.setProducer("Finance Learning Hub");
   doc.setCreator("Finance Learning Hub");
 
+  // THE DOCUMENT DATES ARE THE ISSUE DATE, NOT "NOW".
+  //
+  // `PDFDocument.create()` stamps `CreationDate` and `ModDate` with the current
+  // time. Two downloads of the same attestation therefore produced two
+  // different files — the dates land in a deflated object stream, so the whole
+  // document even changed length. That contradicts the guarantee this feature
+  // is built on: everything printed is frozen at issue time, and "a document
+  // cannot change under its holder" has to include the bytes.
+  //
+  // An unparseable `issuedAt` falls back to the epoch rather than to `now`, for
+  // the same reason `frenchDate` returns the raw string rather than inventing a
+  // date: a wrong-but-stable value is auditable, a value that changes on every
+  // request is not.
+  const issuedOn = Number.isNaN(Date.parse(input.issuedAt))
+    ? new Date(0)
+    : new Date(input.issuedAt);
+
+  doc.setCreationDate(issuedOn);
+  doc.setModificationDate(issuedOn);
+
   return doc.save();
 }
