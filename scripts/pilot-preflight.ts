@@ -1,6 +1,6 @@
 ﻿import { execFileSync } from "node:child_process";
 import { existsSync } from "node:fs";
-import { dirname, isAbsolute, join, resolve, sep } from "node:path";
+import { dirname, isAbsolute, join, posix, resolve, sep, win32 } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 // Imports relatifs plutôt que par nom de paquet, comme `seed-published-content.ts` :
 // la racine du dépôt ne déclare pas ces paquets dans ses dépendances, et les y
@@ -120,6 +120,25 @@ export function renderReport(report: PreflightReport): string {
 // --- Masquage ---------------------------------------------------------------
 
 /**
+ * Absolu au sens de *l'une ou l'autre* famille de chemins, jamais seulement au
+ * sens de la plateforme courante.
+ *
+ * `isAbsolute` de `node:path` est lié à l'hôte : en mode POSIX il ne reconnaît
+ * qu'un `/` initial, si bien que `C:\Users\<nom>\…` y passe pour relatif. Un
+ * masquage qui s'y fierait rendrait le chemin **intact** — donc publierait le nom
+ * de compte — dès que le rapport est produit ailleurs que sur Windows : sur un
+ * runner de CI, dans un conteneur, ou depuis un `.env` recopié d'une machine à
+ * l'autre. Or c'est précisément ce que `maskPath` a pour objet d'empêcher, et un
+ * garde de confidentialité qui échoue en silence est pire que pas de garde.
+ *
+ * Les deux implémentations sont donc interrogées, et il suffit que l'une conclue
+ * à un chemin absolu pour qu'il soit masqué.
+ */
+function isAbsoluteAnyPlatform(path: string): boolean {
+  return win32.isAbsolute(path) || posix.isAbsolute(path);
+}
+
+/**
  * Réduit un chemin absolu à son dernier segment.
  *
  * `C:\Users\<nom>\<cloud>\<matière>\Comptabilité Approfondie` devient
@@ -129,7 +148,7 @@ export function renderReport(report: PreflightReport): string {
  * révèle rien que le dépôt ne dise déjà.
  */
 export function maskPath(path: string): string {
-  if (!isAbsolute(path)) {
+  if (!isAbsoluteAnyPlatform(path)) {
     return path;
   }
 

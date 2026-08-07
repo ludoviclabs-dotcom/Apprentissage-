@@ -38,9 +38,34 @@ describe("masquage des chemins", () => {
     expect(maskPath("/home/quelquun/cloud/dossier")).not.toContain("quelquun");
   });
 
+  /**
+   * Le masquage ne dépend pas de la plateforme qui produit le rapport.
+   *
+   * `isAbsolute` de `node:path` est lié à l'hôte : un chemin Windows y passe pour
+   * relatif sous POSIX, et le chemin ressortait donc intact — nom de compte
+   * compris — dès que le prévol tournait ailleurs que sur Windows. Les deux
+   * familles sont vérifiées ici quelle que soit la plateforme du test, pour que
+   * la régression échoue partout et non sur un seul runner.
+   */
+  it("masque les deux familles de chemins, quelle que soit la plateforme hôte", () => {
+    for (const path of [
+      "C:\\Users\\quelquun\\Cloud\\Dossier",
+      "c:/Users/quelquun/Cloud/Dossier",
+      "\\\\serveur\\partage\\quelquun\\Dossier",
+      "/home/quelquun/cloud/Dossier"
+    ]) {
+      const masked = maskPath(path);
+      expect(masked, path).not.toContain("quelquun");
+      expect(masked, path).toContain("Dossier");
+      expect(masked, path).toMatch(/^…/);
+    }
+  });
+
   it("laisse un chemin relatif au dépôt tel quel", () => {
     expect(maskPath("content-private")).toBe("content-private");
     expect(maskPath("data/extracted")).toBe("data/extracted");
+    // Un chemin relatif ne devient pas absolu parce qu'il contient un antislash.
+    expect(maskPath("data\\extracted")).toBe("data\\extracted");
   });
 });
 
