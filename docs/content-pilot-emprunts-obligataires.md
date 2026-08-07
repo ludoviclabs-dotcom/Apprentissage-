@@ -20,6 +20,9 @@ Deux constats, tous deux visibles dans les artefacts du pipeline :
 - **La page 5 de la mise en situation est dégradée.** Le rapport d'extraction
   porte `degraded-extraction — texte trop court (72 caractères)` sur cette page
   précise. Le fragment existe, mais il ne contient presque rien.
+  *Périmé depuis : la page porte `sparse-page`, non bloquant, et le document
+  repasse en `extracted` — ses 72 caractères sont une consigne complète, pas un
+  reste d'extraction ratée. Voir `docs/content-quality-gates.md`.*
 - **Il n'y a pas de corrigé.** `content:pair` le signale :
   `exercice-sans-corrige — aucun corrigé rapproché pour Les emprunts obligataires -
   Mise en situation.pdf`.

@@ -93,6 +93,12 @@ frais 100 000 € HT, 8 séries) et trois applications (Collins, Young, Brooks).
 citer — la règle « pas de contenu approuvé citant une page `needs-review` » est
 applicable dès ce lot.
 
+> **Périmé depuis.** Le pipeline distingue maintenant une page peu dense d'une
+> page mal extraite : la page 5 porte `sparse-page` (non bloquant) et ce document
+> repasse en `extracted`. Elle est donc citable. Voir
+> `docs/content-quality-gates.md`, « Page mal extraite ou page peu dense ? ». Le
+> tableau ci-dessus est conservé comme l'état constaté à ce lot.
+
 ## 4. Briques réutilisées (à ne pas dupliquer)
 
 | Brique existante | Emplacement | Usage dans ce lot |

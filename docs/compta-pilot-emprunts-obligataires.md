@@ -57,8 +57,11 @@ pnpm content:validate
 ```
 
 Vérifier que le rapport ne signale pas de page dégradée sur les pages que le
-chapitre citera — la page 5 de la mise en situation l'était au moment du lot
-précédent, et le garde **refuse** un contenu qui s'appuie dessus.
+chapitre citera : le garde **refuse** un contenu qui s'appuie dessus. La page 5 de
+la mise en situation l'était au moment des lots précédents ; elle ne l'est plus,
+le pipeline distinguant désormais une page peu dense d'une page mal extraite
+(`sparse-page` contre `degraded-extraction`, voir
+`docs/content-quality-gates.md`). S'en tenir au rapport, pas à cette liste.
 
 ```bash
 pnpm content:generate --chapitre "Emprunts obligataires" --mode live

@@ -71,25 +71,36 @@ L'extraction est donc **fidèle et complète**. Ce qui est en défaut est
 l'heuristique de qualité : `MIN_TEXT_LENGTH = 200` traite une page légitimement
 peu dense comme une extraction ratée.
 
-**Décision : ne rien reclasser silencieusement.** Le marquage est conservé tel
-quel. Il est conservateur — il interdit de citer une page qui, de fait, ne
-contient rien à citer — et le corriger demanderait de distinguer « page vide de
-texte parce que l'extraction a échoué » de « page vide de texte par
-construction », ce qui est un changement du pipeline d'extraction et non de ce
-pilote.
+**Décision de ce lot : ne rien reclasser silencieusement.** Le marquage était
+conservé tel quel, faute de pouvoir distinguer « page vide de texte parce que
+l'extraction a échoué » de « page vide de texte par construction » — un
+changement du pipeline d'extraction, et non de ce pilote.
 
-Conséquences, toutes vérifiées :
+### Résolu depuis, dans le pipeline
 
-- aucune notion n'est perdue : ce que la page demande d'enregistrer est décrit
-  ailleurs dans le même document ;
-- aucun contenu ne doit la citer, et un contenu qui la citerait signale un
-  ancrage faux ;
-- le garde de publication **refuse** un contenu citant une page dégradée
-  (`guard.ts`), donc la règle « le contenu public ne cite jamais cette page » est
-  tenue par le code, pas par la vigilance.
+Cette distinction existe désormais. Le pipeline sonde les images des seules pages
+trop courtes (`getImage()`, toujours sans dépendance nouvelle) et en tire deux
+codes distincts : `sparse-page`, non bloquant, pour une page peu dense dont le
+texte est complet ; `degraded-extraction`, bloquant, quand une image significative
+porte le contenu manquant. Voir `docs/content-quality-gates.md`, « Page mal
+extraite ou page peu dense ? ».
 
-L'heuristique reste une limite connue : elle produira le même faux positif sur
-toute page d'exercice à remplir, dans ce chapitre comme dans les autres.
+Ce que cela change pour la page 5, mesuré sur le pack :
+
+- elle porte `sparse-page` au lieu de `degraded-extraction` ; le constat reste
+  dans l'artefact, motivé (« sans image : le texte extrait est complet »), et
+  `content:extract` comme `content:validate` continuent de le remonter ;
+- « Les emprunts obligataires - Mise en situation » repasse en `extracted` ;
+- le garde de publication ne la refuse plus : `verifyReference` sur cette page
+  rend `valid: true` sans avertissement. **Un contenu peut donc la citer** — la
+  consigne y est complète et fidèlement extraite.
+
+Le sondage a aussi corrigé le constat dans l'autre sens : les pages 2 de « Les
+titres - Fiche de cours » et 3 de « Les titres - Mise en situation », que ce lot
+rangeait avec la page 5, sont de **vrais** positifs — leur contenu (un arbre de
+décision, deux avis de débit porteurs des montants) est bien là, en image, hors
+d'atteinte du texte. Elles restent bloquantes, et ces deux documents restent en
+`needs-review`.
 
 ## 5. Le mode `manual-assisted`
 
