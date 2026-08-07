@@ -4,7 +4,7 @@ import { createContentProvider, resolveMaxInputChars } from "../providers";
 import { saveDrafts } from "../store/draft-store";
 import type { ContentPayload } from "../types/artifact";
 import { listDrafts } from "../store/draft-store";
-import { draftsRoot, fail, parseCommonOptions, resolveContext, UsageError } from "./shared";
+import { draftsRoot, fail, manualOptions, parseCommonOptions, resolveContext, UsageError } from "./shared";
 
 /**
  * `pnpm content:generate --chapter "Emprunts obligataires" --mode mock`
@@ -77,7 +77,11 @@ async function main(): Promise<void> {
     return;
   }
 
-  const provider = createContentProvider(options.mode, process.env);
+  const provider = createContentProvider(
+    options.mode,
+    process.env,
+    options.mode === "manual-assisted" ? manualOptions(options) : undefined
+  );
   const storeOptions = {
     rootDir: draftsRoot(options),
     packId: options.sourcePack,
@@ -142,9 +146,10 @@ main().catch((error) => {
   if (error instanceof UsageError) {
     console.error(`\n✖ ${error.message}`);
     console.error(
-      '\nUsage : pnpm content:generate --chapter "Emprunts obligataires" [--mode mock|live]\n' +
+      '\nUsage : pnpm content:generate --chapter "Emprunts obligataires" [--mode mock|live|manual-assisted]\n' +
         "        [--types sheet,flashcards,calculations,journal_entries,error_diagnoses,case]\n" +
-        "        [--dry-run] [--force] [--limit N] [--source-pack <id>] [--output <dossier>] [--verbose]"
+        "        [--dry-run] [--force] [--limit N] [--source-pack <id>] [--output <dossier>] [--verbose]\n" +
+        "        [--author <nom>] [--manual-input <dossier>]   (mode manual-assisted)"
     );
     process.exit(1);
   }

@@ -1,11 +1,14 @@
 import { createAiProviderFromEnv } from "@finance/ai";
+import type { GenerationMode } from "../types/metadata";
 import { LiveContentProvider } from "./live";
+import { ManualAssistedContentProvider, type ManualAssistedOptions } from "./manual-assisted";
 import { MockContentProvider } from "./mock";
 import type { ContentGenerationProvider } from "./types";
 
 export * from "./types";
 export { MockContentProvider } from "./mock";
 export { LiveContentProvider } from "./live";
+export * from "./manual-assisted";
 export * from "./fixture-helpers";
 
 export interface ContentAiEnv {
@@ -56,11 +59,22 @@ export function resolveMaxInputChars(env: ContentAiEnv, fallback: number): numbe
  * l'apprendre tout de suite.
  */
 export function createContentProvider(
-  requestedMode: "mock" | "live",
-  env: ContentAiEnv
+  requestedMode: GenerationMode,
+  env: ContentAiEnv,
+  manual?: ManualAssistedOptions
 ): ContentGenerationProvider {
   if (requestedMode === "mock") {
     return new MockContentProvider();
+  }
+
+  if (requestedMode === "manual-assisted") {
+    if (!manual) {
+      throw new LiveProviderUnavailableError(
+        "le mode manual-assisted exige une racine de contenus rédigés et un auteur"
+      );
+    }
+
+    return new ManualAssistedContentProvider(manual);
   }
 
   if (env.CONTENT_AI_ENABLED !== "true") {

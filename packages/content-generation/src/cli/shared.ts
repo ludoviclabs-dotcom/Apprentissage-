@@ -1,6 +1,8 @@
 import { dirname, isAbsolute, join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { loadLocalEnv } from "@finance/ingest";
 import { loadCorpus, resolveChapter, type ChapterSummary, type LoadedCorpus } from "../corpus/load";
+import { generationModes, type GenerationMode } from "../types/metadata";
 
 /**
  * Socle commun aux commandes `content:generate`, `content:validate-generated`
@@ -13,16 +15,30 @@ import { loadCorpus, resolveChapter, type ChapterSummary, type LoadedCorpus } fr
 const here = dirname(fileURLToPath(import.meta.url));
 export const repoRoot = join(here, "..", "..", "..", "..");
 
+/**
+ * `.env` chargé à l'import, avant toute lecture de `process.env`.
+ *
+ * `createContentProvider` décide du mode sur `CONTENT_AI_ENABLED` et
+ * `CONTENT_AI_PROVIDER` ; sans ce chargement, un opérateur qui a rempli son
+ * `.env` obtiendrait « génération live indisponible » en croyant l'avoir
+ * configurée. Le shell reste prioritaire.
+ */
+export const localEnv = loadLocalEnv(repoRoot);
+
 export interface CommonOptions {
   chapter?: string;
   types?: string;
-  mode: "mock" | "live";
+  mode: GenerationMode;
   dryRun: boolean;
   force: boolean;
   limit?: number;
   sourcePack: string;
   output: string;
   verbose: boolean;
+  /** Racine des charges utiles rédigées, pour `--mode manual-assisted`. */
+  manualInput: string;
+  /** Qui a rédigé, exigé par `--mode manual-assisted`. */
+  author?: string;
 }
 
 export class UsageError extends Error {
@@ -43,7 +59,8 @@ export function parseCommonOptions(argv: readonly string[]): CommonOptions {
     force: false,
     sourcePack: "comptabilite",
     output: join("data", "generated", "drafts"),
-    verbose: false
+    verbose: false,
+    manualInput: join("data", "generated", "manual")
   };
 
   for (let index = 0; index < argv.length; index += 1) {
@@ -69,10 +86,10 @@ export function parseCommonOptions(argv: readonly string[]): CommonOptions {
         index += 1;
         break;
       case "--mode":
-        if (next !== "mock" && next !== "live") {
-          throw new UsageError("--mode attend « mock » ou « live »");
+        if (!(generationModes as readonly string[]).includes(next ?? "")) {
+          throw new UsageError(`--mode attend ${generationModes.map((mode) => `« ${mode} »`).join(", ")}`);
         }
-        options.mode = next;
+        options.mode = next as GenerationMode;
         index += 1;
         break;
       case "--source-pack":
@@ -83,6 +100,16 @@ export function parseCommonOptions(argv: readonly string[]): CommonOptions {
       case "--output":
         if (!next) throw new UsageError("--output attend un chemin");
         options.output = next;
+        index += 1;
+        break;
+      case "--manual-input":
+        if (!next) throw new UsageError("--manual-input attend un chemin");
+        options.manualInput = next;
+        index += 1;
+        break;
+      case "--author":
+        if (!next) throw new UsageError("--author attend un nom");
+        options.author = next;
         index += 1;
         break;
       case "--limit": {
@@ -119,6 +146,25 @@ export function extractedDir(): string {
 
 export function draftsRoot(options: CommonOptions): string {
   return resolvePath(options.output);
+}
+
+/**
+ * Options du provider assisté, ou une erreur d'usage.
+ *
+ * L'auteur est **exigé** : un brouillon publiable doit nommer qui l'a rédigé, et
+ * une valeur par défaut du genre « manuel » ne nommerait personne. Le mode
+ * assisté est un repli, pas une commodité.
+ */
+export function manualOptions(options: CommonOptions): { rootDir: string; author: string } {
+  const author = options.author ?? process.env.CONTENT_MANUAL_AUTHOR;
+
+  if (!author) {
+    throw new UsageError(
+      "--mode manual-assisted exige --author (ou CONTENT_MANUAL_AUTHOR) : un contenu publiable nomme son rédacteur"
+    );
+  }
+
+  return { rootDir: resolvePath(options.manualInput), author };
 }
 
 export interface ResolvedContext {

@@ -126,6 +126,13 @@ async function main(): Promise<void> {
   console.log(`Mode de génération : ${[...modes].join(", ")}`);
   if (modes.has("mock")) {
     console.log("  ⚠ Des contenus proviennent de FIXTURES techniques (mode mock), pas d'une génération réelle.");
+    console.log("    Ils sont impubliables : le garde les refuse, quelle que soit l'approbation.");
+  }
+  if (modes.has("manual-assisted")) {
+    console.log(
+      "  ⚠ Des contenus ont été RÉDIGÉS à partir des extraits validés (mode manual-assisted), sans appel à un fournisseur."
+    );
+    console.log("    Ils passent les mêmes contrôles que le mode live et exigent la même approbation humaine.");
   }
   console.log("Aucun de ces contenus n'est publié : la publication n'existe pas dans ce lot.");
 }

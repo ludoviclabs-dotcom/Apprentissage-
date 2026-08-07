@@ -42,9 +42,22 @@ than merely forbidden. Approving is refused outright while the deterministic
 checks fail, and an approved draft is terminal, so regenerating with `--force`
 revises everything except what a human already accepted.
 
-Generation runs in `mock` mode by default — fixtures anchored on the real
-corpus, needing no API key — so `pnpm test` and `pnpm build` never reach a
-network. `/admin/content-review` shows each draft beside the source text it
+Generation has three modes and the boundary that matters is which of them may
+ever be published, expressed as a whitelist (`publishableGenerationModes`)
+rather than as a list of refusals — so a mode added later is refused until
+somebody decides otherwise. `mock` is fixtures anchored on the real corpus,
+needs no API key, is what `pnpm test` and `pnpm build` exercise, and is
+**permanently unpublishable**. `live` is a model writing from the source
+envelope. `manual-assisted` is a draft written from the validated extracts with
+no provider call, read from a git-ignored input file, then put through the same
+Zod schema, the same deterministic checks and the same human approval as `live`
+— it is not a relabelled mock: a fixture is picked by prompt id from a catalogue
+compiled into the repo, while an assisted payload is read from a file written
+for that chapter, its absence is a failure rather than a fallback, and the
+recorded model carries the input file's digest. Three independent barriers cite
+that one whitelist — the guard, the store write and the public read — because
+three barriers are only worth having if they say the same thing. See
+`docs/compta-pilot-activation.md`. `/admin/content-review` shows each draft beside the source text it
 cites, its failed checks and its history; it is gated by
 `CONTENT_REVIEW_ENABLED` plus the admin role, answers 404 otherwise, and
 refuses to boot in production without accounts. See

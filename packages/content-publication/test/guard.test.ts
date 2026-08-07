@@ -64,7 +64,22 @@ describe("garde de publication — provenance du contenu", () => {
     );
 
     expect(report.passed).toBe(false);
-    expect(codes(report)).toContain("mode-mock");
+    expect(codes(report)).toContain("mode-non-publiable");
+  });
+
+  it("accepte un contenu rédigé en mode manual-assisted", () => {
+    // Le mode assisté a franchi les mêmes contrôles déterministes et attend la
+    // même approbation humaine que le mode live : rien ne justifie de le
+    // refuser ici. C'est la seule différence de traitement entre lui et `mock`,
+    // et elle doit être vérifiée plutôt que supposée.
+    const report = inspect(
+      draftFor({ contentType: "smart_revision_sheet", content: sheetContent() } as ContentPayload, {
+        status: "approved",
+        mode: "manual-assisted"
+      })
+    );
+
+    expect(codes(report)).not.toContain("mode-non-publiable");
   });
 
   it("refuse un contenu dont le corpus est introuvable", () => {
@@ -311,6 +326,8 @@ describe("garde de publication — contenu vide et empreinte", () => {
       publicationVersion: 1
     });
     expect(report.contentHash).toMatch(/^[a-f0-9]{64}$/);
-    expect(codes(report)).toEqual(expect.arrayContaining(["statut-non-approuve", "mode-mock"]));
+    expect(codes(report)).toEqual(
+      expect.arrayContaining(["statut-non-approuve", "mode-non-publiable"])
+    );
   });
 });

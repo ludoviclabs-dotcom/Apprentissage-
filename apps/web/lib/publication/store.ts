@@ -15,6 +15,7 @@ import {
   type PublicationKey,
   type PublishedContentVersion
 } from "@finance/content-publication";
+import { isPublishableGenerationMode } from "@finance/content-generation";
 import {
   canUseDatabase,
   getPublishedVersion,
@@ -175,9 +176,13 @@ function fromIndexEntry(entry: PublicationIndexEntry): PublishedEntry {
  * de test monté par erreur, une base restaurée depuis un environnement de
  * recette. Trois barrières indépendantes pour une règle dont la violation est
  * précisément ce que le cahier des charges interdit.
+ *
+ * La liste des modes acceptés est celle du paquet de génération, et non une
+ * copie locale : trois barrières ne valent que si elles disent toutes la même
+ * chose, et une quatrième définition du mot « publiable » finirait par diverger.
  */
-function isLiveVersion(version: PublishedContentVersion): boolean {
-  return version.generationMetadataSnapshot.mode === "live";
+function isPublishableVersion(version: PublishedContentVersion): boolean {
+  return isPublishableGenerationMode(version.generationMetadataSnapshot.mode);
 }
 
 // --- Lectures ---------------------------------------------------------------
@@ -247,7 +252,7 @@ export const loadPublishedVersion = cache(
         ? await loadFromDatabase(id)
         : await readVersion(publicationStoreOptions(), id);
 
-    if (!version || version.status !== "published" || !isLiveVersion(version)) {
+    if (!version || version.status !== "published" || !isPublishableVersion(version)) {
       return undefined;
     }
 

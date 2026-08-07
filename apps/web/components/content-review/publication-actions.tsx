@@ -81,13 +81,20 @@ const TYPE_LABELS: Record<string, string> = {
 export function PublicationActions({
   draftId,
   status,
-  mode,
+  modePublishable,
   activeVersionId,
   activePublicationVersion
 }: {
   draftId: string;
   status: string;
-  mode: "mock" | "live";
+  /**
+   * Le mode est-il publiable ? Une **décision**, prise par le serveur, et non la
+   * règle elle-même : importer la liste blanche ici embarquerait
+   * `@finance/content-generation` — donc `node:fs` — dans le paquet du
+   * navigateur, ce que le build refuse à juste titre. Le serveur sait déjà ;
+   * lui faire répéter sa conclusion coûte un booléen.
+   */
+  modePublishable: boolean;
   /** Version publiée actuellement active pour cette identité logique, s'il y en a une. */
   activeVersionId: string | null;
   activePublicationVersion: number | null;
@@ -103,7 +110,7 @@ export function PublicationActions({
   );
 
   const disabled = busy || pending;
-  const publishable = status === "approved" && mode !== "mock";
+  const publishable = status === "approved" && modePublishable;
 
   async function loadPreview(): Promise<void> {
     if (disabled) {
@@ -205,12 +212,13 @@ export function PublicationActions({
 
   return (
     <div className="review-actions">
-      {mode === "mock" ? (
+      {modePublishable ? null : (
         <Feedback tone="partial">
-          Ce contenu vient d&apos;une fixture de démonstration (mode mock). Il ne peut pas être publié :
-          régénérez-le en mode live avant de le proposer au site public.
+          Ce contenu vient d&apos;un mode impubliable — une fixture de démonstration. Il ne peut pas
+          être publié : régénérez-le en mode <code>live</code> ou <code>manual-assisted</code> avant
+          de le proposer au site public.
         </Feedback>
-      ) : null}
+      )}
 
       <div className="review-actions-row">
         <button
