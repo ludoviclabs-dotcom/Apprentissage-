@@ -1,9 +1,10 @@
 import { createHash } from "node:crypto";
 import { join } from "node:path";
 import { extractDocument, type IngestFile } from "../index";
-import { assessQuality } from "../extractors";
+import { assessQuality, readImageProbe, type PageImageProbe } from "../extractors";
 import {
   extractedDocumentArtifactSchema,
+  isBlockingIssue,
   type ContentIssue,
   type ContentManifestEntry,
   type ExtractedDocumentArtifact,
@@ -42,22 +43,44 @@ export function looksLikeFlattenedTable(pageText: string): boolean {
   return columnLike / lines.length >= 0.4;
 }
 
-function assessPage(pageNumber: number, rawText: string): ContentIssue[] {
+/**
+ * Pourquoi une page peu dense n'est pas forcément une page mal extraite.
+ *
+ * `assessQuality` ne sait qu'une chose : cette page porte peu de texte. Elle ne
+ * sait pas *pourquoi*, et les deux raisons possibles appellent des conclusions
+ * opposées. Constaté sur le pack `compta-approfondie` :
+ *
+ * - « Les emprunts obligataires - Mise en situation.pdf » page 5 porte 72
+ *   caractères — une consigne complète — au-dessus d'un formulaire de journal
+ *   vierge tracé en vectoriel. L'extraction est fidèle : tout le texte de la
+ *   page est là, la page est peu dense par construction.
+ * - « Les titres - Fiche de cours.pdf » page 2 porte 1 caractère et une image de
+ *   1319 × 1022 : un arbre de décision entier — « Possession durable ? »,
+ *   « Titres de participation », « TIAP » — dont rien n'est atteignable en
+ *   texte. L'extraction a échoué.
+ *
+ * Le texte seul ne départage pas ces deux pages ; la présence d'une image
+ * significative, si. C'est ce que sonde `probePageImages` et ce dont ce
+ * classement se sert — sans jamais rien corriger en silence : chaque cas garde
+ * un code distinct, et la page peu dense porte le constat de son propre
+ * reclassement, motivé, plutôt que de sortir indemne de l'extraction.
+ *
+ * Le sondage n'est consulté que pour le défaut `text-too-short`. Un ratio
+ * alphanumérique faible constate un texte déjà abîmé : aucune absence d'image
+ * ne le rend fidèle.
+ */
+function assessPage(
+  pageNumber: number,
+  rawText: string,
+  imageProbe: PageImageProbe | undefined
+): ContentIssue[] {
   const issues: ContentIssue[] = [];
   const trimmed = rawText.trim();
-
-  if (trimmed.length === 0) {
-    issues.push({
-      code: "empty-page",
-      message: "page sans texte extrait — probable scan ou page d'illustration",
-      page: pageNumber
-    });
-    return issues;
-  }
-
   const quality = assessQuality(trimmed);
 
-  if (!quality.ok) {
+  if (!quality.ok && quality.defect === "text-too-short") {
+    issues.push(assessSparseness(pageNumber, trimmed.length, readImageProbe(imageProbe, pageNumber)));
+  } else if (!quality.ok) {
     issues.push({
       code: "degraded-extraction",
       message: quality.reason ?? "qualité d'extraction insuffisante",
@@ -74,6 +97,48 @@ function assessPage(pageNumber: number, rawText: string): ContentIssue[] {
   }
 
   return issues;
+}
+
+/** Le constat d'une page peu dense, et la preuve sur laquelle il repose. */
+function assessSparseness(
+  pageNumber: number,
+  length: number,
+  verdict: ReturnType<typeof readImageProbe>
+): ContentIssue {
+  if (verdict === "no-image") {
+    return length === 0
+      ? {
+          code: "blank-page",
+          message: "page sans texte ni image : page réellement vierge, rien n'a été perdu à l'extraction",
+          page: pageNumber,
+          severity: "informational"
+        }
+      : {
+          code: "sparse-page",
+          message:
+            `page peu dense (${length} caractères) mais sans image : le texte extrait est complet ` +
+            "— probable formulaire à remplir ou page de séparation",
+          page: pageNumber,
+          severity: "informational"
+        };
+  }
+
+  const evidence =
+    verdict === "image-present"
+      ? "une image significative y a été détectée : le contenu est présent mais hors d'atteinte du texte"
+      : "le sondage d'images n'a pas abouti sur cette page — classement prudent, faute de pouvoir conclure";
+
+  return length === 0
+    ? {
+        code: "empty-page",
+        message: `page sans texte extrait — ${evidence}`,
+        page: pageNumber
+      }
+    : {
+        code: "degraded-extraction",
+        message: `texte trop court (${length} caractères) — ${evidence}`,
+        page: pageNumber
+      };
 }
 
 /**
@@ -157,7 +222,10 @@ export async function extractManifestEntry(
     pageNumber: page.pageNumber,
     rawText: page.rawText,
     markdownText: page.markdownText,
-    issues: entry.extension === ".md" ? [] : assessPage(page.pageNumber, page.rawText)
+    issues:
+      entry.extension === ".md"
+        ? []
+        : assessPage(page.pageNumber, page.rawText, extracted.imageProbe)
   }));
 
   if (entry.extension === ".docx") {
@@ -174,12 +242,33 @@ export async function extractManifestEntry(
     });
   }
 
-  const pageIssueCount = pages.reduce((total, page) => total + page.issues.length, 0);
+  if (extracted.imageProbe?.probeFailure) {
+    documentIssues.push({
+      code: "image-probe-failed",
+      message:
+        `le sondage d'images a échoué (${extracted.imageProbe.probeFailure}) : les pages peu denses ` +
+        "restent classées comme dégradées, faute de pouvoir établir qu'elles ne le sont pas",
+      // Diagnostic, non verdict : ce constat explique pourquoi les pages restent
+      // classées prudemment, il ne retient rien par lui-même. Le blocage est
+      // porté par les pages concernées, qui gardent leur propre constat. Le
+      // déclarer bloquant le ferait passer pour la cause du refus dans le
+      // rapport d'extraction, à la place du vrai problème de page.
+      severity: "informational"
+    });
+  }
+
+  // Seul un constat bloquant met le document en revue. Une page peu dense mais
+  // fidèlement extraite est signalée — son constat reste dans l'artefact — sans
+  // retenir le document entier.
+  const blockingPageIssues = pages.reduce(
+    (total, page) => total + page.issues.filter(isBlockingIssue).length,
+    0
+  );
   let status: ExtractionStatus;
 
   if (extracted.status === "needs-docling") {
     status = "needs-docling";
-  } else if (pageIssueCount > 0) {
+  } else if (blockingPageIssues > 0) {
     status = "needs-review";
   } else {
     status = "extracted";

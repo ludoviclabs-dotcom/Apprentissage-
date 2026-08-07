@@ -114,24 +114,32 @@ Une validation technique n'est pas une approbation pédagogique.
 - [ ] Le contenu cité **est** à la page citée. Ouvrir la source, vérifier.
 - [ ] La référence porte sur ce que le contenu affirme, pas sur son voisinage.
 - [ ] Quand une règle s'étale sur deux fragments, les deux sont cités.
-- [ ] **Aucune référence ne pointe une page marquée dégradée.** Pour ce
-      chapitre : la **page 5 de la mise en situation**. Un avertissement
+- [ ] **Aucune référence ne pointe une page marquée dégradée.** Un avertissement
       `page-degradee` s'affiche le cas échéant — il ne bloque pas l'approbation,
-      mais il bloquera la publication.
+      mais il bloquera la publication. Se fier à l'avertissement, pas à une liste
+      de pages apprise par cœur : le pipeline distingue maintenant une page mal
+      extraite d'une page simplement peu dense, et seule la première est marquée.
 
 ### Le cas de la page 5
 
-Vérifié sur le document source : cette page ne porte qu'une consigne et un
-**formulaire de journal vierge**, destiné à être rempli par l'étudiant.
-L'extraction est fidèle ; c'est l'heuristique de qualité qui la signale, parce
-qu'une page de 72 caractères ressemble à une extraction ratée.
+Cette page ne porte qu'une consigne et un **formulaire de journal vierge**,
+destiné à être rempli par l'étudiant. L'extraction en est **fidèle et complète**.
 
-Conséquences pour la revue :
+Elle était signalée `degraded-extraction` par le seul effet de sa longueur
+(72 caractères), et la consigne de revue était de rejeter tout contenu la citant.
+**Ce n'est plus le cas** : le pipeline la classe `sparse-page`, non bloquant, et
+le garde de publication ne la refuse plus. Une référence qui la cite est donc
+recevable — la consigne y est entière — et n'a plus à être rejetée pour ce motif.
 
-- aucune notion n'est perdue : ce que la page demande d'enregistrer est décrit
-  ailleurs dans le document ;
-- **aucun contenu ne doit citer cette page** — il n'y a rien à y citer ;
-- si un contenu la cite, c'est un signe que son ancrage est faux : **rejeter**.
+Ce qui reste vrai : aucune notion n'est perdue, ce que la page demande
+d'enregistrer étant décrit ailleurs dans le document. Ce qui vaut d'être vérifié
+est donc ce qui vaut pour toute référence : que le contenu cité soit bien à la
+page citée, et qu'il porte sur ce que le contenu affirme.
+
+En revanche, les pages **2 de « Les titres - Fiche de cours »** et **3 de « Les
+titres - Mise en situation »** sont, elles, réellement dégradées : leur contenu
+est en image, hors d'atteinte du texte. Un contenu qui les cite s'appuie sur un
+texte qu'on sait incomplet — **rejeter**.
 
 ## 7. Absence d'information extérieure
 

@@ -2,6 +2,7 @@ import {
   contentManifestSchema,
   extractedDocumentArtifactSchema,
   pairingReportSchema,
+  isBlockingIssue,
   type ContentIssue,
   type ContentManifest,
   type ExtractedDocumentArtifact,
@@ -127,12 +128,17 @@ export function validateExtractionArtifact(
     }
   }
 
-  const pageIssueCount = artifact.pages.reduce((total, page) => total + page.issues.length, 0);
+  // Un constat `informational` — page peu dense mais fidèlement extraite — ne
+  // retient pas le document : il est là pour être lu, pas pour bloquer.
+  const blockingPageIssues = artifact.pages.reduce(
+    (total, page) => total + page.issues.filter(isBlockingIssue).length,
+    0
+  );
 
-  if (artifact.status === "extracted" && pageIssueCount > 0) {
+  if (artifact.status === "extracted" && blockingPageIssues > 0) {
     errors.push({
       code: "statut-incoherent",
-      message: `${label} : ${pageIssueCount} problème(s) de page mais statut « extracted » — attendu « needs-review »`
+      message: `${label} : ${blockingPageIssues} problème(s) bloquant(s) de page mais statut « extracted » — attendu « needs-review »`
     });
   }
 
@@ -143,9 +149,14 @@ export function validateExtractionArtifact(
     });
   }
 
-  if (artifact.status === "needs-review") {
-    for (const page of artifact.pages) {
-      for (const issue of page.issues) {
+  for (const page of artifact.pages) {
+    for (const issue of page.issues) {
+      // Les constats d'un document en revue sont tous remontés. Ceux qui ne
+      // bloquent pas le sont quel que soit le statut : sinon un reclassement
+      // disparaîtrait de la porte de qualité au moment précis où il fait passer
+      // le document en « extracted » — ce qui est l'inverse d'un reclassement
+      // visible.
+      if (artifact.status === "needs-review" || !isBlockingIssue(issue)) {
         warnings.push({ ...issue, message: `${label} : ${issue.message}` });
       }
     }

@@ -8,6 +8,7 @@ import { scanContentSources } from "./content-pipeline/scan";
 import { loadLocalEnv } from "./local-config";
 import {
   contentManifestSchema,
+  isBlockingIssue,
   type ContentIssue,
   type ContentManifest
 } from "./content-pipeline/types";
@@ -128,6 +129,7 @@ async function runScan(options: CliOptions): Promise<void> {
 async function runExtract(options: CliOptions): Promise<void> {
   const manifest = await readManifest(options);
   const byStatus: Record<string, number> = {};
+  const informational: Array<{ relativePath: string; issue: ContentIssue }> = [];
 
   for (const entry of manifest.files) {
     const artifact = await extractManifestEntry(options.rootPath, entry);
@@ -139,6 +141,12 @@ async function runExtract(options: CliOptions): Promise<void> {
       issues: [...artifact.issues, ...artifact.pages.flatMap((page) => page.issues)]
     };
     byStatus[artifact.status] = (byStatus[artifact.status] ?? 0) + 1;
+
+    for (const issue of entry.extraction.issues) {
+      if (!isBlockingIssue(issue)) {
+        informational.push({ relativePath: entry.relativePath, issue });
+      }
+    }
   }
 
   await writeJson(join(options.outputDir, "manifest.json"), contentManifestSchema.parse(manifest));
@@ -152,8 +160,19 @@ async function runExtract(options: CliOptions): Promise<void> {
   if (flagged.length > 0) {
     console.log(`\nÀ revoir (${flagged.length}) :`);
     for (const entry of flagged) {
-      const first = entry.extraction.issues[0];
+      const first = entry.extraction.issues.find(isBlockingIssue) ?? entry.extraction.issues[0];
       console.log(`  - ${entry.relativePath} [${entry.extraction.status}]${first ? ` — ${first.message}` : ""}`);
+    }
+  }
+
+  // Un reclassement ne passe pas en silence : une page tenue pour peu dense
+  // plutôt que dégradée n'apparaît plus dans « À revoir », elle doit donc être
+  // dite ici, avec le motif qui l'y a mise.
+  if (informational.length > 0) {
+    console.log(`\nSignalé sans bloquer (${informational.length}) :`);
+    for (const { relativePath, issue } of informational) {
+      const page = issue.page !== undefined ? ` [page ${issue.page}]` : "";
+      console.log(`  - ${relativePath}${page} [${issue.code}] ${issue.message}`);
     }
   }
 }

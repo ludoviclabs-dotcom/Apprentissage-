@@ -4,6 +4,7 @@ import { join } from "node:path";
 import {
   contentManifestSchema,
   extractedDocumentArtifactSchema,
+  isBlockingIssue,
   type ContentManifest
 } from "@finance/ingest";
 import { CorpusIndex, type CorpusDocument } from "../types/source-reference";
@@ -78,7 +79,11 @@ export async function loadCorpus(extractedDir: string, packId: string): Promise<
         chapterSlug: entry.chapterSlug,
         pages: artifact.pages.map((page) => ({
           pageNumber: page.pageNumber,
-          degraded: page.issues.length > 0
+          // « Dégradée » veut dire « une partie du contenu manque au texte », et
+          // non « quelque chose a été signalé ». Une page peu dense mais
+          // fidèlement extraite porte un constat `informational` : elle reste
+          // citable, et le garde de publication n'a pas à la refuser.
+          degraded: page.issues.some(isBlockingIssue)
         })),
         chunks: artifact.chunks.map((chunk) => ({
           id: chunk.id,
