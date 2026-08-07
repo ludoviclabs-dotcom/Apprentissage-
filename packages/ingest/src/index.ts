@@ -4,9 +4,9 @@ import { createHash } from "node:crypto";
 import { extname, join, relative } from "node:path";
 import type { DomainId } from "@finance/domain";
 import { z } from "zod";
-import { extractDocx, extractPdf, type ExtractedPageContent } from "./extractors";
+import { extractDocx, extractPdf, type ExtractedPageContent, type PageImageProbe } from "./extractors";
 
-export type { ExtractedPageContent } from "./extractors";
+export type { ExtractedPageContent, PageImageProbe } from "./extractors";
 export * from "./supported-extensions";
 export * from "./content-pipeline";
 export * from "./local-config";
@@ -41,6 +41,11 @@ export interface ExtractedDocument {
   pageContents: ExtractedPageContent[];
   status: "extracted" | "needs-docling";
   reason?: string;
+  /**
+   * Ce que le sondage d'images a établi sur les pages peu denses. Absent pour
+   * les formats où la question ne se pose pas (DOCX, Markdown) ou non couverts.
+   */
+  imageProbe?: PageImageProbe;
 }
 
 export interface TextChunk {
@@ -194,7 +199,8 @@ export async function extractDocument(rootPath: string, file: IngestFile): Promi
       pages: extracted.pages,
       pageContents: extracted.pageContents,
       status: extracted.status,
-      reason: extracted.reason
+      reason: extracted.reason,
+      imageProbe: extracted.imageProbe
     };
   }
 

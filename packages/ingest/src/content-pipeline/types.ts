@@ -52,13 +52,39 @@ const portableRelativePathSchema = z
 
 const sha256Schema = z.string().regex(/^[a-f0-9]{64}$/, "checksum SHA-256 hexadécimal attendu");
 
+/**
+ * Gravité d'un constat.
+ *
+ * `blocking` : le constat dit qu'une partie du document manque à l'extraction —
+ * la page ne peut pas étayer un contenu approuvé, encore moins publié.
+ * `informational` : le constat est exact mais ne retire rien au texte extrait —
+ * il est conservé pour être lu, pas pour bloquer.
+ *
+ * Le champ est facultatif et son absence vaut `blocking` (voir
+ * {@link isBlockingIssue}). Deux propriétés en découlent, toutes deux voulues :
+ * un artefact écrit avant l'introduction de la gravité garde l'interprétation
+ * prudente qui était la sienne, et un code ajouté demain bloque par défaut
+ * plutôt que de passer inaperçu.
+ */
+export const issueSeverities = ["blocking", "informational"] as const;
+
+export type IssueSeverity = (typeof issueSeverities)[number];
+
+export const issueSeveritySchema = z.enum(issueSeverities);
+
 export const contentIssueSchema = z.object({
   code: z.string().min(1),
   message: z.string().min(1),
-  page: z.number().int().positive().optional()
+  page: z.number().int().positive().optional(),
+  severity: issueSeveritySchema.optional()
 });
 
 export type ContentIssue = z.infer<typeof contentIssueSchema>;
+
+/** `true` sauf pour un constat explicitement déclaré `informational`. */
+export function isBlockingIssue(issue: Pick<ContentIssue, "severity">): boolean {
+  return issue.severity !== "informational";
+}
 
 export const contentManifestEntrySchema = z.object({
   relativePath: portableRelativePathSchema,
