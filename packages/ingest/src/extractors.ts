@@ -98,22 +98,31 @@ export interface QualityAssessment {
 export function assessQuality(text: string): QualityAssessment {
   const trimmed = text.trim();
 
+  // Le ratio est évalué *avant* la longueur, et non l'inverse : un texte court
+  // peut être abîmé, et c'est le défaut abîmé qui doit l'emporter. Tant que les
+  // deux défauts menaient au même refus, l'ordre était sans effet ; depuis que
+  // `text-too-short` peut être reclassé en page fidèle sur preuve d'absence
+  // d'image, sortir sur la longueur en premier ferait déclarer fidèle un texte
+  // fait de ponctuation et de traits — exactement ce que le ratio est là pour
+  // attraper. Aucune absence d'image ne rend un texte abîmé fidèle.
+  if (trimmed.length > 0) {
+    const alnum = (trimmed.match(/[\p{L}\p{N}]/gu) ?? []).length;
+    const ratio = alnum / trimmed.length;
+
+    if (ratio < MIN_ALNUM_RATIO) {
+      return {
+        ok: false,
+        defect: "low-alnum-ratio",
+        reason: `ratio alphanumérique faible (${ratio.toFixed(2)}) — probable scan ou tableau`
+      };
+    }
+  }
+
   if (trimmed.length < MIN_TEXT_LENGTH) {
     return {
       ok: false,
       defect: "text-too-short",
       reason: `texte trop court (${trimmed.length} caractères)`
-    };
-  }
-
-  const alnum = (trimmed.match(/[\p{L}\p{N}]/gu) ?? []).length;
-  const ratio = alnum / trimmed.length;
-
-  if (ratio < MIN_ALNUM_RATIO) {
-    return {
-      ok: false,
-      defect: "low-alnum-ratio",
-      reason: `ratio alphanumérique faible (${ratio.toFixed(2)}) — probable scan ou tableau`
     };
   }
 

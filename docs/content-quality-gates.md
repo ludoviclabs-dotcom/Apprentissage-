@@ -82,7 +82,12 @@ Trois précautions, chacune motivée :
   document porte `image-probe-failed` pour le dire.
 
 Le ratio alphanumérique faible n'est jamais reclassé : il constate un texte déjà
-abîmé, qu'aucune absence d'image ne rend fidèle.
+abîmé, qu'aucune absence d'image ne rend fidèle. **Il est donc évalué avant la
+longueur, et non après** : un texte court peut être abîmé, et c'est alors le
+défaut abîmé qui l'emporte. Tant que les deux défauts menaient au même refus
+l'ordre était sans effet ; depuis qu'un texte court peut être déclaré fidèle sur
+preuve d'absence d'image, trancher sur la longueur en premier ferait passer pour
+un formulaire vierge une page réduite à de la ponctuation et des traits.
 
 ### Gravité des constats
 

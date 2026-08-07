@@ -247,7 +247,13 @@ export async function extractManifestEntry(
       code: "image-probe-failed",
       message:
         `le sondage d'images a échoué (${extracted.imageProbe.probeFailure}) : les pages peu denses ` +
-        "restent classées comme dégradées, faute de pouvoir établir qu'elles ne le sont pas"
+        "restent classées comme dégradées, faute de pouvoir établir qu'elles ne le sont pas",
+      // Diagnostic, non verdict : ce constat explique pourquoi les pages restent
+      // classées prudemment, il ne retient rien par lui-même. Le blocage est
+      // porté par les pages concernées, qui gardent leur propre constat. Le
+      // déclarer bloquant le ferait passer pour la cause du refus dans le
+      // rapport d'extraction, à la place du vrai problème de page.
+      severity: "informational"
     });
   }
 

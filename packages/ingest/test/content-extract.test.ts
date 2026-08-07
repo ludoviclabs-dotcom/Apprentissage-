@@ -3,7 +3,7 @@ import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { describe, expect, it } from "vitest";
 import { chunkMarkdown, extractDocument, type ExtractedDocument } from "../src";
-import { readImageProbe } from "../src/extractors";
+import { assessQuality, readImageProbe } from "../src/extractors";
 import {
   chunkExtractedPages,
   extractManifestEntry,
@@ -366,6 +366,46 @@ describe("extraction page-aware", () => {
     expect(artifact.status).toBe("extracted");
     expect(artifact.issues.map((issue) => issue.code)).not.toContain("needs-docling");
     expect(artifact.pages[0].issues.map((issue) => issue.code)).toEqual(["sparse-page"]);
+  });
+
+  it("ne déclare pas fidèle un texte court mais abîmé", async () => {
+    const root = join(tmpdir(), `content-garbage-${Date.now()}`);
+    await mkdir(root, { recursive: true });
+    // Court *et* fait de ponctuation : sans image, la longueur seule le ferait
+    // passer pour un formulaire vierge. Le ratio alphanumérique doit l'emporter.
+    await writeFile(
+      join(root, "Les titres - Fiche de cours.pdf"),
+      buildPdfWithImages([{ lines: DENSE_PARAGRAPH }, { lines: [". . | | -- ... | -- . |"] }])
+    );
+
+    const manifest = await scanContentSources(root, { packId: "test-pack" });
+    const artifact = await extractManifestEntry(root, manifest.files[0]);
+
+    const [, damaged] = artifact.pages;
+    expect(damaged.issues[0].code).toBe("degraded-extraction");
+    expect(damaged.issues[0].severity).toBeUndefined();
+    expect(damaged.issues[0].message).toContain("ratio alphanumérique faible");
+    expect(artifact.status).toBe("needs-review");
+  });
+
+  it("évalue le ratio alphanumérique quelle que soit la longueur du texte", () => {
+    // Court et abîmé : le défaut abîmé l'emporte, car lui n'est jamais reclassé.
+    expect(assessQuality(". . | | -- ... |").defect).toBe("low-alnum-ratio");
+    // Court et propre : reclassable sur preuve d'absence d'image.
+    expect(assessQuality("Comptabiliser au journal.").defect).toBe("text-too-short");
+    // Vide : ni ratio calculable, ni texte abîmé — c'est la longueur qui parle.
+    expect(assessQuality("").defect).toBe("text-too-short");
+    expect(assessQuality("   ").defect).toBe("text-too-short");
+    // Un seul caractère alphanumérique reste un texte propre, seulement court.
+    expect(assessQuality("2").defect).toBe("text-too-short");
+  });
+
+  it("classe l'échec du sondage comme diagnostic, non comme verdict", () => {
+    // Le constat explique pourquoi les pages restent prudentes ; il ne retient
+    // rien par lui-même, sans quoi il passerait pour la cause du refus.
+    expect(isBlockingIssue({ code: "image-probe-failed", message: "x", severity: "informational" })).toBe(
+      false
+    );
   });
 
   it("retombe sur le classement prudent quand le sondage d'images n'a pas eu lieu", () => {
