@@ -34,6 +34,18 @@ export interface VersionedAccount {
   parentAccount?: string;
   /** Le compte à employer aujourd'hui, quand celui-ci a été remplacé. */
   supersededBy?: string;
+  /**
+   * Le compte officiel que cette subdivision *double*.
+   *
+   * TOUTES LES SUBDIVISIONS NE SE VALENT PAS. 4671 subdivise 467 pour distinguer
+   * un usage que le plan ne nomme pas : elle ajoute quelque chose, et rien dans
+   * le plan 2026 ne la contredit. 4816 porte au contraire l'intitulé exact du
+   * compte 481 — ce n'est pas une subdivision *en plus* de 481, c'est 481 sous
+   * un numéro antérieur. La première reste employable dans le référentiel en
+   * vigueur une fois déclarée ; la seconde ne le peut pas, puisqu'il faudrait
+   * deux numéros pour une seule chose.
+   */
+  duplicatesOfficialAccount?: string;
   /** Pourquoi ce compte figure ici — affiché au relecteur, jamais deviné. */
   rationale: string;
 }
@@ -87,6 +99,7 @@ export const VERSIONED_ACCOUNTS: readonly VersionedAccount[] = [
     accountNumber: "4816",
     kind: "custom-subdivision",
     parentAccount: "481",
+    duplicatesOfficialAccount: "481",
     label: "Frais d'émission des emprunts (subdivision du support)",
     rationale:
       "Même intitulé que le compte 481 du plan 2026, numéro différent. Le plan 2026 ne prescrit pas ce numéro : ce n'est pas un compte officiel, c'est une subdivision."

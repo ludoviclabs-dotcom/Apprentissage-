@@ -1,7 +1,12 @@
 import { dirname, isAbsolute, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { loadLocalEnv } from "@finance/ingest";
-import { loadCorpus, resolveChapter, type ChapterSummary, type LoadedCorpus } from "../corpus/load";
+import {
+  loadCorpusWithReferences,
+  resolveChapter,
+  type ChapterSummary,
+  type LoadedCorpus
+} from "../corpus/load";
 import { generationModes, type GenerationMode } from "../types/metadata";
 
 /**
@@ -177,7 +182,9 @@ export async function resolveContext(options: CommonOptions): Promise<ResolvedCo
     throw new UsageError('--chapter est requis (exemple : --chapter "Emprunts obligataires")');
   }
 
-  const corpus = await loadCorpus(extractedDir(), options.sourcePack);
+  // Avec les référentiels : un contenu du profil en vigueur doit pouvoir citer
+  // le plan comptable, qui vit dans son propre pack.
+  const corpus = await loadCorpusWithReferences(extractedDir(), options.sourcePack);
   return { corpus, chapter: resolveChapter(corpus, options.chapter) };
 }
 

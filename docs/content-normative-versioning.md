@@ -75,9 +75,13 @@ Le référentiel du parcours public, et le seul sur lequel un apprenant est not�
 - `status: "current"` ;
 - `scoringPolicy` : `graded` pour un exercice, `not-gradable` pour une fiche —
   jamais `comparison-only`, qui est la voie de ce qui n'est plus applicable ;
-- refuse 791, 6812, 16883 : leur traitement a été remplacé ;
-- refuse une subdivision issue du support (`source: "course"`) ; une subdivision
-  d'entité (`source: "entity-plan"`) reste possible si elle est déclarée ;
+- refuse 791, 6812, 16883 **dans un champ typé** — carte des comptes,
+  chronologie, ligne d'écriture, comptes requis : c'est là qu'un compte devient
+  la réponse. Les *nommer en prose* reste possible, et c'est ce qui permet
+  d'écrire un encart comparatif ; il faut alors déclarer la divergence ;
+- refuse une subdivision qui **double** un compte officiel — 4816 porte
+  l'intitulé exact de 481 — mais admet une subdivision déclarée qui nomme un
+  usage que le plan ne nomme pas, comme 4671 sous 467 ;
 - exige au moins une source `official-reference` : se déclarer du plan en vigueur
   en ne citant que le support revient à affirmer que le support *est* le plan.
 
@@ -116,8 +120,8 @@ reviendrait à le réécrire.
 | 6272 | officiel courant | frais retenus, charge de l'exercice |
 | 512 | officiel courant | exige une source `official-reference` : son intitulé vient du plan de comptes, pas du support |
 | 467 | officiel courant | parent de 4671 et 4672 |
-| 4816 | subdivision | à déclarer avec `parentAccount: "481"` ; hors du profil courant |
-| 4671, 4672 | subdivision | à déclarer avec `parentAccount: "467"` ; hors du profil courant |
+| 4816 | subdivision, double 481 | à déclarer avec `parentAccount: "481"` ; refusé dans le profil courant, où 481 tient ce rôle |
+| 4671, 4672 | subdivision | à déclarer avec `parentAccount: "467"` ; admise dans tous les profils une fois déclarée |
 | 791 | remplacé | jamais dans le profil courant ; divergence à marquer |
 | 6812 | remplacé par 6862 | conservé dans le seul support d'origine |
 | 16883 | remplacé par 1638 | même constat, même traitement |
@@ -134,8 +138,9 @@ Un seul code couvre tous les mélanges, parce que le relecteur n'a pas besoin de
 dix codes pour une seule question — « ce contenu dit-il vrai selon un seul
 référentiel, et lequel ? ». Sont refusés :
 
-1. 481 (plan en vigueur) avec 791 (virement historique) ;
-2. 6862 et 6812 pour la même dotation ;
+1. 481 (plan en vigueur) avec 791 (virement historique), **dans des champs
+   typés** ;
+2. 6862 et 6812 pour la même dotation, **dans des champs typés** ;
 3. un contenu `anc-2026-current` qui ne cite aucune référence officielle ;
 4. un contenu **noté** dont la réponse attendue emploie un compte remplacé ;
 5. un contenu qui emploie un compte remplacé sans note de divergence ;
@@ -145,6 +150,11 @@ Les points 1 et 2 sont refusés **même sans référentiel déclaré** : additio
 deux mécanismes qui se remplacent est faux quel que soit le plan qu'on invoque.
 4816 avec 791, en revanche, n'est *pas* un mélange — c'est le traitement
 historique cohérent.
+
+Un mélange est une **écriture** qui additionne deux mécanismes, pas une phrase
+qui les compare. Le contrôle porte donc sur les champs typés : l'appliquer à la
+prose aurait rendu impossible d'écrire ce qui a changé, alors que le comprendre
+fait partie de ce qu'un apprenant doit savoir.
 
 Codes voisins, pour ce qui n'est pas un mélange :
 
@@ -203,3 +213,16 @@ même chose :
 Ils sont enregistrés comme deux documents distincts, avec deux identifiants
 distincts. Les confondre revient à sourcer un intitulé de compte dans un document
 qui ne le porte pas.
+
+### Un référentiel n'appartient à aucun chapitre
+
+Le plan comptable vaut pour les emprunts obligataires comme pour les contrats à
+long terme : il vit dans son propre pack d'import. `loadCorpusWithReferences`
+réunit donc, pour un chapitre donné, le pack du contenu **et** tout pack
+entièrement composé de documents de référence. Sans cette réunion, un contenu
+qui citait le PCG était refusé pour « document inconnu », et l'exigence d'une
+source officielle dans le profil en vigueur était intenable.
+
+Les packs de chapitres restent étanches entre eux : le critère est « tous les
+documents sont des références », et non « au moins un », faute de quoi un
+chapitre aurait pu citer le cours d'un autre sans que rien ne le signale.

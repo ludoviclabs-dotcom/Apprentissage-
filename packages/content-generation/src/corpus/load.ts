@@ -38,7 +38,17 @@ export class CorpusNotExtractedError extends Error {
   }
 }
 
-export async function loadCorpus(extractedDir: string, packId: string): Promise<LoadedCorpus> {
+/**
+ * Les documents d'un pack, lus depuis ses artefacts d'extraction.
+ *
+ * Séparé de {@link loadCorpus} parce qu'un index peut désormais réunir
+ * plusieurs packs : le pack du chapitre, et les référentiels transversaux qui
+ * n'appartiennent à aucun chapitre.
+ */
+async function readPackDocuments(
+  extractedDir: string,
+  packId: string
+): Promise<{ manifest: ContentManifest; documents: CorpusDocument[] }> {
   const packDir = join(extractedDir, packId);
   const manifestPath = join(packDir, "manifest.json");
 
@@ -98,7 +108,75 @@ export async function loadCorpus(extractedDir: string, packId: string): Promise<
     }
   }
 
+  return { manifest, documents };
+}
+
+export async function loadCorpus(extractedDir: string, packId: string): Promise<LoadedCorpus> {
+  const { manifest, documents } = await readPackDocuments(extractedDir, packId);
+
   return { packId, manifest, index: new CorpusIndex(documents) };
+}
+
+/**
+ * Un pack est un référentiel quand il ne porte que des documents de référence.
+ *
+ * Le critère est délibérément strict : « au moins un document de référence »
+ * aurait fait entrer un pack de chapitre entier dans l'index d'un autre chapitre
+ * dès qu'il contient un extrait de norme, et un contenu aurait pu citer le cours
+ * d'un chapitre voisin sans que rien ne le signale.
+ */
+function isReferencePack(manifest: ContentManifest): boolean {
+  return manifest.files.length > 0 && manifest.files.every((file) => file.category === "reference");
+}
+
+/**
+ * Le corpus d'un chapitre, augmenté des référentiels transversaux.
+ *
+ * UN RÉFÉRENTIEL N'APPARTIENT À AUCUN CHAPITRE, ET C'EST TOUT LE PROBLÈME QUE
+ * CETTE FONCTION RÉSOUT. Le plan comptable vaut pour les emprunts obligataires
+ * comme pour les contrats à long terme : le ranger dans le pack d'un chapitre
+ * serait faux, et l'y recopier une fois par chapitre le serait tout autant. Il
+ * vit donc dans son propre pack — mais un index limité à un seul pack rendait
+ * alors ses documents introuvables, si bien qu'un contenu qui citait le PCG
+ * était refusé pour « document inconnu ». Le modèle normatif exige pourtant
+ * qu'un contenu du profil en vigueur cite une référence officielle : sans cette
+ * réunion, l'exigence était intenable.
+ *
+ * Ce que la réunion n'ouvre pas : les packs de chapitres restent étanches entre
+ * eux. Seuls les packs entièrement composés de documents de référence sont
+ * joints, et `manifest` reste celui du pack demandé — les chapitres, les
+ * voisinages de doublons et la résolution `--chapter` continuent de ne voir que
+ * le pack du contenu.
+ */
+export async function loadCorpusWithReferences(
+  extractedDir: string,
+  packId: string
+): Promise<LoadedCorpus> {
+  const own = await readPackDocuments(extractedDir, packId);
+  const documents = [...own.documents];
+
+  if (existsSync(extractedDir)) {
+    for (const candidate of (await readdir(extractedDir, { withFileTypes: true }))
+      .filter((entry) => entry.isDirectory() && entry.name !== packId)
+      .map((entry) => entry.name)
+      .sort()) {
+      try {
+        const other = await readPackDocuments(extractedDir, candidate);
+
+        if (isReferencePack(other.manifest)) {
+          documents.push(...other.documents);
+        }
+      } catch {
+        // Un pack voisin non extrait, ou dont le manifeste a été écrasé, ne doit
+        // pas empêcher de relire le chapitre demandé. Son absence se constate
+        // ailleurs : `content:validate` le dit, et une référence vers un de ses
+        // documents échouera de toute façon en « document inconnu ».
+        continue;
+      }
+    }
+  }
+
+  return { packId, manifest: own.manifest, index: new CorpusIndex(documents) };
 }
 
 export interface ChapterSummary {

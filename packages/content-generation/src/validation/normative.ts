@@ -106,12 +106,24 @@ function pathOf(occurrences: readonly AccountOccurrence[], accountNumber: string
  *
  * 6862 et 6812 : deux dotations pour un seul étalement. L'une remplace l'autre,
  * elles ne s'ajoutent pas.
+ *
+ * LE CONTRÔLE PORTE SUR LES CHAMPS TYPÉS, PAS SUR LA PROSE. Un mélange est une
+ * *écriture* qui additionne deux mécanismes : deux lignes, deux comptes requis.
+ * Une phrase qui compare les deux traitements les nomme tous les deux sans rien
+ * additionner, et c'est exactement ce qu'un encart comparatif doit faire.
+ * L'appliquer au texte aurait rendu la comparaison impossible à écrire — or
+ * comprendre ce qui a changé fait partie de ce qu'un apprenant doit savoir. Une
+ * mention en prose reste soumise à {@link checkConflictIsDeclared} : nommer un
+ * compte remplacé oblige à dater la divergence.
  */
 function checkProfileIndependentHybrids(
-  present: ReadonlySet<string>,
   occurrences: readonly AccountOccurrence[],
   errors: ValidationIssue[]
 ): void {
+  const present = new Set(
+    occurrences.filter((occurrence) => occurrence.structured).map((occurrence) => occurrence.accountNumber)
+  );
+
   if (present.has("481") && present.has("791")) {
     errors.push(
       issue(
@@ -158,10 +170,28 @@ function checkCurrentProfile(
     );
   }
 
+  const structured = new Set(
+    occurrences.filter((occurrence) => occurrence.structured).map((occurrence) => occurrence.accountNumber)
+  );
+
   for (const accountNumber of present) {
     const account = versionedAccount(accountNumber);
 
     if (account?.kind === "legacy") {
+      // NOMMER L'ANCIEN TRAITEMENT N'EST PAS L'APPLIQUER. Une fiche du profil en
+      // vigueur doit pouvoir dire ce qui a changé — c'est même la seule façon
+      // qu'a un apprenant de comprendre un support antérieur qu'il a sous les
+      // yeux. Ce qui est interdit, c'est de l'employer : de le mettre dans une
+      // carte des comptes, une chronologie, une ligne d'écriture ou une liste de
+      // comptes requis, c'est-à-dire là où il devient la réponse.
+      //
+      // Une simple mention en prose reste soumise à `checkConflictIsDeclared` :
+      // elle exige une note de divergence, faute de quoi le lecteur ne peut pas
+      // savoir que le compte cité appartient à un état antérieur du droit.
+      if (!structured.has(accountNumber)) {
+        continue;
+      }
+
       errors.push(
         issue(
           "error",
@@ -178,18 +208,17 @@ function checkCurrentProfile(
       continue;
     }
 
-    // Une subdivision reste possible dans le référentiel courant — un plan de
-    // comptes d'entreprise en comporte légitimement — mais seulement si elle
-    // vient d'une entité. Une subdivision *du support* appartient au traitement
-    // historique par construction : elle n'a pas d'autre existence.
-    const disclosure = disclosureFor(context.customAccountDisclosures, accountNumber);
-
-    if (disclosure?.source === "course") {
+    // Une subdivision déclarée reste employable dans le référentiel en vigueur :
+    // le plan admet les subdivisions, et 4671 nomme un usage que 467 ne nomme
+    // pas. Ce qui est refusé est la subdivision qui *double* un compte officiel
+    // — 4816 porte l'intitulé exact de 481 — parce qu'il faudrait alors deux
+    // numéros pour une seule chose, et que le plan en a tranché un.
+    if (account.duplicatesOfficialAccount) {
       errors.push(
         issue(
           "error",
           NORMATIVE_MISMATCH_CODE,
-          `le compte ${accountNumber} est une subdivision du support d'origine : il relève du profil « Support d'origine — historique » ou « Sous-compte propre au cas », jamais du plan officiel 2026, qui ne le prescrit pas`,
+          `le compte ${accountNumber} porte l'intitulé du compte ${account.duplicatesOfficialAccount} du plan 2026 sous un numéro que ce plan ne prescrit pas : dans le référentiel en vigueur, employer ${account.duplicatesOfficialAccount}. Le numéro ${accountNumber} relève du profil « Support d'origine — historique ».`,
           pathOf(occurrences, accountNumber)
         )
       );
@@ -445,7 +474,7 @@ export function checkNormativeContext(input: NormativeCheckInput): NormativeChec
   const present = new Set(distinctAccountNumbers(occurrences));
   const context = input.normativeContext ?? null;
 
-  checkProfileIndependentHybrids(present, occurrences, errors);
+  checkProfileIndependentHybrids(occurrences, errors);
 
   if (!context) {
     if (present.size > 0) {
