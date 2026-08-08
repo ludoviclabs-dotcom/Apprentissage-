@@ -204,7 +204,7 @@ function checkCurrentProfile(
       continue;
     }
 
-    if (account?.kind !== "custom-subdivision") {
+    if (account?.kind !== "custom-subdivision" || !structured.has(accountNumber)) {
       continue;
     }
 
@@ -280,7 +280,17 @@ function checkDisclosures(
   context: NormativeContext,
   errors: ValidationIssue[]
 ): void {
-  for (const accountNumber of present) {
+  // L'obligation de déclarer porte sur l'EMPLOI, pas sur la citation. Un
+  // sous-compte devient trompeur quand il figure dans une carte des comptes, une
+  // ligne d'écriture ou une liste de comptes requis : le lecteur le prend alors
+  // pour un compte du plan. Une phrase qui le nomme pour dire d'où il vient ne
+  // le présente comme obligatoire à personne — et l'exiger aurait interdit
+  // d'expliquer la différence entre deux numérotations.
+  const used = new Set(
+    occurrences.filter((occurrence) => occurrence.structured).map((occurrence) => occurrence.accountNumber)
+  );
+
+  for (const accountNumber of used) {
     const account = versionedAccount(accountNumber);
 
     if (account?.kind !== "custom-subdivision") {
@@ -367,9 +377,17 @@ function checkConflictIsDeclared(
   context: NormativeContext,
   errors: ValidationIssue[]
 ): void {
-  const legacy = [...present].filter((accountNumber) => versionedAccount(accountNumber)?.kind === "legacy");
+  // Deux façons d'être daté : un compte dont le traitement a été remplacé (791,
+  // 6812, 16883), et un sous-compte qui porte l'intitulé d'un compte officiel
+  // sous un numéro antérieur (4816). Les deux appellent la même obligation :
+  // nommer un numéro daté sans dire qu'il l'est le fait passer pour courant.
+  const dated = [...present].filter((accountNumber) => {
+    const account = versionedAccount(accountNumber);
 
-  if (legacy.length === 0 || context.versionConflictNotes.length > 0) {
+    return account?.kind === "legacy" || Boolean(account?.duplicatesOfficialAccount);
+  });
+
+  if (dated.length === 0 || context.versionConflictNotes.length > 0) {
     return;
   }
 
@@ -377,7 +395,7 @@ function checkConflictIsDeclared(
     issue(
       "error",
       NORMATIVE_MISMATCH_CODE,
-      `le contenu emploie ${legacy.join(", ")}, dont le traitement a été remplacé, sans aucune note de divergence : présenter l'ancien traitement sans avertissement le fait passer pour toujours applicable`,
+      `le contenu nomme ${dated.join(", ")}, dont le traitement ou la numérotation a été remplacé, sans aucune note de divergence : présenter l'ancien traitement sans avertissement le fait passer pour toujours applicable`,
       "normativeContext.versionConflictNotes"
     )
   );

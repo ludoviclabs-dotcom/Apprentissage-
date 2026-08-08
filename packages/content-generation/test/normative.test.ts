@@ -431,6 +431,34 @@ describe("sous-comptes — déclarés ou refusés", () => {
     expect(result.errors.some((problem) => problem.message.includes("employer 481"))).toBe(true);
   });
 
+  it("admet qu'un encart comparatif nomme un sous-compte daté sans l'employer", () => {
+    // C'est la fiche du chapitre : elle applique 481 et 6862, et explique que le
+    // support numérote 4816. Exiger une déclaration pour cette phrase aurait
+    // interdit d'écrire la comparaison.
+    const payload = currentSpreadPayload({
+      explanation:
+        "Le support d'origine porte ces frais au compte 4816 et les amortit par 6812 ; le plan en vigueur retient 481 et 6862."
+    });
+
+    const result = checkNormativeContext({
+      payload,
+      normativeContext: context({ versionConflictNotes: [LEGACY_CONFLICT_NOTE] })
+    });
+
+    expect(result.errors).toEqual([]);
+  });
+
+  it("exige une note de divergence dès qu'un sous-compte daté est nommé", () => {
+    const payload = currentSpreadPayload({
+      explanation: "Le compte 4816 reçoit les frais d'émission étalés."
+    });
+
+    const result = checkNormativeContext({ payload, normativeContext: context() });
+
+    expect(codesOf(result)).toContain(NORMATIVE_MISMATCH_CODE);
+    expect(result.errors.some((problem) => problem.message.includes("note de divergence"))).toBe(true);
+  });
+
   it("refuse une déclaration qui ne correspond à aucun compte employé", () => {
     const result = checkNormativeContext({
       payload: currentSpreadPayload(),
