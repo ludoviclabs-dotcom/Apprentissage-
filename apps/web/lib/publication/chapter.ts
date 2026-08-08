@@ -420,7 +420,15 @@ async function loadChapterCatalogue(
   }
 
   const { entries } = await readEntries(chapterSlug);
-  const activeArtifactIds = new Set(entries.map((entry) => entry.id));
+  // SEULES LES VERSIONS NOTÉES ENTRENT DANS LA MAÎTRISE. Un contenu de
+  // comparaison reste lisible et son identifiant reste valide ; il n'a
+  // simplement rien à faire dans le calcul de progression. Le champ vient de
+  // l'entrée d'index, que les deux pilotes remplissent de la même façon — il
+  // n'y a donc pas d'instantané à ouvrir pour le savoir. `null` désigne une
+  // version antérieure au modèle : elle reste notée, comme avant.
+  const activeArtifactIds = new Set(
+    entries.filter((entry) => (entry.scoringPolicy ?? "graded") === "graded").map((entry) => entry.id)
+  );
   const caseStepIds = new Map<string, ReadonlySet<string>>();
 
   if (types.includes("progressive_case")) {

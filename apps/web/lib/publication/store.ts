@@ -20,6 +20,7 @@ import {
   canUseDatabase,
   getPublishedVersion,
   getPublishedVersionHistory,
+  type PublishedVersionRow,
   listPublishedChapterVersions,
   listPublishedModuleVersions,
   PublishedContentUnavailableError,
@@ -137,6 +138,20 @@ export interface PublishedEntry {
   publicationVersion: number;
   publishedAt: string;
   contentHash: string;
+  /**
+   * Le référentiel de la version, sans ouvrir son instantané.
+   *
+   * LES DEUX PILOTES DOIVENT RÉPONDRE LA MÊME CHOSE. Le catalogue de progression
+   * et la file de révision espacée raisonnent sur ces entrées : si le pilote
+   * fichier savait qu'un contenu est « comparaison seule » et le pilote
+   * PostgreSQL l'ignorait, la même bibliothèque noterait différemment selon la
+   * machine qui la sert.
+   *
+   * `null` désigne une version publiée avant le modèle normatif : les lectures
+   * la traitent comme le référentiel en vigueur, ce qu'elle signifiait alors.
+   */
+  normativeProfile: string | null;
+  scoringPolicy: string | null;
 }
 
 function fromSummary(row: PublishedVersionSummary): PublishedEntry {
@@ -149,7 +164,9 @@ function fromSummary(row: PublishedVersionSummary): PublishedEntry {
     title: row.title,
     publicationVersion: row.publicationVersion,
     publishedAt: row.publishedAt,
-    contentHash: row.contentHash
+    contentHash: row.contentHash,
+    normativeProfile: row.normativeProfile,
+    scoringPolicy: row.scoringPolicy
   };
 }
 
@@ -163,7 +180,9 @@ function fromIndexEntry(entry: PublicationIndexEntry): PublishedEntry {
     title: entry.title,
     publicationVersion: entry.publicationVersion,
     publishedAt: entry.publishedAt,
-    contentHash: entry.contentHash
+    contentHash: entry.contentHash,
+    normativeProfile: entry.normativeProfile,
+    scoringPolicy: entry.scoringPolicy
   };
 }
 
@@ -271,13 +290,27 @@ export const loadPublishedVersion = cache(
 async function loadFromDatabase(id: string): Promise<PublishedContentVersion | undefined> {
   const row = await getPublishedVersion(id);
 
-  if (!row) {
-    return undefined;
-  }
+  return row ? versionFromRow(row) : undefined;
+}
 
+/**
+ * La ligne PostgreSQL rendue à la forme que le reste du code manipule.
+ *
+ * Exportée pour être éprouvée : c'est ici qu'un champ se perd en silence, et un
+ * test qui construirait sa propre correspondance ne prouverait rien de celle-ci.
+ */
+export function versionFromRow(row: PublishedVersionRow): PublishedContentVersion {
   const version = publishedContentVersionSchema.parse({
     ...row,
     contentSnapshot: row.contentSnapshot,
+    // LA COLONNE EST RELUE, PAS SUPPOSÉE. Sans elle, `resolveNormativeContext`
+    // rendait le référentiel en vigueur à toute version lue depuis PostgreSQL :
+    // une carte publiée « support d'origine — comparaison seule » revenait
+    // courante et notable, entrait dans la file de révision espacée et corrigeait
+    // sur un traitement remplacé. `null` reste `null` — une ligne antérieure à la
+    // migration 0015 n'a jamais porté de référentiel, et c'est ce fait-là qui est
+    // rendu, pas une valeur inventée.
+    normativeContextSnapshot: row.normativeContextSnapshot ?? null,
     sourceReferencesSnapshot: row.sourceReferencesSnapshot,
     generationMetadataSnapshot: row.generationMetadataSnapshot,
     validationMetadataSnapshot: row.validationMetadataSnapshot,
@@ -292,7 +325,7 @@ async function loadFromDatabase(id: string): Promise<PublishedContentVersion | u
   // chemin de *production* seul sans contrôle, ce qui est l'inverse de la
   // priorité voulue.
   if (contentHash(version.contentSnapshot) !== version.contentHash) {
-    throw new SnapshotIntegrityError(id);
+    throw new SnapshotIntegrityError(row.id);
   }
 
   return version;

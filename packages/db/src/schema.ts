@@ -17,7 +17,8 @@ export const migrationFiles = [
   "migrations/0011_excel_formula_engine.sql",
   "migrations/0012_certificate_verification.sql",
   "migrations/0013_content_drafts.sql",
-  "migrations/0014_content_publication.sql"
+  "migrations/0014_content_publication.sql",
+  "migrations/0015_published_normative_context.sql"
 ] as const;
 
 /** Tables protected by row level security, keyed on `user_id`. */

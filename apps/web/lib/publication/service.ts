@@ -11,6 +11,7 @@ import {
   resolveSlug,
   UnknownChapterError,
   type PublicationIndexEntry,
+  storedNormativeFields,
   type PublicationReport,
   type PublishedContentVersion
 } from "@finance/content-publication";
@@ -260,7 +261,11 @@ export async function publishDraft(input: {
       validationMetadataSnapshot: version.validationMetadataSnapshot,
       reviewMetadataSnapshot: version.reviewMetadataSnapshot,
       contentHash: version.contentHash,
-      previousPublishedVersionId: version.previousPublishedVersionId
+      previousPublishedVersionId: version.previousPublishedVersionId,
+      // Le référentiel et les deux champs qui en dérivent, par la même fonction
+      // que l'index du magasin de fichiers : les deux pilotes écrivent le même
+      // contrat, sans que la règle soit écrite deux fois.
+      ...storedNormativeFields(version)
     },
     {
       action: active ? "republish" : "publish",

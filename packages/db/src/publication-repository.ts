@@ -58,6 +58,24 @@ export interface PublishedVersionInput {
   reviewMetadataSnapshot: unknown;
   contentHash: string;
   previousPublishedVersionId: string | null;
+  /**
+   * The referential this version is true against, copied whole.
+   *
+   * `null` only for a row that never had one — a publication written before
+   * migration 0015. A *new* publication with a null context is refused upstream
+   * by the publication guard: the storage layer stores what it is given, and the
+   * decision of what may be published belongs where the rules live.
+   */
+  normativeContextSnapshot: unknown | null;
+  /**
+   * Derived from the snapshot, never authored separately.
+   *
+   * They exist so that "what is published in this chapter, and what may grade a
+   * learner" is answerable without selecting a JSONB column for every row — the
+   * summary query behind the chapter screens and the spaced-repetition queue.
+   */
+  normativeProfile: string | null;
+  scoringPolicy: string | null;
 }
 
 export interface PublicationAuditInput {
@@ -611,6 +629,9 @@ export interface PublishedVersionRow {
   status: string;
   previousPublishedVersionId: string | null;
   archivedAt: string | null;
+  normativeContextSnapshot: unknown | null;
+  normativeProfile: string | null;
+  scoringPolicy: string | null;
 }
 
 /**
@@ -631,6 +652,16 @@ export interface PublishedVersionSummary {
   publicationVersion: number;
   publishedAt: string;
   contentHash: string;
+  /**
+   * Le référentiel, sans ouvrir l'instantané.
+   *
+   * `null` sur une ligne antérieure à la migration 0015 : l'appelant la lit
+   * alors comme le référentiel en vigueur, ce qu'elle signifiait quand elle a
+   * été écrite. Le magasin de fichiers porte les deux mêmes champs dans son
+   * index, pour que les deux pilotes répondent la même chose.
+   */
+  normativeProfile: string | null;
+  scoringPolicy: string | null;
 }
 
 const summaryColumns = {
@@ -642,7 +673,9 @@ const summaryColumns = {
   title: publishedContentVersionsTable.title,
   publicationVersion: publishedContentVersionsTable.publicationVersion,
   publishedAt: publishedContentVersionsTable.publishedAt,
-  contentHash: publishedContentVersionsTable.contentHash
+  contentHash: publishedContentVersionsTable.contentHash,
+  normativeProfile: publishedContentVersionsTable.normativeProfile,
+  scoringPolicy: publishedContentVersionsTable.scoringPolicy
 };
 
 /**

@@ -8,6 +8,7 @@ import {
   resolveNormativeContext,
   scoringPolicySchema
 } from "@finance/content-generation";
+import { storedNormativeFields } from "./types";
 import { assertSnapshotPublishable } from "./guard";
 import { contentHash } from "./hash";
 import {
@@ -133,7 +134,12 @@ async function writeIndex(options: PublicationStoreOptions, index: PublicationIn
 }
 
 function toIndexEntry(version: PublishedContentVersion): PublicationIndexEntry {
-  const context = resolveNormativeContext(version.normativeContextSnapshot);
+  // La dérivation vient de `storedNormativeFields`, comme pour PostgreSQL. Le
+  // repli sur le référentiel en vigueur reste ici : l'index de fichiers, lui,
+  // n'admet pas de valeur nulle — ses défauts de schéma jouent le même rôle que
+  // `resolveNormativeContext` côté lecture.
+  const stored = storedNormativeFields(version);
+  const context = resolveNormativeContext(stored.normativeContextSnapshot);
 
   return {
     id: version.id,
