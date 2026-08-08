@@ -1,4 +1,4 @@
-import { contentPayloadSchema, contentTypeSchema } from "@finance/content-generation";
+import { contentPayloadSchema, contentTypeSchema, normativeContextSchema } from "@finance/content-generation";
 import { z } from "zod";
 
 /**
@@ -98,6 +98,20 @@ export const publishedContentVersionSchema = z.object({
   chapterLabel: z.string().min(1),
   /** Le contenu lui-même, discriminé par `artifactType`, recopié tel quel. */
   contentSnapshot: contentPayloadSchema,
+  /**
+   * Le référentiel selon lequel l'instantané dit vrai, recopié comme le reste.
+   *
+   * IL DÉCIDE DE LA NOTATION APRÈS LA PUBLICATION. Un contenu
+   * « comparaison seule » ne corrige aucune tentative et ne compte dans aucun
+   * score : le laisser derrière dans le brouillon aurait obligé chaque page
+   * publique à interroger la fabrique pour savoir si elle a le droit de noter,
+   * ce que l'architecture interdit — le site public ne lit que des instantanés.
+   *
+   * Facultatif pour la même raison que dans l'enveloppe : les versions publiées
+   * avant ce champ restent lisibles. `resolveNormativeContext` fournit alors le
+   * référentiel courant, qui était le comportement implicite d'avant.
+   */
+  normativeContextSnapshot: normativeContextSchema.nullish(),
   sourceReferencesSnapshot: z.array(publishedSourceReferenceSchema).min(1),
   /** 1 pour la première publication, incrémentée à chaque nouvelle version. */
   publicationVersion: z.number().int().min(1),

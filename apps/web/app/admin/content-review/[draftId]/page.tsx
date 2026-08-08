@@ -3,9 +3,21 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { contentTypeLabels, isPublishableGenerationMode } from "@finance/content-generation";
 import { resolvePublicChapter, resolveSlug } from "@finance/content-publication";
-import { findDraft, loadCorpusIndex, requireReviewAccess, resolveExcerpts } from "@/lib/content-review/service";
+import {
+  findDraft,
+  loadCorpusIndex,
+  requireReviewAccess,
+  resolveExcerpts,
+  type SourceExcerpt
+} from "@/lib/content-review/service";
 import { findActive, loadHistory } from "@/lib/publication/store";
 import { ContentPreview } from "@/components/content-review/content-preview";
+import {
+  NormativePanel,
+  NormativeProfileBadge,
+  ScoringPolicyBadge,
+  UndeterminedProfileBadge
+} from "@/components/content-review/normative-panel";
 import { DraftEditor } from "@/components/content-review/draft-editor";
 import { PublicationActions } from "@/components/content-review/publication-actions";
 import { ReviewActions } from "@/components/content-review/review-actions";
@@ -17,6 +29,26 @@ export const metadata: Metadata = {
 };
 
 export const dynamic = "force-dynamic";
+
+/** Un extrait cité, rendu à l'identique dans les deux listes de sources. */
+function renderExcerpt(excerpt: SourceExcerpt) {
+  return (
+    <article key={`${excerpt.documentTitle}-${excerpt.pageStart}-${excerpt.pageEnd}`} className="review-source">
+      <h4>{excerpt.documentTitle}</h4>
+      <p className="muted">
+        {excerpt.pageStart === excerpt.pageEnd
+          ? `Page ${excerpt.pageStart}`
+          : `Pages ${excerpt.pageStart} à ${excerpt.pageEnd}`}
+        {excerpt.degraded ? " — extraction dégradée" : ""}
+      </p>
+      {excerpt.chunks.map((chunk) => (
+        <blockquote key={chunk.chunkId} className="review-excerpt">
+          {chunk.content}
+        </blockquote>
+      ))}
+    </article>
+  );
+}
 
 export default async function ContentReviewDetailPage({
   params
@@ -35,6 +67,11 @@ export default async function ContentReviewDetailPage({
   const { draft, location } = entry;
   const corpus = await loadCorpusIndex(location.packId);
   const excerpts = resolveExcerpts(draft, corpus);
+  // Deux listes plutôt qu'une : « ce que dit la norme » et « ce que dit le
+  // support » ne se relisent pas de la même façon, et c'est leur confusion qui
+  // a laissé un traitement remplacé passer pour le traitement en vigueur.
+  const normativeExcerpts = excerpts.filter((excerpt) => excerpt.materialKind === "official-reference");
+  const pedagogicalExcerpts = excerpts.filter((excerpt) => excerpt.materialKind !== "official-reference");
   const validation = draft.validationMetadata;
   // Même règle que la route d'approbation : contrôles passés ET aucune source
   // dégradée. Le bouton ne fait que refléter la décision du serveur.
@@ -65,6 +102,14 @@ export default async function ContentReviewDetailPage({
           <p className="review-badges">
             <StatusToken status={draft.status} />
             <ModeBadge mode={draft.generationMetadata.mode} />
+            {draft.normativeContext ? (
+              <>
+                <NormativeProfileBadge profile={draft.normativeContext.profile} />
+                <ScoringPolicyBadge policy={draft.normativeContext.scoringPolicy} />
+              </>
+            ) : (
+              <UndeterminedProfileBadge />
+            )}
             <span className="muted">
               {draft.generationMetadata.promptId}.{draft.generationMetadata.promptVersion} ·{" "}
               {draft.generationMetadata.model} · révision {draft.reviewMetadata.revision} ·{" "}
@@ -84,22 +129,28 @@ export default async function ContentReviewDetailPage({
               affichés. Les références restent vérifiées lors de la validation.
             </p>
           ) : (
-            excerpts.map((excerpt) => (
-              <article key={`${excerpt.documentTitle}-${excerpt.pageStart}-${excerpt.pageEnd}`} className="review-source">
-                <h3>{excerpt.documentTitle}</h3>
-                <p className="muted">
-                  {excerpt.pageStart === excerpt.pageEnd
-                    ? `Page ${excerpt.pageStart}`
-                    : `Pages ${excerpt.pageStart} à ${excerpt.pageEnd}`}
-                  {excerpt.degraded ? " — extraction dégradée" : ""}
-                </p>
-                {excerpt.chunks.map((chunk) => (
-                  <blockquote key={chunk.chunkId} className="review-excerpt">
-                    {chunk.content}
-                  </blockquote>
-                ))}
-              </article>
-            ))
+            <>
+              <section>
+                <h3>Sources normatives</h3>
+                {normativeExcerpts.length === 0 ? (
+                  <p className="muted">
+                    Aucune référence officielle citée. Un contenu qui affirme relever du plan en vigueur
+                    doit en citer une&nbsp;: sans elle, le référentiel invoqué n&apos;est étayé par rien.
+                  </p>
+                ) : (
+                  normativeExcerpts.map(renderExcerpt)
+                )}
+              </section>
+
+              <section>
+                <h3>Sources pédagogiques</h3>
+                {pedagogicalExcerpts.length === 0 ? (
+                  <p className="muted">Aucun support de cours ni énoncé cité.</p>
+                ) : (
+                  pedagogicalExcerpts.map(renderExcerpt)
+                )}
+              </section>
+            </>
           )}
 
           <p className="muted">
@@ -108,6 +159,11 @@ export default async function ContentReviewDetailPage({
         </aside>
 
         <div className="review-main">
+          <section className="panel">
+            <h2 className="panel-heading">Référentiel normatif</h2>
+            <NormativePanel context={draft.normativeContext} />
+          </section>
+
           <section className="panel">
             <h2 className="panel-heading">Aperçu</h2>
             <ContentPreview draft={draft} />

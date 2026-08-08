@@ -160,6 +160,7 @@ export function buildPublishedVersion(input: BuildSnapshotInput): PublishedConte
     chapter: key.chapter,
     chapterLabel: chapter.label,
     contentSnapshot: payload,
+    normativeContextSnapshot: draft.normativeContext ?? null,
     sourceReferencesSnapshot: collectPublishedReferences(draft),
     publicationVersion: input.publicationVersion,
     publishedAt: input.publishedAt,

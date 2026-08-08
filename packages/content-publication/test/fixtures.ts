@@ -3,7 +3,8 @@ import {
   type ContentDraft,
   type ContentDraftStatus,
   type ContentPayload,
-  type CorpusDocument
+  type CorpusDocument,
+  type NormativeContext
 } from "@finance/content-generation";
 
 /**
@@ -404,6 +405,45 @@ export interface DraftOptions {
   validationPassed?: boolean;
   warnings?: Array<{ code: string; message: string; severity: "warning" }>;
   id?: string;
+  /** `null` pour exercer explicitement le cas du référentiel non déclaré. */
+  normativeContext?: NormativeContext | null;
+}
+
+/**
+ * Le référentiel des brouillons de test.
+ *
+ * LES FIXTURES EMPLOIENT 4671, QUI N'EST PAS UN COMPTE DU PLAN. Le support de
+ * cours le dit lui-même ; il reste utilisable comme subdivision de 467, à
+ * condition de l'annoncer. Sans cette déclaration, le garde refuse désormais la
+ * publication — et c'est le comportement attendu, pas un défaut de fixture :
+ * publier un sous-compte comme s'il était prescrit est exactement ce que ce
+ * modèle corrige.
+ */
+export function fixtureNormativeContext(payload: ContentPayload): NormativeContext {
+  // La déclaration suit l'emploi : déclarer un sous-compte qu'un contenu
+  // n'emploie pas est refusé, et à juste titre — elle décrirait alors un autre
+  // contenu. Les fixtures qui n'emploient que des comptes du plan relèvent donc
+  // simplement du référentiel en vigueur.
+  const usesSubAccount = JSON.stringify(payload.content).includes("4671");
+
+  return {
+    profile: usesSubAccount ? "entity-specific" : "anc-2026-current",
+    status: usesSubAccount ? "custom" : "current",
+    effectiveFrom: "2026-01-01",
+    scoringPolicy: "graded",
+    sourceVersionIds: [],
+    customAccountDisclosures: usesSubAccount
+      ? [
+          {
+            accountNumber: "4671",
+            parentAccount: "467",
+            source: "course",
+            label: "Obligataires, obligations à placer"
+          }
+        ]
+      : [],
+    versionConflictNotes: []
+  };
 }
 
 /** Assemble un brouillon complet autour d'un contenu. */
@@ -441,6 +481,8 @@ export function draftFor(payload: ContentPayload, options: DraftOptions = {}): C
       qualityScore: passed ? 95 : 20,
       blockingReasons: passed ? [] : ["test : échec simulé"]
     },
+    normativeContext:
+      options.normativeContext === undefined ? fixtureNormativeContext(payload) : options.normativeContext,
     reviewMetadata: {
       reviewedBy: "relecteur@example.test",
       reviewedAt: "2026-08-01T11:00:00.000Z",

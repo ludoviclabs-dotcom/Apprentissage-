@@ -10,13 +10,17 @@ import type { ContentPayload } from "../src/types/artifact";
 export const COURSE_DOC_ID = "test-pack-aaaaaaaaaaaa";
 export const EXERCISE_DOC_ID = "test-pack-bbbbbbbbbbbb";
 
+export const REFERENCE_DOC_ID = "test-pack-cccccccccccc";
+
 export const CHUNK_RULES = "chunk-rules0000000000";
 export const CHUNK_ACCOUNTS = "chunk-accounts000000";
 export const CHUNK_DATA = "chunk-data0000000000";
+export const CHUNK_PLAN = "chunk-plan0000000000";
 
 const HASH_RULES = "a".repeat(64);
 const HASH_ACCOUNTS = "b".repeat(64);
 const HASH_DATA = "c".repeat(64);
+const HASH_PLAN = "d".repeat(64);
 
 const documents: CorpusDocument[] = [
   {
@@ -73,6 +77,31 @@ const documents: CorpusDocument[] = [
         sectionTitle: "Sans titre"
       }
     ]
+  },
+  // Un troisième document, classé `reference` : sans lui, aucun test ne pourrait
+  // distinguer « le contenu cite le référentiel » de « le contenu cite le cours »,
+  // qui est précisément la confusion que ce modèle corrige.
+  {
+    documentId: REFERENCE_DOC_ID,
+    packId: "test-pack",
+    title: "Plan comptable général - Version consolidée au 1er janvier 2026",
+    relativePath: "reference/pcg-2026.pdf",
+    category: "reference",
+    domainId: "compta-generale",
+    chapterSlug: "plan-comptable-general",
+    effectiveDate: "2026-01-01",
+    pages: [{ pageNumber: 141, degraded: false }],
+    chunks: [
+      {
+        id: CHUNK_PLAN,
+        documentId: REFERENCE_DOC_ID,
+        pageStart: 141,
+        pageEnd: 141,
+        contentHash: HASH_PLAN,
+        content: "512 Banques. 481 Charges à répartir sur plusieurs exercices.",
+        sectionTitle: "Comptes de trésorerie"
+      }
+    ]
   }
 ];
 
@@ -99,6 +128,18 @@ export const dataReference = {
   pageEnd: 1,
   chunkIds: [CHUNK_DATA],
   excerptHash: HASH_DATA
+};
+
+export const officialReference = {
+  pack: "test-pack",
+  documentId: REFERENCE_DOC_ID,
+  documentTitle: "Plan comptable général - Version consolidée au 1er janvier 2026",
+  sourceType: "official-reference" as const,
+  effectiveDate: "2026-01-01",
+  pageStart: 141,
+  pageEnd: 141,
+  chunkIds: [CHUNK_PLAN],
+  excerptHash: HASH_PLAN
 };
 
 export function flashcardPayload(overrides: Record<string, unknown> = {}): ContentPayload {

@@ -4,7 +4,10 @@ import {
   computeChapterProgress,
   COMPTA_APPROFONDIE,
   COMPTA_APPROFONDIE_MODULE,
+  filterComparisonOnlyVersions,
+  filterGradedVersions,
   getPublicChapter,
+  normativeContextOf,
   toPublicCalculationExercise,
   toPublicErrorDiagnosisExercise,
   toPublicFlashcardFront,
@@ -18,6 +21,7 @@ import {
   type PublicErrorDiagnosisExercise,
   type PublicFlashcardFront,
   type PublicJournalEntryExercise,
+  type PublicNormativeContext,
   type PublicProgressiveCase,
   type PublicSourceReference
 } from "@finance/content-publication";
@@ -216,6 +220,8 @@ export interface PublicSheetView {
   publicationVersion: number;
   sheet: SmartRevisionSheet;
   sources: PublicSourceReference[];
+  /** Selon quel référentiel la fiche dit vrai, et sur quelle période. */
+  normativeContext: PublicNormativeContext;
 }
 
 export async function loadChapterSheet(chapterSlug: string): Promise<PublicSheetView | null> {
@@ -234,7 +240,8 @@ export async function loadChapterSheet(chapterSlug: string): Promise<PublicSheet
     artifactId: version.id,
     publicationVersion: version.publicationVersion,
     sheet: version.contentSnapshot.content,
-    sources: toPublicSourceReferences(version.sourceReferencesSnapshot)
+    sources: toPublicSourceReferences(version.sourceReferencesSnapshot),
+    normativeContext: normativeContextOf(version)
   };
 }
 
@@ -258,7 +265,13 @@ export interface ScheduledFlashcard extends PublicFlashcardFront {
  * Sans compte, tout est « dû » : il n'y a pas d'historique à respecter.
  */
 export async function loadChapterFlashcards(chapterSlug: string): Promise<ScheduledFlashcard[]> {
-  const versions = await loadChapterVersionsOfType(COMPTA_APPROFONDIE_MODULE, chapterSlug, "flashcard");
+  // LA FILE NOTÉE NE PROPOSE QUE CE QUI FAIT FOI. Une carte du support d'origine
+  // est utile à lire — comprendre pourquoi la norme a changé en fait partie —
+  // mais la répétition espacée sert à ancrer une réponse. Ancrer un traitement
+  // remplacé reviendrait à faire apprendre l'ancienne réponse par cœur.
+  const versions = filterGradedVersions(
+    await loadChapterVersionsOfType(COMPTA_APPROFONDIE_MODULE, chapterSlug, "flashcard")
+  );
   const cards = versions.map(toPublicFlashcardFront);
   const user = await getCurrentUser();
 
@@ -305,6 +318,15 @@ export interface ChapterTrainingSet {
   journalEntries: PublicJournalEntryExercise[];
   diagnoses: PublicErrorDiagnosisExercise[];
   cases: PublicProgressiveCase[];
+  /**
+   * Les écritures du support d'origine, conservées pour comparaison.
+   *
+   * Elles ne sont pas dans `journalEntries` et ce n'est pas un détail de
+   * rangement : ce qui est dans `journalEntries` est proposé à la correction.
+   * Un encart comparatif est une lecture, pas un exercice — et la séparation
+   * empêche qu'un écran les affiche par mégarde dans la même liste.
+   */
+  comparison: PublicJournalEntryExercise[];
 }
 
 export async function loadChapterTraining(chapterSlug: string): Promise<ChapterTrainingSet> {
@@ -316,10 +338,11 @@ export async function loadChapterTraining(chapterSlug: string): Promise<ChapterT
   ]);
 
   return {
-    calculations: calculations.map(toPublicCalculationExercise),
-    journalEntries: journalEntries.map(toPublicJournalEntryExercise),
-    diagnoses: diagnoses.map(toPublicErrorDiagnosisExercise),
-    cases: cases.map(toPublicProgressiveCase)
+    calculations: filterGradedVersions(calculations).map(toPublicCalculationExercise),
+    journalEntries: filterGradedVersions(journalEntries).map(toPublicJournalEntryExercise),
+    diagnoses: filterGradedVersions(diagnoses).map(toPublicErrorDiagnosisExercise),
+    cases: filterGradedVersions(cases).map(toPublicProgressiveCase),
+    comparison: filterComparisonOnlyVersions(journalEntries).map(toPublicJournalEntryExercise)
   };
 }
 

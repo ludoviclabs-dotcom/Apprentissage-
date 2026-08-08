@@ -1,7 +1,9 @@
 import {
   collectSourceReferences,
+  collectVersionedAccounts,
   contentPayloadSchema,
   contentTypes,
+  distinctAccountNumbers,
   isPublishableGenerationMode,
   runTemplate,
   sourceReferenceSchema,
@@ -444,6 +446,26 @@ export function inspectForPublication(input: PublicationGuardInput): Publication
     );
   }
 
+  // --- 5 bis. Référentiel déterminé ---------------------------------------
+  //
+  // CE QUE LA VALIDATION TOLÈRE, LA PUBLICATION NE LE TOLÈRE PAS. Le moteur de
+  // validation se contente d'un avertissement quand un contenu emploie un
+  // compte dont le traitement dépend du millésime sans déclarer de contexte
+  // normatif : c'est ce qui permet aux brouillons antérieurs de rester
+  // relisibles. Mais publier un tel contenu, c'est le servir à un apprenant
+  // sans savoir selon quel plan comptable il est vrai — et, s'il est noté, le
+  // corriger sur un référentiel que personne n'a choisi.
+  const versionedAccounts = distinctAccountNumbers(collectVersionedAccounts(payload));
+
+  if (versionedAccounts.length > 0 && !draft.normativeContext) {
+    errors.push(
+      issue(
+        "contexte-normatif-absent",
+        `le contenu emploie des comptes dont le traitement dépend du millésime (${versionedAccounts.join(", ")}) sans déclarer de contexte normatif : le référentiel applicable doit être établi avant publication`
+      )
+    );
+  }
+
   // --- 6. Sources ----------------------------------------------------------
   const sourceIntegrity = checkSourceIntegrity(payload, input.corpus);
   errors.push(...sourceIntegrity.problems);
@@ -459,7 +481,11 @@ export function inspectForPublication(input: PublicationGuardInput): Publication
 
   // --- 8. Moteur de validation complet, rejoué -----------------------------
   if (input.corpus) {
-    const revalidated = validateContent({ payload, corpus: input.corpus });
+    const revalidated = validateContent({
+      payload,
+      corpus: input.corpus,
+      normativeContext: draft.normativeContext
+    });
 
     for (const problem of revalidated.errors) {
       errors.push(issue(problem.code, problem.message, problem.path));

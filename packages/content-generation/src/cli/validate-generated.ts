@@ -36,7 +36,12 @@ async function main(): Promise<void> {
 
   for (const draft of drafts) {
     const payload = { contentType: draft.contentType, content: draft.content } as ContentPayload;
-    const result = validateContent({ payload, corpus: corpus.index, siblings });
+    const result = validateContent({
+      payload,
+      corpus: corpus.index,
+      siblings,
+      normativeContext: draft.normativeContext
+    });
     const timestamp = new Date().toISOString();
     totalWarnings += result.warnings.length;
 

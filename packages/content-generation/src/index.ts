@@ -8,6 +8,7 @@
 
 export * from "./types/status";
 export * from "./types/source-reference";
+export * from "./types/normative-context";
 export * from "./types/metadata";
 export * from "./types/smart-revision-sheet";
 export * from "./types/flashcard";
@@ -19,6 +20,8 @@ export * from "./types/artifact";
 
 export * from "./calc/templates";
 export * from "./validation/text";
+export * from "./validation/normative-accounts";
+export * from "./validation/normative";
 export * from "./validation/engine";
 export * from "./envelope/build";
 export * from "./prompts/registry";

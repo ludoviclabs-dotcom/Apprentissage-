@@ -27,6 +27,7 @@
     "content:generate": "corepack pnpm --filter @finance/content-generation content:generate",
     "content:validate-generated": "corepack pnpm --filter @finance/content-generation content:validate-generated",
     "content:report": "corepack pnpm --filter @finance/content-generation content:report",
+    "content:classify-normative": "corepack pnpm --filter @finance/content-generation content:classify-normative",
     "content:pilot:preflight": "tsx scripts/pilot-preflight.ts"
   },
   "dependencies": {

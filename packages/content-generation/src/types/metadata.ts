@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { normativeContextSchema } from "./normative-context";
 import { contentDraftStatusSchema, statusTransitionSchema } from "./status";
 
 /**
@@ -106,6 +107,17 @@ export const contentDraftEnvelopeSchema = z.object({
   difficulty: z.number().int().min(1).max(5),
   generationMetadata: generationMetadataSchema,
   validationMetadata: validationMetadataSchema.nullable(),
+  /**
+   * Selon quel référentiel ce contenu dit vrai.
+   *
+   * Facultatif, et pour une seule raison : les brouillons produits avant ce
+   * champ ne le portent pas, et les invalider en bloc aurait fait basculer tout
+   * un chapitre en `validation_failed` sans qu'un relecteur ait rien arbitré.
+   * Le validateur avertit dès qu'un compte versionné apparaît sans lui, et le
+   * classement (`classifyNormativeContext`) en propose un ; le champ deviendra
+   * obligatoire quand les contenus existants l'auront reçu.
+   */
+  normativeContext: normativeContextSchema.nullish(),
   reviewMetadata: reviewMetadataSchema,
   history: z.array(statusTransitionSchema),
   createdAt: z.string().min(1),

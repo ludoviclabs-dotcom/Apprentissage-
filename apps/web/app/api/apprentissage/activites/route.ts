@@ -7,6 +7,8 @@ import {
   gradeErrorDiagnosis,
   gradeJournalEntry,
   getPublicChapter,
+  isGradedVersion,
+  normativeContextOf,
   revealFlashcard,
   revealHint,
   type ChapterActivityKind
@@ -207,6 +209,44 @@ function unavailable(): Response {
   );
 }
 
+/**
+ * Les actions qui engagent la progression de l'apprenant.
+ *
+ * Elles corrigent une tentative, écrivent un événement de chapitre ou déplacent
+ * une carte dans la file de révision espacée. Les autres — révéler un verso,
+ * demander un indice — ne font que lire, et un contenu de comparaison a
+ * précisément vocation à être lu.
+ */
+const SCORING_ACTIONS = new Set([
+  "record",
+  "rateFlashcard",
+  "gradeCalculation",
+  "gradeJournalEntry",
+  "gradeDiagnosis",
+  "gradeCaseStep"
+]);
+
+/**
+ * Une réponse d'hier ne vaut pas correction aujourd'hui.
+ *
+ * C'EST ICI QUE LA RÈGLE DEVIENT VRAIE, PAS DANS LES ÉCRANS. Les chargeurs de
+ * chapitre écartent déjà les contenus de comparaison des files notées, mais un
+ * écran qui filtre est une convention : il suffit d'un identifiant recopié dans
+ * une requête pour la contourner. Ce refus-ci porte sur l'acte lui-même, donc
+ * sur le seul chemin par lequel un score peut naître.
+ */
+function notGradable(version: { title: string }, profile: string): Response {
+  return Response.json(
+    {
+      error: "Ce contenu n'est pas noté",
+      details:
+        `«\u00a0${version.title}\u00a0» relève du profil normatif «\u00a0${profile}\u00a0» et n'est publié que pour comparaison : ` +
+        "il ne corrige aucune tentative et ne compte dans aucun score."
+    },
+    { status: 409 }
+  );
+}
+
 export async function POST(request: Request) {
   let raw: unknown;
 
@@ -236,6 +276,11 @@ export async function POST(request: Request) {
   }
 
   const version = loaded.version;
+
+  if (SCORING_ACTIONS.has(body.data.action) && !isGradedVersion(version)) {
+    return notGradable(version, normativeContextOf(version).profile);
+  }
+
   const user = await getCurrentUser();
 
   try {
