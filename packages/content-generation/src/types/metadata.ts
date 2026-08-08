@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { generationModeSchema } from "./generation-mode";
 import { normativeContextSchema } from "./normative-context";
 import { contentDraftStatusSchema, statusTransitionSchema } from "./status";
 
@@ -11,34 +12,13 @@ import { contentDraftStatusSchema, statusTransitionSchema } from "./status";
  */
 
 /**
- * Trois provenances, et une seule frontière qui compte.
- *
- * - `mock` : une fixture technique. Elle sert à exercer la chaîne sans réseau et
- *   n'est du contenu pédagogique en aucun sens. **Impubliable, définitivement.**
- * - `live` : un modèle a rédigé le brouillon à partir de l'enveloppe de sources.
- * - `manual-assisted` : le brouillon a été rédigé à partir des extraits validés,
- *   sans appel à un fournisseur, puis soumis **aux mêmes** contrôles
- *   déterministes et à la **même** approbation humaine que `live`.
- *
- * `manual-assisted` n'est donc pas un `mock` renommé, et la distinction n'est pas
- * déclarative : une fixture est choisie par `prompt.id` dans un catalogue
- * compilé dans le dépôt, tandis qu'un contenu assisté est lu d'un fichier
- * d'entrée hors Git, écrit pour ce chapitre-là, et refusé s'il n'existe pas. Les
- * deux modes ne peuvent pas produire le même octet par accident.
- *
- * Ce qui autorise la publication est l'approbation humaine, pas le mode ; ce que
- * le mode décide est seulement s'il existe un chemin vers cette approbation. Le
- * mock n'en a aucun.
+ * Les modes de génération vivent dans leur propre module, et sont réexportés ici
+ * pour que les appelants historiques — la CLI, les fournisseurs, les tests — ne
+ * changent pas d'import. La définition, elle, n'existe qu'à un seul endroit :
+ * `./generation-mode`, atteignable sans `node:fs` par le schéma de publication
+ * comme par un îlot client.
  */
-export const generationModes = ["mock", "live", "manual-assisted"] as const;
-export type GenerationMode = (typeof generationModes)[number];
-
-/** Les modes qu'une publication peut accepter, une fois l'humain passé. */
-export const publishableGenerationModes = ["live", "manual-assisted"] as const;
-
-export function isPublishableGenerationMode(mode: string): boolean {
-  return (publishableGenerationModes as readonly string[]).includes(mode);
-}
+export * from "./generation-mode";
 
 export const generationMetadataSchema = z.object({
   provider: z.string().min(1),
@@ -55,7 +35,7 @@ export const generationMetadataSchema = z.object({
   sourcePackId: z.string().min(1),
   documentIds: z.array(z.string().min(1)).min(1),
   chunkIds: z.array(z.string().min(1)),
-  mode: z.enum(generationModes),
+  mode: generationModeSchema,
   /** Nombre de réparations JSON qu'il a fallu pour obtenir une sortie valide. */
   repairAttempts: z.number().int().min(0).default(0)
 });

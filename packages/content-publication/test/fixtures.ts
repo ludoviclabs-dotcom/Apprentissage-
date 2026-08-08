@@ -4,6 +4,7 @@ import {
   type ContentDraftStatus,
   type ContentPayload,
   type CorpusDocument,
+  type GenerationMode,
   type NormativeContext
 } from "@finance/content-generation";
 
@@ -401,7 +402,14 @@ export function caseContent(overrides: Record<string, unknown> = {}) {
 
 export interface DraftOptions {
   status?: ContentDraftStatus;
-  mode?: "mock" | "live";
+  /**
+   * Le type vient du paquet de génération, et non d'une paire écrite ici.
+   * L'énumération locale `"mock" | "live"` datait d'avant `manual-assisted` : les
+   * tests qui l'employaient déjà ne compilaient que parce que les fichiers de
+   * test sont hors du `include` du tsconfig, ce qui est exactement le genre de
+   * divergence que ce correctif supprime ailleurs.
+   */
+  mode?: GenerationMode;
   chapterSlug?: string;
   validationPassed?: boolean;
   warnings?: Array<{ code: string; message: string; severity: "warning" }>;
