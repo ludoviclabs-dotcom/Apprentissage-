@@ -591,10 +591,19 @@ export function classifyNormativeContext(payload: ContentPayload): NormativeClas
     proposedScoringPolicy = "not-gradable";
   }
 
-  // Ce qui demande un humain : un contenu qui mélange les deux traitements, ou
-  // qui emploie un compte officiel non sourcé. Le classement ne tranche pas.
-  const mixesTreatments = accountsFound.includes("481") && accountsFound.includes("791");
-  const doubleDotation = accountsFound.includes("6862") && accountsFound.includes("6812");
+  // Ce qui demande un humain : une écriture qui mélange les deux traitements, ou
+  // un compte officiel non sourcé. Le classement ne tranche pas.
+  //
+  // Le mélange se juge sur les champs typés, comme le refus correspondant : une
+  // fiche qui *compare* les deux traitements les nomme tous les deux en prose
+  // sans rien additionner, et c'est précisément ce qu'un encart comparatif doit
+  // faire. La signaler comme ambiguë l'aurait envoyée en arbitrage humain à
+  // chaque passage, y compris une fois corrigée.
+  const inAnswer = new Set(
+    occurrences.filter((occurrence) => occurrence.structured).map((occurrence) => occurrence.accountNumber)
+  );
+  const mixesTreatments = inAnswer.has("481") && inAnswer.has("791");
+  const doubleDotation = inAnswer.has("6862") && inAnswer.has("6812");
   const unsourced512 =
     accountsFound.includes("512") && !citedMaterialKinds(payload).has("official-reference");
 
