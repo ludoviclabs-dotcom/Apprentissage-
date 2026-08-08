@@ -6,6 +6,12 @@ import {
   type NormativeProfile,
   type ScoringPolicy
 } from "@finance/content-generation";
+// SOUS-CHEMIN, PAS LA RACINE. Le schéma des modes est le même objet que celui
+// que le garde interroge : l'importer d'ici plutôt que de le récrire est
+// exactement ce qui empêche les deux contrats de diverger à nouveau. Le
+// sous-chemin ne tire ni `node:fs` ni dépendance serveur, ce qui laisse ce
+// module utilisable partout où le type d'une version publiée l'est.
+import { generationModeSchema } from "@finance/content-generation/generation-mode";
 import { z } from "zod";
 
 /**
@@ -64,6 +70,16 @@ export type PublishedSourceReference = z.infer<typeof publishedSourceReferenceSc
  * atteindre le site public, et le garde le refuse. Il est recopié malgré tout,
  * pour qu'un audit puisse constater sur pièce que la version servie ne vient pas
  * d'une fixture. La clé d'API n'a jamais existé dans cette structure.
+ *
+ * CE SCHÉMA DÉCRIT UNE VALEUR LISIBLE, PAS UNE AUTORISATION. Il a longtemps
+ * énuméré `["mock", "live"]` de son côté, et cette liste-là a cessé d'être vraie
+ * le jour où `manual-assisted` est né : le garde acceptait le mode, le
+ * constructeur d'instantané le recopiait fidèlement, et c'est la relecture Zod
+ * de l'instantané qui échouait — une exception au lieu d'un refus motivé, sur un
+ * contenu que la revue humaine avait justement approuvé. Les trois modes connus
+ * sont donc désormais **désérialisables** ; ce qu'un `mock` ne franchit pas est
+ * la liste blanche de `isPublishableGenerationMode`, interrogée par le garde, par
+ * l'écriture du magasin de fichiers et par la lecture publique.
  */
 export const publishedGenerationMetadataSchema = z.object({
   provider: z.string().min(1),
@@ -74,8 +90,10 @@ export const publishedGenerationMetadataSchema = z.object({
   inputHash: z.string().regex(/^[a-f0-9]{64}$/),
   sourcePackId: z.string().min(1),
   documentIds: z.array(z.string().min(1)),
-  mode: z.enum(["mock", "live"])
+  mode: generationModeSchema
 });
+
+export type PublishedGenerationMetadata = z.infer<typeof publishedGenerationMetadataSchema>;
 
 export const publishedValidationMetadataSchema = z.object({
   passed: z.literal(true),

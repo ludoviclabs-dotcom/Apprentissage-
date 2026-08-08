@@ -80,7 +80,7 @@ Il refuse un contenu qui :
 | Refus | Code |
 | --- | --- |
 | n'est pas `approved` | `statut-non-approuve` |
-| a été généré en mode `mock` | `mode-mock` |
+| a été généré dans un mode hors liste blanche (`mock`, ou un mode inconnu) | `mode-non-publiable` |
 | porte un type non supporté | `type-non-supporte` |
 | a un champ porteur vide | `contenu-vide` |
 | comporte un chemin absolu | `chemin-prive` |
@@ -97,6 +97,30 @@ vérifier n'est pas vérifier.
 
 Le rapport rendu porte `passed`, `errors`, `warnings`, `sourceIntegrity`,
 `deterministicValidation`, `contentHash` et `publicationVersion`.
+
+## Les modes de génération, définis une seule fois
+
+`packages/content-generation/src/types/generation-mode.ts`, atteignable par
+`@finance/content-generation/generation-mode` — un module sans `node:fs`, donc
+utilisable aussi bien par le schéma de publication que par un îlot client.
+
+| Liste | Contenu | Ce qu'elle décide |
+| --- | --- | --- |
+| `generationModes` / `generationModeSchema` | `mock`, `live`, `manual-assisted` | ce qui se **désérialise** |
+| `publishableGenerationModes` / `isPublishableGenerationMode` | `live`, `manual-assisted` | ce qui se **publie** |
+
+Les deux questions sont distinctes, et les confondre a coûté un chapitre. Le
+schéma de publication a longtemps énuméré `["mock", "live"]` de son côté : le
+garde acceptait `manual-assisted`, l'instantané le recopiait, puis la relecture
+Zod de cet instantané échouait — une exception au lieu d'un refus motivé, sur un
+contenu que la revue humaine venait d'approuver. Un `mock` est donc désormais
+**lisible** — c'est ce qui permet à un audit de constater d'où vient une version
+— et reste **impubliable**, refusé par le garde, par l'écriture du magasin et par
+la lecture publique, qui interrogent tous la même liste blanche.
+
+La règle est énoncée par ce qui est accepté. Un `mode !== "mock"` rendrait
+publiable, sans que personne ne l'ait décidé, tout mode ajouté plus tard ; la
+liste blanche oblige la décision à être prise au moment où le mode est créé.
 
 ## Le snapshot
 
@@ -119,7 +143,7 @@ faire d'autre.
 | Action | Condition |
 | --- | --- |
 | Prévisualiser | toujours |
-| Publier | `approved`, mode `live`, contrôles passés, droits administrateur |
+| Publier | `approved`, mode publiable (`live` ou `manual-assisted`), contrôles passés, droits administrateur |
 | Publier une nouvelle version | idem, quand une version est déjà active |
 | Archiver | une version active existe |
 | Historique | toujours |
@@ -129,6 +153,22 @@ rejoue les contrôles. La confirmation est une étape du protocole — la route
 exige `confirmed: true` — et affiche titre, type, chapitre, version, nombre de
 sources, avertissements, URL publique cible et la mention que la publication crée
 un instantané immuable.
+
+### Ce que la route répond quand ça ne passe pas
+
+| Situation | Réponse |
+| --- | --- |
+| contrôles refusés (dont mode impubliable) | `409`, avec le rapport |
+| brouillon introuvable | `404` |
+| chapitre hors taxonomie | `409` |
+| magasin absent, base injoignable, migration non appliquée | `503`, rien n'a été publié |
+| une autre version vient d'être publiée | `409`, recharger et recommencer |
+
+Le `503` couvre ce qu'un relecteur ne peut pas corriger : l'écriture classe les
+échecs de la base par leur code — connexion refusée, table absente — et rapporte
+une indisponibilité au lieu de laisser remonter une exception. La violation
+d'unicité, elle, continue de remonter : c'est un refus, pas une panne, et les
+confondre transformerait une course perdue en « rien n'a été enregistré ».
 
 ## Procédure
 

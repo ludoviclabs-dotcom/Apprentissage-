@@ -5,7 +5,8 @@
   "type": "module",
   "exports": {
     ".": "./src/index.ts",
-    "./normative": "./src/types/normative-context.ts"
+    "./normative": "./src/types/normative-context.ts",
+    "./generation-mode": "./src/types/generation-mode.ts"
   },
   "scripts": {
     "content:generate": "tsx src/cli/generate.ts",

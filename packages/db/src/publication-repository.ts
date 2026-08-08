@@ -38,6 +38,86 @@ export type PublicationWriteResult =
 
 const DATABASE_DISABLED = "FINANCE_HUB_USE_DATABASE is not true, or DATABASE_URL is not set";
 
+/**
+ * Failures that mean "this store could not be reached", not "this write was
+ * refused".
+ *
+ * THE DISTINCTION IS THE WHOLE POINT. A configured-but-unreachable database and
+ * a database that *rejected* the row are different facts, and only the first one
+ * is an availability problem. Collapsing them would swallow `23505` — the unique
+ * violation that says another version was published first — and turn a
+ * "reload and try again" into a silent "nothing was recorded". So the list is a
+ * whitelist of causes, and every other error is re-thrown untouched, exactly as
+ * before.
+ *
+ * The two families it covers are the two an install actually hits: the server
+ * never answered, or it answered and migration 0014/0015 was never applied. Both
+ * are the operator's problem and neither is the reviewer's fault; both deserve
+ * "the store is unavailable", not "internal error".
+ */
+const UNAVAILABLE_CODES: ReadonlyMap<string, string> = new Map([
+  ["ECONNREFUSED", "the database refused the connection"],
+  ["ENOTFOUND", "the database host could not be resolved"],
+  ["ETIMEDOUT", "the database did not answer in time"],
+  ["EHOSTUNREACH", "the database host is unreachable"],
+  ["ENETUNREACH", "the database network is unreachable"],
+  ["ECONNRESET", "the database connection was reset"],
+  ["CONNECT_TIMEOUT", "the database did not answer in time"],
+  ["CONNECTION_CLOSED", "the database connection closed"],
+  ["CONNECTION_ENDED", "the database connection ended"],
+  ["CONNECTION_DESTROYED", "the database connection was destroyed"],
+  ["3D000", "the database named in DATABASE_URL does not exist"],
+  ["28P01", "the database rejected the credentials"],
+  ["28000", "the database rejected the credentials"],
+  ["42P01", "the publication tables are missing: run the migrations (0014)"],
+  ["42703", "the publication columns are missing: run the migrations (0015)"]
+]);
+
+/**
+ * Exported so the whitelist can be exercised without a server.
+ *
+ * The install this runs on has no local PostgreSQL, so a test that proved the
+ * classification by *causing* a connection failure would prove it on one machine
+ * and skip on the next. The classification is a pure function of the error code;
+ * testing it as one is both honest and portable.
+ */
+export function publicationWriteUnavailabilityReason(error: unknown): string | null {
+  if (typeof error !== "object" || error === null || !("code" in error)) {
+    return null;
+  }
+
+  const code = String((error as { code?: unknown }).code);
+  const reason = UNAVAILABLE_CODES.get(code);
+
+  // The code alone, never the message: postgres-js puts host and port in it, and
+  // this string reaches an administration screen.
+  return reason ? `${reason} (${code})` : null;
+}
+
+/**
+ * Runs a publication write, turning an unreachable store into a reported result.
+ *
+ * A caller reading `{ status: "unavailable" }` knows nothing was recorded — the
+ * transaction is atomic, so there is no half-written state to reason about — and
+ * can say so. A caller receiving a thrown error knows the write was *refused*,
+ * which is a different conversation to have with the reviewer.
+ */
+async function runPublicationWrite(write: () => Promise<void>): Promise<PublicationWriteResult> {
+  try {
+    await write();
+  } catch (error) {
+    const reason = publicationWriteUnavailabilityReason(error);
+
+    if (reason === null) {
+      throw error;
+    }
+
+    return { status: "unavailable", reason };
+  }
+
+  return { status: "written" };
+}
+
 export interface PublishedVersionInput {
   id: string;
   sourceArtifactId: string;
@@ -122,35 +202,35 @@ export async function recordPublishedVersion(
     return { status: "unavailable", reason: DATABASE_DISABLED };
   }
 
-  await createDb().transaction(async (tx) => {
-    if (version.previousPublishedVersionId) {
-      await tx
-        .update(publishedContentVersionsTable)
-        .set({ status: "archived", archivedAt: version.publishedAt })
-        .where(eq(publishedContentVersionsTable.id, version.previousPublishedVersionId));
-    }
+  return runPublicationWrite(() =>
+    createDb().transaction(async (tx) => {
+      if (version.previousPublishedVersionId) {
+        await tx
+          .update(publishedContentVersionsTable)
+          .set({ status: "archived", archivedAt: version.publishedAt })
+          .where(eq(publishedContentVersionsTable.id, version.previousPublishedVersionId));
+      }
 
-    await tx.insert(publishedContentVersionsTable).values({
-      ...version,
-      status: "published",
-      archivedAt: null
-    });
+      await tx.insert(publishedContentVersionsTable).values({
+        ...version,
+        status: "published",
+        archivedAt: null
+      });
 
-    await tx.insert(contentPublicationAuditTable).values({
-      action: audit.action,
-      versionId: audit.versionId,
-      previousVersionId: audit.previousVersionId,
-      artifactType: audit.artifactType,
-      chapter: audit.chapter,
-      slug: audit.slug,
-      publicationVersion: audit.publicationVersion,
-      actor: audit.actor,
-      comment: audit.comment ?? null,
-      contentHash: audit.contentHash
-    });
-  });
-
-  return { status: "written" };
+      await tx.insert(contentPublicationAuditTable).values({
+        action: audit.action,
+        versionId: audit.versionId,
+        previousVersionId: audit.previousVersionId,
+        artifactType: audit.artifactType,
+        chapter: audit.chapter,
+        slug: audit.slug,
+        publicationVersion: audit.publicationVersion,
+        actor: audit.actor,
+        comment: audit.comment ?? null,
+        contentHash: audit.contentHash
+      });
+    })
+  );
 }
 
 /** Archives an active version without replacing it, and records the act. */
@@ -163,27 +243,27 @@ export async function recordArchivedVersion(
     return { status: "unavailable", reason: DATABASE_DISABLED };
   }
 
-  await createDb().transaction(async (tx) => {
-    await tx
-      .update(publishedContentVersionsTable)
-      .set({ status: "archived", archivedAt })
-      .where(eq(publishedContentVersionsTable.id, versionId));
+  return runPublicationWrite(() =>
+    createDb().transaction(async (tx) => {
+      await tx
+        .update(publishedContentVersionsTable)
+        .set({ status: "archived", archivedAt })
+        .where(eq(publishedContentVersionsTable.id, versionId));
 
-    await tx.insert(contentPublicationAuditTable).values({
-      action: audit.action,
-      versionId: audit.versionId,
-      previousVersionId: audit.previousVersionId,
-      artifactType: audit.artifactType,
-      chapter: audit.chapter,
-      slug: audit.slug,
-      publicationVersion: audit.publicationVersion,
-      actor: audit.actor,
-      comment: audit.comment ?? null,
-      contentHash: audit.contentHash
-    });
-  });
-
-  return { status: "written" };
+      await tx.insert(contentPublicationAuditTable).values({
+        action: audit.action,
+        versionId: audit.versionId,
+        previousVersionId: audit.previousVersionId,
+        artifactType: audit.artifactType,
+        chapter: audit.chapter,
+        slug: audit.slug,
+        publicationVersion: audit.publicationVersion,
+        actor: audit.actor,
+        comment: audit.comment ?? null,
+        contentHash: audit.contentHash
+      });
+    })
+  );
 }
 
 /**
