@@ -1,13 +1,15 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { contentTypeLabels, type ContentType } from "@finance/content-generation";
-import { loadAllDrafts, requireReviewAccess } from "@/lib/content-review/service";
+import { loadAllDrafts, loadReviewRisks, requireReviewAccess } from "@/lib/content-review/service";
 import { EmptyState } from "@/components/ui/empty-state";
 import { PageHeader } from "@/components/ui/page-header";
 import {
   NormativeProfileBadge,
+  ScoringPolicyBadge,
   UndeterminedProfileBadge
 } from "@/components/content-review/normative-panel";
+import { RiskBadge } from "@/components/content-review/risk-badge";
 import { StatusToken, ModeBadge } from "@/components/content-review/status-token";
 
 export const metadata: Metadata = {
@@ -17,12 +19,32 @@ export const metadata: Metadata = {
 
 export const dynamic = "force-dynamic";
 
+/**
+ * Les filtres rapides de la file.
+ *
+ * Ils reprennent l'ordre de revue recommandé — les prioritaires d'abord — et
+ * les trois statuts qu'un relecteur veut isoler. Ce sont de simples liens :
+ * l'état vit dans l'URL, donc un filtre se partage, se met en signet et
+ * survit à un rechargement.
+ */
+const QUICK_FILTERS: ReadonlyArray<{ label: string; params: Record<string, string> }> = [
+  { label: "Tous", params: {} },
+  { label: "C prioritaires", params: { risque: "C" } },
+  { label: "B à lire", params: { risque: "B" } },
+  { label: "A rapides", params: { risque: "A" } },
+  { label: "À relire", params: { statut: "needs_review" } },
+  { label: "Approuvés", params: { statut: "approved" } },
+  { label: "Rejetés", params: { statut: "rejected" } }
+];
+
 interface SearchParams {
   chapitre?: string;
   type?: string;
   statut?: string;
   q?: string;
   qualite?: string;
+  /** Filtre rapide sur le niveau de risque établi par la pré-revue. */
+  risque?: string;
 }
 
 export default async function ContentReviewPage({
@@ -34,6 +56,14 @@ export default async function ContentReviewPage({
 
   const filters = await searchParams;
   const all = await loadAllDrafts();
+  const risks = await loadReviewRisks();
+
+  // LE COMPTEUR PORTE SUR LES DÉCISIONS, PAS SUR LES CONTENUS RESTANTS. Une file
+  // qui n'affiche que « 24 contenus » ne dit pas où en est la revue : approuver
+  // et rejeter font tous deux avancer, et c'est leur somme qui progresse.
+  const decided = all.filter(
+    (entry) => entry.draft.status === "approved" || entry.draft.status === "rejected"
+  ).length;
 
   const chapters = [...new Set(all.map((entry) => entry.draft.chapterLabel))].sort();
   const types = [...new Set(all.map((entry) => entry.draft.contentType))].sort();
@@ -46,6 +76,7 @@ export default async function ContentReviewPage({
     if (filters.chapitre && draft.chapterLabel !== filters.chapitre) return false;
     if (filters.type && draft.contentType !== filters.type) return false;
     if (filters.statut && draft.status !== filters.statut) return false;
+    if (filters.risque && risks.get(draft.id)?.level !== filters.risque) return false;
     if (query && !draft.title.toLowerCase().includes(query)) return false;
     if (
       minQuality !== undefined &&
@@ -64,6 +95,39 @@ export default async function ContentReviewPage({
         title="Relecture des contenus générés"
         description="L'approbation enregistre une décision de relecture ; elle ne publie rien. La publication est une action distincte, déclenchée contenu par contenu depuis sa fiche."
       />
+
+      <section className="panel">
+        <h2 className="panel-heading">Filtres rapides</h2>
+        <p className="review-counter">
+          <strong>
+            {decided} / {all.length}
+          </strong>{" "}
+          décision{decided > 1 ? "s" : ""} enregistrée{decided > 1 ? "s" : ""}
+          <span className="muted"> — une décision est une approbation ou un rejet.</span>
+        </p>
+        <nav className="review-quick-filters" aria-label="Filtres rapides">
+          {QUICK_FILTERS.map((filter) => {
+            const target = new URLSearchParams();
+            if (filters.chapitre) target.set("chapitre", filters.chapitre);
+            for (const [key, value] of Object.entries(filter.params)) target.set(key, value);
+            const query = target.toString();
+            const active =
+              (filters.risque ?? "") === (filter.params.risque ?? "") &&
+              (filters.statut ?? "") === (filter.params.statut ?? "");
+
+            return (
+              <Link
+                key={filter.label}
+                className={`state-token ${active ? "ready" : "processing"}`}
+                href={query.length > 0 ? `/admin/content-review?${query}` : "/admin/content-review"}
+                aria-current={active ? "true" : undefined}
+              >
+                {filter.label}
+              </Link>
+            );
+          })}
+        </nav>
+      </section>
 
       <section className="panel">
         <h2 className="panel-heading">Filtrer</h2>
@@ -141,9 +205,11 @@ export default async function ContentReviewPage({
                   <th scope="col">Type</th>
                   <th scope="col">Chapitre</th>
                   <th scope="col">Statut</th>
+                  <th scope="col">Risque</th>
                   <th scope="col">Qualité</th>
                   <th scope="col">Origine</th>
                   <th scope="col">Référentiel</th>
+                  <th scope="col">Alertes</th>
                 </tr>
               </thead>
               <tbody>
@@ -157,15 +223,35 @@ export default async function ContentReviewPage({
                     <td>
                       <StatusToken status={draft.status} />
                     </td>
+                    <td>
+                      <RiskBadge level={risks.get(draft.id)?.level ?? null} />
+                    </td>
                     <td>{draft.validationMetadata?.qualityScore ?? "—"}</td>
                     <td>
                       <ModeBadge mode={draft.generationMetadata.mode} />
                     </td>
                     <td>
                       {draft.normativeContext ? (
-                        <NormativeProfileBadge profile={draft.normativeContext.profile} />
+                        <>
+                          <NormativeProfileBadge profile={draft.normativeContext.profile} />{" "}
+                          <ScoringPolicyBadge policy={draft.normativeContext.scoringPolicy} />
+                        </>
                       ) : (
                         <UndeterminedProfileBadge />
+                      )}
+                    </td>
+                    <td>
+                      {(draft.validationMetadata?.warnings ?? []).length > 0 ? (
+                        <span
+                          className="state-token needs-review"
+                          title={(draft.validationMetadata?.warnings ?? [])
+                            .map((issue) => issue.code)
+                            .join(", ")}
+                        >
+                          {(draft.validationMetadata?.warnings ?? []).length}
+                        </span>
+                      ) : (
+                        <span className="muted">—</span>
                       )}
                     </td>
                   </tr>
