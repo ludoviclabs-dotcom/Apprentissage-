@@ -20,6 +20,7 @@ import {
  */
 
 export const COURSE_DOC_ID = "e2e-pack-course";
+export const REFERENCE_DOC_ID = "e2e-pack-reference";
 export const EXERCISE_DOC_ID = "e2e-pack-exercise";
 
 export const CHUNK_RULES = "e2e-chunk-rules";
@@ -431,7 +432,9 @@ export function fixtureNormativeContext(payload: ContentPayload): NormativeConte
     status: usesSubAccount ? "custom" : "current",
     effectiveFrom: "2026-01-01",
     scoringPolicy: "graded",
-    sourceVersionIds: [],
+    // Un profil en vigueur nomme le référentiel qu'il suit : le garde le refuse
+    // sinon, faute de quoi rien ne dirait quoi reprendre quand le plan changera.
+    sourceVersionIds: [REFERENCE_DOC_ID],
     customAccountDisclosures: usesSubAccount
       ? [
           {

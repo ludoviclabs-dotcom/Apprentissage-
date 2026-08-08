@@ -1,4 +1,5 @@
 import {
+  checkPublishableNormativeContext,
   collectSourceReferences,
   collectVersionedAccounts,
   contentPayloadSchema,
@@ -455,13 +456,20 @@ export function inspectForPublication(input: PublicationGuardInput): Publication
   // relisibles. Mais publier un tel contenu, c'est le servir à un apprenant
   // sans savoir selon quel plan comptable il est vrai — et, s'il est noté, le
   // corriger sur un référentiel que personne n'a choisi.
+  // La règle vient du paquet de génération, là où vivent les autres règles
+  // normatives. Les deux magasins — fichier et PostgreSQL — passent par ce
+  // garde : ils héritent donc du même contrat sans qu'il soit écrit deux fois.
+  for (const problem of checkPublishableNormativeContext(draft.normativeContext)) {
+    errors.push(issue(problem.code, problem.message, problem.path));
+  }
+
   const versionedAccounts = distinctAccountNumbers(collectVersionedAccounts(payload));
 
   if (versionedAccounts.length > 0 && !draft.normativeContext) {
     errors.push(
       issue(
         "contexte-normatif-absent",
-        `le contenu emploie des comptes dont le traitement dépend du millésime (${versionedAccounts.join(", ")}) sans déclarer de contexte normatif : le référentiel applicable doit être établi avant publication`
+        `le contenu emploie en outre des comptes dont le traitement dépend du millésime (${versionedAccounts.join(", ")}) : le référentiel applicable doit être établi avant publication`
       )
     );
   }

@@ -752,6 +752,14 @@ export const publishedContentVersionsTable = pgTable("published_content_versions
   chapterLabel: text("chapter_label").notNull(),
   contentSnapshot: jsonb("content_snapshot").notNull(),
   sourceReferencesSnapshot: jsonb("source_references_snapshot").notNull(),
+  // Le référentiel selon lequel la version dit vrai. Nullable : une ligne
+  // écrite avant la migration 0015 n'en portait pas, et lui en inventer un
+  // reviendrait à classer du contenu que personne n'a relu. Les deux colonnes
+  // suivantes en sont dérivées — elles évitent d'ouvrir le JSONB pour répondre
+  // « ce chapitre a-t-il de quoi noter ? ».
+  normativeContextSnapshot: jsonb("normative_context_snapshot"),
+  normativeProfile: text("normative_profile"),
+  scoringPolicy: text("scoring_policy"),
   publicationVersion: integer("publication_version").notNull(),
   publishedAt: timestamp("published_at", { mode: "string" }).notNull().defaultNow(),
   publishedBy: text("published_by").notNull(),

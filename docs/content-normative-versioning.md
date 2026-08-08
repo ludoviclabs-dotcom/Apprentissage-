@@ -182,6 +182,81 @@ Codes voisins, pour ce qui n'est pas un mélange :
   Ils voyagent avec ce qui est déjà visible : la fiche, le verso révélé, la
   correction rendue.
 
+## Persistance
+
+Le référentiel doit survivre à la publication, et il doit y survivre **par les
+deux magasins**. Le site public ne lit que des instantanés : si la couche de
+stockage perd le contexte, aucune page ne peut plus savoir si elle a le droit de
+noter.
+
+### Ce qui était perdu
+
+`published_content_versions` n'avait pas de colonne pour lui. L'écriture le
+laissait tomber, la lecture ne pouvait pas le retrouver, et
+`resolveNormativeContext` — dont le défaut est *le référentiel en vigueur* —
+rendait courante et notable une carte publiée « support d'origine, comparaison
+seule ». Elle serait entrée dans la file de révision espacée et aurait corrigé un
+apprenant sur un traitement remplacé. Le défaut par défaut : correct pour une
+ligne qui n'a jamais eu de contexte, exactement faux pour une ligne qui en avait
+un et l'a perdu en transit.
+
+### Trois colonnes, une seule dérivation
+
+La migration `0015_published_normative_context.sql` ajoute :
+
+| Colonne | Rôle |
+| --- | --- |
+| `normative_context_snapshot` (JSONB) | le contexte entier, recopié comme le reste de l'instantané |
+| `normative_profile` (TEXT) | dérivé, pour répondre sans ouvrir le JSONB |
+| `scoring_policy` (TEXT) | dérivé, même raison |
+
+Les deux colonnes dérivées existent parce que « qu'y a-t-il de publié ici, et
+qu'a-t-on le droit de noter ? » est la question de chaque écran de chapitre :
+la poser au JSONB reviendrait à tirer un instantané par ligne, ce que la requête
+de résumé existe précisément pour éviter. L'index du magasin de fichiers porte
+les deux mêmes champs, et `storedNormativeFields` les dérive **une seule fois**
+pour les deux magasins : les calculer chacun de son côté aurait créé deux
+définitions du même fait, donc tôt ou tard deux réponses.
+
+### Les lignes antérieures restent nulles
+
+Aucune reprise de données. Réécrire le contexte des anciennes lignes
+reviendrait à affirmer un référentiel que personne n'a relu, et à le faire en
+silence — exactement le geste que ce modèle existe pour empêcher. `NULL` dit
+« non établi » ; la lecture le traite comme le référentiel en vigueur, ce que la
+ligne signifiait quand elle a été écrite.
+
+Une contrainte exige en revanche que les trois colonnes s'accordent sur ce
+qu'elles savent : toutes nulles, ou toutes renseignées.
+
+### Ce qui interdit une nouvelle publication muette
+
+La colonne ne peut pas être `NOT NULL` sans casser les publications
+historiques ; une contrainte SQL ne saurait pas distinguer une ancienne ligne
+d'une nouvelle. Le refus vit donc là où la décision se prend, dans le garde de
+publication, qui appelle `checkPublishableNormativeContext` — la même fonction
+pour les deux magasins. Sont refusés :
+
+- une publication sans contexte normatif ;
+- un profil `anc-2026-current` qui ne nomme aucune version de référentiel ;
+- un profil historique déclaré notable (déjà couvert par la cohérence de profil) ;
+- un mode de génération hors liste blanche.
+
+### Ce que les tests prouvent, et ce qu'ils ne prouvent pas
+
+- `packages/db/test/migration-0015.test.ts` — le *texte* de la migration :
+  idempotence, absence de destruction, nullabilité, valeurs admises.
+- `apps/web/test/publication-normative-persistence.test.ts` — la
+  *correspondance* : brouillon → instantané → colonnes → `versionFromRow` →
+  projection publique, sur les trois profils. C'est là qu'un champ se perd.
+- `packages/db/test/normative-persistence.integration.test.ts` — le *moteur* :
+  migrations rejouées depuis zéro deux fois, contraintes qui refusent, rollback
+  transactionnel. Il exige `RLS_TEST_ADMIN_DATABASE_URL` et **se saute
+  bruyamment** sans base.
+
+Aucun de ces tests ne remplace le suivant. Tant que le troisième n'a pas tourné
+sur un vrai PostgreSQL, la migration n'a pas été appliquée — elle a été écrite.
+
 ## Classement des contenus existants
 
 ```bash

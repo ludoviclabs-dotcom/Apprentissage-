@@ -30,8 +30,12 @@ const statements = sql
   .join("\n");
 
 describe("migration 0014 — enregistrement", () => {
-  it("est déclarée dans migrationFiles, en dernier", () => {
-    expect(migrationFiles.at(-1)).toBe(MIGRATION);
+  it("est déclarée dans migrationFiles, avant celles qui la suivent", () => {
+    // « En dernier » a cessé d'être vrai quand 0015 est arrivée. Ce qui doit
+    // rester vrai est l'ordre : 0014 crée les tables que 0015 modifie, et les
+    // rejouer dans l'autre sens échouerait.
+    expect(migrationFiles).toContain(MIGRATION);
+    expect(migrationFiles.indexOf(MIGRATION)).toBe(migrationFiles.length - 2);
   });
 
   it("déclare ses trois tables dans schema.ts", () => {

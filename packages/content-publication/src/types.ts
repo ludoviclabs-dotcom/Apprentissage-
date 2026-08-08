@@ -1,4 +1,11 @@
-import { contentPayloadSchema, contentTypeSchema, normativeContextSchema } from "@finance/content-generation";
+import {
+  contentPayloadSchema,
+  contentTypeSchema,
+  normativeContextSchema,
+  type NormativeContext,
+  type NormativeProfile,
+  type ScoringPolicy
+} from "@finance/content-generation";
 import { z } from "zod";
 
 /**
@@ -155,3 +162,34 @@ export function serializePublicationKey(key: PublicationKey): string {
 export function publicationVersionId(key: PublicationKey, version: number): string {
   return `pub-${key.artifactType.replace(/_/g, "-")}-${key.chapter}-${key.slug}-v${version}`;
 }
+
+/**
+ * Ce qu'un magasin retient du référentiel d'une version.
+ *
+ * UNE SEULE DÉRIVATION POUR DEUX MAGASINS. Le magasin de fichiers porte ces
+ * champs dans son index, PostgreSQL dans trois colonnes ; les deux répondent
+ * ainsi à « qu'y a-t-il de publié ici, et qu'a-t-on le droit de noter ? » sans
+ * ouvrir un instantané. Les calculer chacun de son côté aurait créé deux
+ * définitions du même fait, donc tôt ou tard deux réponses — et la divergence
+ * se serait vue le jour où un contenu historique aurait noté quelqu'un.
+ *
+ * `null` partout pour une version antérieure au champ : on ne lui invente pas
+ * un référentiel. Les lectures la traitent comme le référentiel en vigueur, ce
+ * qu'elle signifiait quand elle a été écrite.
+ */
+export interface StoredNormativeFields {
+  normativeContextSnapshot: NormativeContext | null;
+  normativeProfile: NormativeProfile | null;
+  scoringPolicy: ScoringPolicy | null;
+}
+
+export function storedNormativeFields(version: PublishedContentVersion): StoredNormativeFields {
+  const context = version.normativeContextSnapshot ?? null;
+
+  return {
+    normativeContextSnapshot: context,
+    normativeProfile: context?.profile ?? null,
+    scoringPolicy: context?.scoringPolicy ?? null
+  };
+}
+

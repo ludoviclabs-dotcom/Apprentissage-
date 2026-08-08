@@ -526,6 +526,55 @@ export function checkNormativeContext(input: NormativeCheckInput): NormativeChec
   return { errors, warnings, occurrences };
 }
 
+
+/**
+ * Ce qu'un contexte normatif doit porter pour qu'une version soit publiable.
+ *
+ * ELLE EST PLUS STRICTE QUE LA VALIDATION, ET C'EST VOULU. Un brouillon sans
+ * référentiel reste relisible : c'est ce qui permet aux contenus écrits avant ce
+ * modèle d'exister. Publier, c'est autre chose — c'est servir le contenu à un
+ * apprenant et, s'il est noté, le corriger. On ne le fait pas sans savoir selon
+ * quel plan comptable il dit vrai.
+ *
+ * Elle est appelée par le garde de publication, donc par les deux magasins :
+ * fichier et PostgreSQL héritent de la même règle sans la réécrire.
+ */
+export function checkPublishableNormativeContext(
+  context: NormativeContext | null | undefined
+): ValidationIssue[] {
+  if (!context) {
+    return [
+      issue(
+        "error",
+        MISSING_CONTEXT_CODE,
+        "aucun référentiel n'est déclaré : on ne publie pas un contenu sans savoir selon quel plan comptable il dit vrai, ni s'il a le droit de noter une réponse",
+        "normativeContext"
+      )
+    ];
+  }
+
+  const problems: ValidationIssue[] = [];
+
+  // Un profil en vigueur qui ne nomme aucune version de référentiel affirme
+  // suivre un plan sans dire lequel. La trace est ce qui permet, plus tard, de
+  // savoir ce qu'il faudra reprendre quand ce plan changera.
+  if (context.profile === "anc-2026-current" && context.sourceVersionIds.length === 0) {
+    problems.push(
+      issue(
+        "error",
+        NORMATIVE_MISMATCH_CODE,
+        "le profil « ANC 2026 — actuel » ne nomme aucune version de référentiel : sans elle, rien ne dira quel contenu reprendre le jour où le plan changera",
+        "normativeContext.sourceVersionIds"
+      )
+    );
+  }
+
+  // La cohérence profil/statut/politique est déjà vérifiée par
+  // `checkNormativeContext`, que le garde rejoue : la redécrire ici en ferait
+  // deux définitions de la même règle, donc tôt ou tard deux réponses.
+  return problems;
+}
+
 // --- Classement ------------------------------------------------------------
 
 export interface NormativeClassification {
