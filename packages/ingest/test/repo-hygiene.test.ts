@@ -25,6 +25,26 @@ describe("hygiène du dépôt — sources privées", () => {
     expect(gitignore).toContain("data/generated/drafts/*");
   });
 
+  /**
+   * Le `.gitkeep` est la seule exception admise, et elle est nommée.
+   *
+   * Une assertion « rien sous data/ n'est suivi » serait fausse : les dossiers
+   * doivent exister dans un clone neuf, et un dépôt ne sait pas versionner un
+   * dossier vide. Ce qu'on interdit est le *contenu* — extraction, brouillon,
+   * point de reprise, rapport de revue — pas le jalon qui crée l'arborescence.
+   */
+  it.each(["data/extracted", "data/generated"])("aucun contenu de %s n'est suivi par Git", (path) => {
+    const tracked = execFileSync("git", ["ls-files", `${path}/**`], {
+      cwd: repoRoot,
+      encoding: "utf8"
+    })
+      .split("\n")
+      .map((file) => file.trim())
+      .filter((file) => file.length > 0 && !file.endsWith(".gitkeep"));
+
+    expect(tracked).toEqual([]);
+  });
+
   it("assemble-compta.mjs ne dépend plus d'un chemin temporaire absolu", () => {
     const script = readFileSync(join(repoRoot, "packages", "domain", "assemble-compta.mjs"), "utf8");
 

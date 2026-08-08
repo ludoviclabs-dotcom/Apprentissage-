@@ -2,7 +2,12 @@ import { existsSync } from "node:fs";
 import { mkdir, readFile, rename, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { z } from "zod";
-import { isPublishableGenerationMode } from "@finance/content-generation";
+import {
+  isPublishableGenerationMode,
+  normativeProfileSchema,
+  resolveNormativeContext,
+  scoringPolicySchema
+} from "@finance/content-generation";
 import { assertSnapshotPublishable } from "./guard";
 import { contentHash } from "./hash";
 import {
@@ -60,7 +65,21 @@ const indexEntrySchema = z.object({
   publishedBy: z.string().min(1),
   archivedAt: z.string().min(1).nullable(),
   contentHash: z.string().regex(/^[a-f0-9]{64}$/),
-  sourceArtifactId: z.string().min(1)
+  sourceArtifactId: z.string().min(1),
+  /**
+   * Le référentiel de la version, porté par l'index et pas seulement par
+   * l'instantané.
+   *
+   * SANS LUI, SAVOIR SI UN CONTENU EST NOTABLE EXIGERAIT DE L'OUVRIR. La file
+   * de révision espacée et le catalogue de progression raisonnent sur
+   * l'index : les obliger à lire chaque instantané pour écarter un contenu de
+   * comparaison ferait payer à chaque page le coût de tout ce qu’elle écarte.
+   * Les deux champs ont une valeur par défaut, si bien qu’un index écrit avant
+   * ce modèle reste lisible et décrit ce qu’il décrivait alors : le
+   * référentiel en vigueur.
+   */
+  normativeProfile: normativeProfileSchema.default("anc-2026-current"),
+  scoringPolicy: scoringPolicySchema.default("graded")
 });
 
 export type PublicationIndexEntry = z.infer<typeof indexEntrySchema>;
@@ -114,6 +133,8 @@ async function writeIndex(options: PublicationStoreOptions, index: PublicationIn
 }
 
 function toIndexEntry(version: PublishedContentVersion): PublicationIndexEntry {
+  const context = resolveNormativeContext(version.normativeContextSnapshot);
+
   return {
     id: version.id,
     artifactType: version.artifactType,
@@ -127,7 +148,9 @@ function toIndexEntry(version: PublishedContentVersion): PublicationIndexEntry {
     publishedBy: version.publishedBy,
     archivedAt: version.archivedAt,
     contentHash: version.contentHash,
-    sourceArtifactId: version.sourceArtifactId
+    sourceArtifactId: version.sourceArtifactId,
+    normativeProfile: context.profile,
+    scoringPolicy: context.scoringPolicy
   };
 }
 
@@ -363,4 +386,18 @@ export function activeEntriesForChapter(
   return index.entries
     .filter((entry) => entry.status === "published" && entry.chapter === chapter)
     .sort((left, right) => left.slug.localeCompare(right.slug));
+}
+
+/**
+ * Les entrées actives dont la réponse fait foi aujourd'hui.
+ *
+ * C'est ce qu'une file notée — révision espacée, progression — a le droit de
+ * proposer. Un contenu de comparaison reste actif et lisible : il n’entre
+ * simplement dans aucun calcul de maîtrise.
+ */
+export function gradedEntriesForChapter(
+  index: PublicationIndex,
+  chapter: string
+): PublicationIndexEntry[] {
+  return activeEntriesForChapter(index, chapter).filter((entry) => entry.scoringPolicy === "graded");
 }

@@ -1,9 +1,22 @@
+// SOUS-CHEMIN « normative », PAS LA RACINE DU PAQUET. La racine de
+// `@finance/content-generation` réexporte le magasin de brouillons et le
+// chargeur de corpus, qui importent `node:fs`. Ce module est atteint depuis des
+// îlots clients par `@finance/content-publication/public` : passer par la racine
+// tirerait `node:fs` dans le paquet du navigateur et ferait échouer le build —
+// c'est exactement le piège que `source-list.tsx` documente déjà un cran plus
+// haut. Les types, eux, passent par la racine : `import type` s'efface à la
+// compilation et ne crée aucune arête d'exécution.
+import { resolveNormativeContext } from "@finance/content-generation/normative";
 import type {
   CalculationExercise,
+  CustomAccountDisclosure,
   ErrorDiagnosisExercise,
   GeneratedFlashcard,
   JournalEntryExercise,
+  NormativeProfile,
+  NormativeStatus,
   ProgressiveCase,
+  ScoringPolicy,
   SmartRevisionSheet
 } from "@finance/content-generation";
 import type { PublishedContentVersion, PublishedSourceReference } from "../types";
@@ -76,6 +89,107 @@ export function toPublicSourceReferences(
   return references.map(toPublicSourceReference);
 }
 
+// --- Contexte normatif -----------------------------------------------------
+
+/**
+ * Le référentiel tel qu'un visiteur le voit.
+ *
+ * LES NOTES DE DIVERGENCE NE SORTENT PAS. `versionConflictNotes` est un
+ * raisonnement de relecteur — il nomme des identifiants de document, cite ce
+ * qu'un audit a établi, et s'adresse à quelqu'un qui arbitre. Un apprenant a
+ * besoin de savoir *ce qui s'applique*, pas de lire l'instruction du dossier.
+ * `sourceVersionIds` reste dedans pour la même raison : ce sont des références
+ * internes de version, et la liste des sources publiques existe déjà à côté.
+ *
+ * LES SOUS-COMPTES DÉCLARÉS N'Y SONT PAS NON PLUS, ET POUR UNE RAISON QUI N'A
+ * RIEN À VOIR. Ils sont pédagogiquement utiles — savoir que 4671 subdivise 467
+ * fait partie de ce qu'un apprenant doit comprendre — mais un énoncé d'écriture
+ * est projeté *sans* ses comptes requis, justement pour ne pas réduire
+ * l'exercice à un placement de montants. Les publier dans le contexte les
+ * aurait redonnés par la bande. Ils voyagent donc avec ce qui est déjà visible :
+ * la fiche, et la correction rendue après tentative.
+ */
+export interface PublicNormativeContext {
+  profile: NormativeProfile;
+  status: NormativeStatus;
+  scoringPolicy: ScoringPolicy;
+  effectiveFrom?: string;
+  effectiveTo?: string;
+  supersededByProfile?: NormativeProfile;
+}
+
+/**
+ * Le contexte d'une version publiée, ou celui du référentiel en vigueur quand
+ * la version est antérieure au champ. Jamais `undefined` : une page publique ne
+ * doit pas avoir à décider quoi faire d'un référentiel absent.
+ */
+export function normativeContextOf(version: PublishedContentVersion): PublicNormativeContext {
+  const context = resolveNormativeContext(version.normativeContextSnapshot);
+
+  return {
+    profile: context.profile,
+    status: context.status,
+    scoringPolicy: context.scoringPolicy,
+    effectiveFrom: context.effectiveFrom,
+    effectiveTo: context.effectiveTo,
+    supersededByProfile: context.supersededByProfile
+  };
+}
+
+/**
+ * Les sous-comptes déclarés d'une version publiée.
+ *
+ * À n'appeler que là où la réponse est déjà connue du lecteur : une fiche de
+ * révision, un verso révélé, une correction rendue. Sur un énoncé non encore
+ * tenté, ils nommeraient un compte attendu.
+ */
+export function disclosedAccountsOf(version: PublishedContentVersion): CustomAccountDisclosure[] {
+  return resolveNormativeContext(version.normativeContextSnapshot).customAccountDisclosures;
+}
+
+/**
+ * Vrai quand la réponse attendue de ce contenu fait foi aujourd'hui.
+ *
+ * C'est la seule question que les files de travail et le calcul de maîtrise ont
+ * à poser. Un contenu « comparaison seule » s'affiche — c'est son intérêt — mais
+ * ne corrige rien et ne compte nulle part.
+ */
+export function isGradedVersion(version: PublishedContentVersion): boolean {
+  return normativeContextOf(version).scoringPolicy === "graded";
+}
+
+/** Vrai quand le contenu relève du référentiel en vigueur. */
+export function isCurrentProfileVersion(version: PublishedContentVersion): boolean {
+  return normativeContextOf(version).profile === "anc-2026-current";
+}
+
+/**
+ * Les versions qu'un parcours noté a le droit d'employer.
+ *
+ * Le filtre est écrit une fois et appelé partout — file de révision espacée,
+ * catalogue de progression, entraînement — parce que trois filtres écrits
+ * séparément finiraient par diverger, et que la divergence se verrait le jour
+ * où un contenu historique noterait quelqu'un.
+ */
+export function filterGradedVersions(
+  versions: readonly PublishedContentVersion[]
+): PublishedContentVersion[] {
+  return versions.filter(isGradedVersion);
+}
+
+/**
+ * Les versions qui ne servent qu'à comparer deux états du droit.
+ *
+ * Elles alimentent l'encart comparatif facultatif, jamais une correction.
+ */
+export function filterComparisonOnlyVersions(
+  versions: readonly PublishedContentVersion[]
+): PublishedContentVersion[] {
+  return versions.filter(
+    (version) => normativeContextOf(version).scoringPolicy === "comparison-only"
+  );
+}
+
 // --- Fiche de révision -----------------------------------------------------
 
 /**
@@ -94,6 +208,8 @@ export interface PublicFlashcardFront {
   front: string;
   difficulty: number;
   tags: string[];
+  /** Selon quel référentiel la réponse fait foi. */
+  normativeContext: PublicNormativeContext;
 }
 
 export interface RevealedFlashcard {
@@ -101,6 +217,9 @@ export interface RevealedFlashcard {
   back: string;
   explanation: string;
   sources: PublicSourceReference[];
+  normativeContext: PublicNormativeContext;
+  /** Les sous-comptes que la réponse emploie, une fois la réponse connue. */
+  disclosedAccounts: CustomAccountDisclosure[];
 }
 
 export function toPublicFlashcardFront(version: PublishedContentVersion): PublicFlashcardFront {
@@ -115,7 +234,8 @@ export function toPublicFlashcardFront(version: PublishedContentVersion): Public
     type: card.type,
     front: card.front,
     difficulty: card.difficulty,
-    tags: card.tags
+    tags: card.tags,
+    normativeContext: normativeContextOf(version)
   };
 }
 
@@ -130,7 +250,9 @@ export function revealFlashcard(version: PublishedContentVersion): RevealedFlash
     cardId: version.id,
     back: card.back,
     explanation: card.explanation,
-    sources: toPublicSourceReferences(version.sourceReferencesSnapshot)
+    sources: toPublicSourceReferences(version.sourceReferencesSnapshot),
+    normativeContext: normativeContextOf(version),
+    disclosedAccounts: disclosedAccountsOf(version)
   };
 }
 
@@ -154,6 +276,7 @@ export interface PublicCalculationExercise {
   difficulty: number;
   competencyTags: string[];
   sources: PublicSourceReference[];
+  normativeContext: PublicNormativeContext;
 }
 
 export function toPublicCalculationExercise(
@@ -175,7 +298,8 @@ export function toPublicCalculationExercise(
     roundingRule: exercise.roundingRule,
     difficulty: exercise.difficulty,
     competencyTags: exercise.competencyTags,
-    sources: toPublicSourceReferences(version.sourceReferencesSnapshot)
+    sources: toPublicSourceReferences(version.sourceReferencesSnapshot),
+    normativeContext: normativeContextOf(version)
   };
 }
 
@@ -198,6 +322,7 @@ export interface PublicJournalEntryExercise {
   difficulty: number;
   competencyTags: string[];
   sources: PublicSourceReference[];
+  normativeContext: PublicNormativeContext;
 }
 
 export function toPublicJournalEntryExercise(
@@ -218,7 +343,8 @@ export function toPublicJournalEntryExercise(
     expectedLineCount: exercise.expectedLines.length,
     difficulty: exercise.difficulty,
     competencyTags: exercise.competencyTags,
-    sources: toPublicSourceReferences(version.sourceReferencesSnapshot)
+    sources: toPublicSourceReferences(version.sourceReferencesSnapshot),
+    normativeContext: normativeContextOf(version)
   };
 }
 
@@ -236,6 +362,7 @@ export interface PublicErrorDiagnosisExercise {
   difficulty: number;
   competencyTags: string[];
   sources: PublicSourceReference[];
+  normativeContext: PublicNormativeContext;
 }
 
 export function toPublicErrorDiagnosisExercise(
@@ -256,7 +383,8 @@ export function toPublicErrorDiagnosisExercise(
     errorCategories: exercise.errorCategories,
     difficulty: exercise.difficulty,
     competencyTags: exercise.competencyTags,
-    sources: toPublicSourceReferences(version.sourceReferencesSnapshot)
+    sources: toPublicSourceReferences(version.sourceReferencesSnapshot),
+    normativeContext: normativeContextOf(version)
   };
 }
 
@@ -296,6 +424,7 @@ export interface PublicProgressiveCase {
   estimatedMinutes: number;
   competencyTags: string[];
   sources: PublicSourceReference[];
+  normativeContext: PublicNormativeContext;
 }
 
 export function toPublicProgressiveCase(version: PublishedContentVersion): PublicProgressiveCase {
@@ -336,6 +465,7 @@ export function toPublicProgressiveCase(version: PublishedContentVersion): Publi
     difficulty: kase.difficulty,
     estimatedMinutes: kase.estimatedMinutes,
     competencyTags: kase.competencyTags,
-    sources: publicSources
+    sources: publicSources,
+    normativeContext: normativeContextOf(version)
   };
 }

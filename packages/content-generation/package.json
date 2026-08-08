@@ -4,12 +4,14 @@
   "private": true,
   "type": "module",
   "exports": {
-    ".": "./src/index.ts"
+    ".": "./src/index.ts",
+    "./normative": "./src/types/normative-context.ts"
   },
   "scripts": {
     "content:generate": "tsx src/cli/generate.ts",
     "content:validate-generated": "tsx src/cli/validate-generated.ts",
     "content:report": "tsx src/cli/report.ts",
+    "content:classify-normative": "tsx src/cli/classify-normative.ts",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {

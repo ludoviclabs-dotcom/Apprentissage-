@@ -5,11 +5,13 @@ import {
   type ContentPayload
 } from "../types/artifact";
 import type { ValidationIssue, ValidationMetadata } from "../types/metadata";
+import type { NormativeContext } from "../types/normative-context";
 import {
   sourceReferenceSchema,
   verifyReference,
   type CorpusIndex
 } from "../types/source-reference";
+import { checkNormativeContext } from "./normative";
 import { answerAddsNothingNew, answerLeakRatio, jaccardSimilarity, normalizeForComparison } from "./text";
 
 /**
@@ -35,6 +37,14 @@ export interface ValidationInput {
   corpus: CorpusIndex;
   /** Contenus déjà retenus, pour la détection de doublons entre brouillons. */
   siblings?: readonly ContentPayload[];
+  /**
+   * Le référentiel selon lequel le contenu se déclare vrai.
+   *
+   * Il vient de l'enveloppe du brouillon, pas du contenu : le générateur ne le
+   * rédige pas, un relecteur le décide. Absent, les contrôles normatifs
+   * avertissent au lieu de refuser — voir `checkNormativeContext`.
+   */
+  normativeContext?: NormativeContext | null;
 }
 
 export interface ValidationResult {
@@ -598,6 +608,10 @@ export function validateContent(input: ValidationInput): ValidationResult {
   checkJournalEntry(payload, errors, warnings);
   checkErrorDiagnosis(payload, errors);
   checkProgressiveCase(payload, errors, warnings);
+
+  const normative = checkNormativeContext({ payload, normativeContext: input.normativeContext });
+  errors.push(...normative.errors);
+  warnings.push(...normative.warnings);
 
   const blockingReasons = [...new Set(errors.map((issue) => issue.code))].map((code) => {
     const first = errors.find((issue) => issue.code === code);

@@ -4,6 +4,10 @@ import { contentTypeLabels, type ContentType } from "@finance/content-generation
 import { loadAllDrafts, requireReviewAccess } from "@/lib/content-review/service";
 import { EmptyState } from "@/components/ui/empty-state";
 import { PageHeader } from "@/components/ui/page-header";
+import {
+  NormativeProfileBadge,
+  UndeterminedProfileBadge
+} from "@/components/content-review/normative-panel";
 import { StatusToken, ModeBadge } from "@/components/content-review/status-token";
 
 export const metadata: Metadata = {
@@ -139,6 +143,7 @@ export default async function ContentReviewPage({
                   <th scope="col">Statut</th>
                   <th scope="col">Qualité</th>
                   <th scope="col">Origine</th>
+                  <th scope="col">Référentiel</th>
                 </tr>
               </thead>
               <tbody>
@@ -155,6 +160,13 @@ export default async function ContentReviewPage({
                     <td>{draft.validationMetadata?.qualityScore ?? "—"}</td>
                     <td>
                       <ModeBadge mode={draft.generationMetadata.mode} />
+                    </td>
+                    <td>
+                      {draft.normativeContext ? (
+                        <NormativeProfileBadge profile={draft.normativeContext.profile} />
+                      ) : (
+                        <UndeterminedProfileBadge />
+                      )}
                     </td>
                   </tr>
                 ))}

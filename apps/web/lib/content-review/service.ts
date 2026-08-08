@@ -13,9 +13,11 @@ import {
   writeDraft,
   CorpusIndex,
   loadCorpus,
+  materialKindForCategory,
   type ContentDraft,
   type ContentDraftStatus,
-  type ContentPayload
+  type ContentPayload,
+  type SourceMaterialKind
 } from "@finance/content-generation";
 import { notFound } from "next/navigation";
 import { getEnv } from "@/lib/env";
@@ -131,6 +133,15 @@ export interface SourceExcerpt {
   pageStart: number;
   pageEnd: number;
   degraded: boolean;
+  /**
+   * Nature du matériau, déduite de la catégorie du document dans le corpus.
+   *
+   * Elle vient du corpus et non de la référence : une référence peut se tromper
+   * sur ce qu'elle cite — le validateur refuse déjà ce cas — alors que la
+   * catégorie du document est établie par l'ingestion. C'est elle qui permet
+   * à l'écran de séparer les sources normatives des sources pédagogiques.
+   */
+  materialKind: SourceMaterialKind;
   chunks: Array<{ chunkId: string; content: string; pageStart: number; pageEnd: number }>;
 }
 
@@ -187,6 +198,7 @@ export function resolveExcerpts(draft: ContentDraft, index: CorpusIndex | undefi
             pageStart: reference.pageStart,
             pageEnd: reference.pageEnd,
             degraded: pages.some((page) => page.degraded),
+            materialKind: materialKindForCategory(document.category),
             chunks: reference.chunkIds
               .map((chunkId) => corpus.getChunk(reference.documentId, chunkId))
               .filter((chunk): chunk is NonNullable<typeof chunk> => Boolean(chunk))
@@ -253,7 +265,12 @@ export async function revalidateDraft(
     )
     .map((candidate) => ({ contentType: candidate.contentType, content: candidate.content }) as ContentPayload);
 
-  const result = validateContent({ payload, corpus, siblings });
+  const result = validateContent({
+    payload,
+    corpus,
+    siblings,
+    normativeContext: entry.draft.normativeContext
+  });
   const revalidated = {
     ...entry.draft,
     validationMetadata: toValidationMetadata(result, now),

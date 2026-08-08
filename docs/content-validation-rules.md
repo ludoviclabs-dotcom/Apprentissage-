@@ -57,6 +57,43 @@ Une référence peut citer plusieurs fragments d'un même document ; l'extrait, 
 ne provient que de l'un d'eux. Le hash doit donc correspondre à **un** des
 fragments référencés, pas à tous.
 
+## Cohérence normative
+
+Un plan comptable est un texte daté : un contenu qui enregistre une opération est
+vrai *selon un référentiel*. Ces contrôles vérifient qu'il n'en invoque qu'un
+seul. Le modèle complet est décrit dans `docs/content-normative-versioning.md`.
+
+| Code | Gravité | Déclenchement |
+| --- | --- | --- |
+| `normative-profile-mismatch` | erreur | Un mélange de référentiels. Six formes : 481 avec 791 ; 6862 avec 6812 pour la même dotation ; un contenu `anc-2026-current` qui n'emploie que des sources de cours ; un contenu **noté** dont la réponse attendue emploie un compte remplacé ; un compte remplacé sans note de divergence ; un profil que son statut ou sa politique de notation contredit. |
+| `compte-personnalise-non-declare` | erreur | Une subdivision hors plan officiel (4816, 4671, 4672) employée sans `customAccountDisclosures` — ou déclarée sans être employée, ce qui décrirait un autre contenu. |
+| `subdivision-parent-errone` | erreur | Le `parentAccount` déclaré n'est pas celui de la subdivision (4816 subdivise 481, 4671 et 4672 subdivisent 467). |
+| `compte-officiel-non-source` | erreur | Le compte 512 est employé sans qu'aucune référence `official-reference` soit citée. Son intitulé vient du plan de comptes, pas du support — le présenter sans source en ferait une connaissance qui n'a pas besoin d'être étayée. |
+| `contexte-normatif-absent` | avertissement, **bloquant à la publication** | Le contenu emploie un compte dont le traitement dépend du millésime sans déclarer de référentiel. |
+
+### Pourquoi l'absence de référentiel n'est qu'un avertissement
+
+`normativeContext` est facultatif tant que les contenus antérieurs au modèle ne
+l'ont pas reçu. Les refuser en bloc aurait fait basculer un chapitre entier en
+`validation_failed` sans qu'un humain ait rien arbitré : une divergence réelle
+aurait été remplacée par une avalanche où plus personne ne l'aurait vue. La
+publication, elle, refuse : servir un contenu sans savoir selon quel plan
+comptable il est vrai — et, s'il est noté, corriger sur ce plan inconnu — n'est
+pas une option.
+
+Deux règles échappent à cette tolérance et refusent même sans référentiel
+déclaré : 481 avec 791, et 6862 avec 6812. Additionner deux mécanismes qui se
+remplacent l'un l'autre est faux quel que soit le plan qu'on invoque.
+
+### Ce qui n'est pas un mélange
+
+4816 avec 791 est le traitement **historique cohérent**, pas une hybridation :
+c'est ainsi que le support d'origine enregistre l'opération. Ce qui est interdit
+est de mêler le compte *actuel* (481) au virement *historique* (791). La première
+version de ce contrôle assimilait la subdivision à son parent et refusait donc
+les contenus qui décrivent fidèlement le support — exactement ceux que ce
+modèle est censé permettre de conserver.
+
 ## Fiche de révision
 
 Une fiche n'a que des avertissements propres : ses champs facultatifs peuvent

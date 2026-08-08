@@ -101,6 +101,31 @@ document, its nature, its section and its pages — enough to find the passage i
 your own copy, and nothing that publishes somebody's PDF. See
 `docs/content-publication.md`.
 
+## Normative Versioning
+
+A chart of accounts is a dated text, not a timeless truth, so a piece of course
+material is true *according to a referential*. `normativeContext` says which one:
+the referential in force (`anc-2026-current`), the original support's treatment
+(`course-original`), or a subdivision local to one entity or exercise
+(`entity-specific`). It lives on the draft envelope beside `generationMetadata`,
+is copied into the published snapshot, and no table was created for it.
+
+The consequence that matters is that grading has a referential. Content marked
+`comparison-only` is readable — understanding why a rule changed is part of the
+subject — but it corrects no attempt, enters no mastery score, and never reaches
+the spaced-repetition queue. The activity route refuses it outright with a 409,
+because a screen that filters is a convention and an id copied into a request
+walks around it.
+
+Mixing referentials is a blocking refusal (`normative-profile-mismatch`): 481
+with 791, 6862 with 6812, a graded exercise whose expected answer uses a
+superseded account, a `current` claim citing only the course. Two of those are
+refused even with no referential declared — adding two mechanisms that replace
+one another is wrong whichever plan you invoke. A closed table of versioned
+accounts (`normative-accounts.ts`) carries exactly what the chapter audit
+established; anything outside it is out of scope and passes silently. See
+`docs/content-normative-versioning.md`.
+
 ## Comptabilité approfondie
 
 The first public track fed by the factory, under `/modules/comptabilite-approfondie`
