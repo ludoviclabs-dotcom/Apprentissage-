@@ -523,7 +523,27 @@ export interface NormativeClassification {
   reasons: string[];
 }
 
+/**
+ * Les types dont la réponse attendue fait foi.
+ *
+ * LA FLASHCARD EN FAIT PARTIE, ET L'OUBLIER VIDAIT LA FILE DE RÉVISION. Une
+ * carte porte une réponse au verso, l'apprenant s'auto-évalue dessus, et
+ * `flashcard_reviewed` est l'une des sept dimensions de la maîtrise d'un
+ * chapitre. La classer « non notable » la faisait écarter par
+ * `filterGradedVersions` : un chapitre entièrement classé par cette commande
+ * serait arrivé en production avec une répétition espacée vide, sans qu'aucun
+ * contrôle ne s'en plaigne.
+ *
+ * La fiche de révision aussi : ses questions de rappel actif sont notées, et
+ * c'est la dimension `active_recall`.
+ *
+ * `not-gradable` reste disponible pour un contenu sans réponse attendue
+ * exploitable. Qu'aucun type n'y tombe aujourd'hui est un fait sur ce chapitre,
+ * pas une raison de retirer la valeur.
+ */
 const GRADABLE_CONTENT_TYPES = new Set<ContentPayload["contentType"]>([
+  "smart_revision_sheet",
+  "flashcard",
   "calculation_exercise",
   "journal_entry_exercise",
   "error_diagnosis_exercise",

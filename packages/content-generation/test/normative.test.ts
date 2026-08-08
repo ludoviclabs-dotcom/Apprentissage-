@@ -13,6 +13,7 @@ import {
 import { collectVersionedAccounts, distinctAccountNumbers } from "../src/validation/normative-accounts";
 import { validateContent } from "../src/validation/engine";
 import {
+  flashcardPayload,
   journalEntryPayload,
   officialReference,
   testCorpus,
@@ -633,6 +634,12 @@ describe("classement automatique", () => {
     );
 
     expect(bankWithoutReference.ambiguous).toBe(true);
+  });
+
+  it("tient une flashcard et une fiche pour notables", () => {
+    // La file de révision espacée ne propose que du « graded » : classer les
+    // cartes « non notables » l'aurait laissée vide sans que rien ne le dise.
+    expect(classifyNormativeContext(flashcardPayload()).proposedScoringPolicy).toBe("graded");
   });
 
   it("ne touche jamais à la réponse attendue", () => {
