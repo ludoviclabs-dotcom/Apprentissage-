@@ -1,6 +1,6 @@
 import "server-only";
 import { existsSync } from "node:fs";
-import { readdir } from "node:fs/promises";
+import { readdir, readFile } from "node:fs/promises";
 import { join } from "node:path";
 import {
   advanceAfterValidation,
@@ -131,6 +131,68 @@ export async function loadCorpusIndex(packId: string): Promise<CorpusIndex | und
     // possible, les références sont simplement affichées sans leur texte.
     return undefined;
   }
+}
+
+/**
+ * Niveau de risque d'un contenu, tel que la pré-revue l'a établi.
+ *
+ * IL VIENT D'UN FICHIER IGNORÉ, ET SON ABSENCE N'EST PAS UNE ERREUR. Le
+ * classement est produit par une passe d'audit sur la machine qui détient le
+ * corpus ; une installation qui ne l'a pas lancée affiche simplement la file
+ * sans priorités. Le faire échouer aurait rendu l'écran de relecture dépendant
+ * d'un artefact de travail.
+ */
+export type ReviewRiskLevel = "A" | "B" | "C";
+
+export interface ReviewRisk {
+  level: ReviewRiskLevel;
+  reasons: string[];
+}
+
+const REVIEW_ROOT = join(repoDataDir(), "generated", "review");
+
+/**
+ * Le classement de tous les chapitres, indexé par identifiant de brouillon.
+ *
+ * Plusieurs chapitres peuvent avoir été classés : les manifestes sont lus
+ * ensemble, et un identifiant ne peut appartenir qu'à un seul.
+ */
+export async function loadReviewRisks(): Promise<Map<string, ReviewRisk>> {
+  const risks = new Map<string, ReviewRisk>();
+
+  if (!existsSync(REVIEW_ROOT)) {
+    return risks;
+  }
+
+  for (const name of (await readdir(REVIEW_ROOT)).filter((file) => file.endsWith("-human-review-final.json"))) {
+    try {
+      const parsed = JSON.parse(await readFile(join(REVIEW_ROOT, name), "utf8")) as {
+        entries?: Array<{ artifactId?: unknown; riskLevel?: unknown; reasons?: unknown }>;
+      };
+
+      for (const entry of parsed.entries ?? []) {
+        if (
+          typeof entry.artifactId !== "string" ||
+          (entry.riskLevel !== "A" && entry.riskLevel !== "B" && entry.riskLevel !== "C")
+        ) {
+          continue;
+        }
+
+        risks.set(entry.artifactId, {
+          level: entry.riskLevel,
+          reasons: Array.isArray(entry.reasons)
+            ? entry.reasons.filter((reason): reason is string => typeof reason === "string")
+            : []
+        });
+      }
+    } catch {
+      // Un manifeste illisible ne doit pas empêcher de relire : la file
+      // s'affiche sans priorités, ce qui est l'état d'avant le classement.
+      continue;
+    }
+  }
+
+  return risks;
 }
 
 export interface SourceExcerpt {

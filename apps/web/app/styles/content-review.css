@@ -269,3 +269,283 @@
   gap: var(--space-1);
   font-size: 0.9rem;
 }
+
+/* Décision de revue.
+
+   L'écran affichait « Décision » et « Publication » côte à côte, sans dire que
+   le second n'est atteignable qu'après le premier. Ce bloc rend le circuit
+   visible, met l'approbation au premier plan, et retire de la vue toute action
+   de publication tant qu'elle n'a pas de sens. */
+
+.workflow-steps {
+  margin-bottom: var(--space-4);
+}
+
+.workflow-steps ol {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.workflow-step {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex: 1 1 10rem;
+  min-width: 0;
+  padding: var(--space-2);
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-subtle);
+  background: var(--surface-muted);
+}
+
+.workflow-step-index {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.6rem;
+  height: 1.6rem;
+  flex: 0 0 auto;
+  border-radius: 50%;
+  border: 1px solid var(--border-strong);
+  font-size: 0.8rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.workflow-step-body {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.workflow-step-label {
+  font-weight: 600;
+  font-size: 0.9rem;
+}
+
+.workflow-step-hint {
+  font-size: 0.78rem;
+  color: var(--text-muted);
+}
+
+.workflow-step-current {
+  border-color: var(--border-strong);
+  background: var(--surface-base);
+  box-shadow: inset 3px 0 0 0 currentColor;
+}
+
+.workflow-step-current .workflow-step-index {
+  background: var(--text-strong);
+  color: var(--surface-base);
+  border-color: var(--text-strong);
+}
+
+/* Une étape franchie reste lisible : elle est atténuée, jamais effacée — le
+   relecteur doit pouvoir reconstituer le chemin parcouru. */
+.workflow-step-todo {
+  opacity: 0.55;
+}
+
+.workflow-steps-note {
+  margin: var(--space-2) 0 0;
+  font-size: 0.9rem;
+}
+
+.review-decision {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.review-decision-primary {
+  font-weight: 600;
+}
+
+.review-decision-note {
+  margin: 0;
+  font-size: 0.9rem;
+  color: var(--text-muted);
+  max-width: 60ch;
+}
+
+.review-reject-help,
+.review-reject-count {
+  margin: 0;
+  font-size: 0.82rem;
+  color: var(--text-muted);
+}
+
+.review-reject-count {
+  font-variant-numeric: tabular-nums;
+}
+
+.review-next {
+  margin: 0;
+}
+
+/* Publication verrouillée : aucun élément interactif, pour qu'aucun geste ne
+   puisse être tenté avant l'approbation. */
+.publication-locked {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  padding: var(--space-3);
+  border: 1px dashed var(--border-strong);
+  border-radius: var(--radius-sm);
+  background: var(--surface-muted);
+}
+
+.publication-locked-title {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin: 0;
+  font-weight: 600;
+}
+
+.publication-locked-icon {
+  flex: 0 0 auto;
+  color: var(--text-muted);
+}
+
+.publication-locked p {
+  margin: 0;
+}
+
+/* Confirmation d'approbation.
+
+   Modale, parce que l'approbation est irréversible depuis l'interface : elle
+   doit interrompre le parcours, pas s'y fondre. */
+.review-confirm-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-4);
+  background: rgb(0 0 0 / 45%);
+}
+
+.review-confirm {
+  width: min(38rem, 100%);
+  max-height: 85vh;
+  overflow-y: auto;
+  padding: var(--space-4);
+  border-radius: var(--radius-md, 0.5rem);
+  border: 1px solid var(--border-strong);
+  background: var(--surface-base);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.review-confirm h3,
+.review-confirm h4,
+.review-confirm p {
+  margin: 0;
+}
+
+/* Barre d'actions collante.
+
+   FIXE, PAS `sticky`. Un `position: sticky` ne colle qu'à l'intérieur de son
+   bloc conteneur : placée dans le panneau « Décision », qui se trouve en bas
+   d'une page longue, elle n'apparaissait qu'une fois ce panneau atteint — donc
+   exactement quand elle ne servait plus à rien. Fixée au bas de la fenêtre, la
+   décision reste atteignable depuis n'importe quel point de la lecture.
+
+   `.page-stack` reçoit en contrepartie une réserve en bas, pour que la barre ne
+   recouvre jamais la fin du contenu. */
+.review-sticky-bar {
+  position: fixed;
+  left: 50%;
+  transform: translateX(-50%);
+  bottom: var(--space-3);
+  width: min(60rem, calc(100vw - 2 * var(--space-4)));
+  z-index: 20;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-strong);
+  background: var(--surface-base);
+  box-shadow: 0 2px 16px rgb(0 0 0 / 18%);
+}
+
+/* La réserve n'existe que sur les écrans qui portent la barre : ailleurs, elle
+   ajouterait un blanc que rien ne justifie. */
+.page-stack:has(.review-sticky-bar) {
+  padding-bottom: 5.5rem;
+}
+
+.review-sticky-status {
+  font-size: 0.9rem;
+}
+
+.review-sticky-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.review-quick-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.review-quick-filters a {
+  text-decoration: none;
+}
+
+.review-counter {
+  margin: 0 0 var(--space-2);
+  font-size: 0.95rem;
+}
+
+@media (max-width: 720px) {
+  .workflow-step {
+    flex-basis: 100%;
+  }
+
+  .review-sticky-bar {
+    flex-direction: column;
+    align-items: stretch;
+    bottom: 0;
+    left: 0;
+    transform: none;
+    width: 100%;
+    border-radius: 0;
+    border-left: 0;
+    border-right: 0;
+    border-bottom: 0;
+  }
+
+  .page-stack:has(.review-sticky-bar) {
+    padding-bottom: 8.5rem;
+  }
+
+  .review-sticky-actions {
+    justify-content: stretch;
+  }
+
+  .review-sticky-actions > * {
+    flex: 1 1 auto;
+    text-align: center;
+  }
+}
+
+/* Réduction des animations : la modale apparaît sans transition plutôt que
+   d'être supprimée — le contenu reste atteignable. */
+@media (prefers-reduced-motion: reduce) {
+  .review-confirm,
+  .review-sticky-bar {
+    transition: none;
+  }
+}

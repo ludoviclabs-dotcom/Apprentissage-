@@ -1,11 +1,18 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { contentTypeLabels, isPublishableGenerationMode } from "@finance/content-generation";
+import {
+  contentTypeLabels,
+  isPublishableGenerationMode,
+  NORMATIVE_PROFILE_LABELS,
+  SCORING_POLICY_LABELS
+} from "@finance/content-generation";
 import { resolvePublicChapter, resolveSlug } from "@finance/content-publication";
 import {
   findDraft,
+  loadAllDrafts,
   loadCorpusIndex,
+  loadReviewRisks,
   requireReviewAccess,
   resolveExcerpts,
   type SourceExcerpt
@@ -21,6 +28,7 @@ import {
 import { DraftEditor } from "@/components/content-review/draft-editor";
 import { PublicationActions } from "@/components/content-review/publication-actions";
 import { ReviewActions } from "@/components/content-review/review-actions";
+import { WorkflowSteps } from "@/components/content-review/workflow-steps";
 import { ModeBadge, StatusToken, statusLabelFor } from "@/components/content-review/status-token";
 
 export const metadata: Metadata = {
@@ -87,6 +95,43 @@ export default async function ContentReviewDetailPage({
     : null;
   const activeVersion = publicationKey ? ((await findActive(publicationKey)) ?? null) : null;
   const publicationHistory = publicationKey ? await loadHistory(publicationKey) : [];
+
+  // LE PROCHAIN À RELIRE, DANS L'ORDRE DE RISQUE. Rendre la main à la liste après
+  // chaque décision oblige à rechercher où l'on en était ; l'ordre est déjà
+  // établi par la pré-revue, autant s'en servir. Sans manifeste de risque, on
+  // retombe sur le prochain `needs_review` venu.
+  const risks = await loadReviewRisks();
+  const RISK_ORDER: Record<string, number> = { C: 0, B: 1, A: 2 };
+  const nextDraftId =
+    (await loadAllDrafts())
+      .filter(
+        (candidate) =>
+          candidate.draft.id !== draft.id &&
+          candidate.draft.status === "needs_review" &&
+          candidate.location.chapterSlug === location.chapterSlug
+      )
+      .sort((left, right) => {
+        const leftRank = RISK_ORDER[risks.get(left.draft.id)?.level ?? "A"] ?? 2;
+        const rightRank = RISK_ORDER[risks.get(right.draft.id)?.level ?? "A"] ?? 2;
+
+        return leftRank - rightRank || left.draft.id.localeCompare(right.draft.id);
+      })[0]?.draft.id ?? null;
+
+  const approvalSummary = {
+    title: draft.title,
+    typeLabel: contentTypeLabels[draft.contentType],
+    chapterLabel: draft.chapterLabel,
+    normativeProfileLabel: draft.normativeContext
+      ? NORMATIVE_PROFILE_LABELS[draft.normativeContext.profile]
+      : "Non déterminé",
+    scoringPolicyLabel: draft.normativeContext
+      ? SCORING_POLICY_LABELS[draft.normativeContext.scoringPolicy]
+      : "Non déterminée",
+    sourceCount: excerpts.length,
+    validationPassed: validation?.passed === true,
+    qualityScore: validation?.qualityScore ?? null,
+    warnings: (validation?.warnings ?? []).map((issue) => `${issue.code} — ${issue.message}`)
+  };
 
   return (
     <div className="page-stack">
@@ -230,12 +275,19 @@ export default async function ContentReviewDetailPage({
             />
           </section>
 
-          <section className="panel">
-            <h2 className="panel-heading">Décision</h2>
-            <ReviewActions draftId={draft.id} status={draft.status} canApprove={canApprove} />
+          <section className="panel" id="decision">
+            <h2 className="panel-heading">Décision de revue</h2>
+            <WorkflowSteps status={draft.status} published={activeVersion !== null} />
+            <ReviewActions
+              draftId={draft.id}
+              status={draft.status}
+              canApprove={canApprove}
+              summary={approvalSummary}
+              nextDraftId={nextDraftId}
+            />
           </section>
 
-          <section className="panel">
+          <section className="panel" id="publication">
             <h2 className="panel-heading">Publication</h2>
 
             {publicChapter ? (

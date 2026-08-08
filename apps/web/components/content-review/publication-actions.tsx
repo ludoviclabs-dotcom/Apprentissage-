@@ -69,6 +69,27 @@ interface PublishResponse {
   auditWarning?: string;
 }
 
+/** Libellés de statut éditorial — jamais la valeur brute à l'écran. */
+const STATUS_LABELS: Record<string, string> = {
+  draft: "brouillon",
+  validation_failed: "contrôles en échec",
+  needs_review: "à relire",
+  rejected: "rejeté",
+  approved: "approuvé"
+};
+
+/** Cadenas dessiné plutôt qu'émoji : indépendant des polices installées. */
+function LockIcon() {
+  return (
+    <svg className="publication-locked-icon" viewBox="0 0 16 16" width="16" height="16" aria-hidden="true">
+      <path
+        fill="currentColor"
+        d="M8 1a3.5 3.5 0 0 0-3.5 3.5V6H4a1 1 0 0 0-1 1v6a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1V7a1 1 0 0 0-1-1h-.5V4.5A3.5 3.5 0 0 0 8 1Zm2 5H6V4.5a2 2 0 1 1 4 0V6Z"
+      />
+    </svg>
+  );
+}
+
 const TYPE_LABELS: Record<string, string> = {
   smart_revision_sheet: "Fiche de révision",
   flashcard: "Flashcard",
@@ -202,11 +223,26 @@ export function PublicationActions({
     startTransition(() => router.refresh());
   }
 
+  // PAS DE BOUTON AVANT L'APPROBATION, PAS MÊME DÉSACTIVÉ. Un bouton grisé se
+  // lit comme « l'action existe, elle est momentanément indisponible » ; or
+  // publier n'est pas ce que ce contenu attend. Ce qu'il attend est une décision
+  // de revue, et l'écran doit le dire plutôt que de laisser deviner. Ce panneau
+  // ne porte donc aucun élément interactif : ni bouton, ni confirmation.
   if (status !== "approved") {
     return (
-      <p className="muted">
-        Seul un contenu approuvé peut être publié. Ce contenu est en «&nbsp;{status}&nbsp;».
-      </p>
+      <div className="publication-locked">
+        <p className="publication-locked-title">
+          <LockIcon /> Publication indisponible
+        </p>
+        <p>
+          Ce contenu doit d&apos;abord être approuvé lors de la revue humaine. Statut actuel&nbsp;:{" "}
+          <strong>{STATUS_LABELS[status] ?? status}</strong>.
+        </p>
+        <p className="muted">
+          L&apos;approbation ne publie rien : la publication reste une action distincte, disponible ici
+          une fois la décision de revue enregistrée.
+        </p>
+      </div>
     );
   }
 
