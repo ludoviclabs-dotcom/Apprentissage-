@@ -13,6 +13,7 @@ import {
 import { collectVersionedAccounts, distinctAccountNumbers } from "../src/validation/normative-accounts";
 import { validateContent } from "../src/validation/engine";
 import {
+  flashcardPayload,
   journalEntryPayload,
   officialReference,
   testCorpus,
@@ -277,6 +278,63 @@ describe("profil support d'origine — ce qui a été remplacé", () => {
   });
 });
 
+describe("le profil en vigueur peut nommer l'ancien traitement", () => {
+  it("admet une mention en prose accompagnée d'une note de divergence", () => {
+    const payload = currentSpreadPayload({
+      explanation:
+        "Le support d'origine virait ces frais par le compte 791 et les amortissait par 6812 ; le plan en vigueur débite 481 à l'engagement et amortit par 6862."
+    });
+
+    const result = checkNormativeContext({
+      payload,
+      normativeContext: context({ versionConflictNotes: [LEGACY_CONFLICT_NOTE] })
+    });
+
+    expect(result.errors).toEqual([]);
+  });
+
+  it("refuse la même mention sans note de divergence", () => {
+    const payload = currentSpreadPayload({
+      explanation: "Ces frais étaient virés par le compte 791 puis amortis par 6812."
+    });
+
+    const result = checkNormativeContext({ payload, normativeContext: context() });
+
+    expect(codesOf(result)).toContain(NORMATIVE_MISMATCH_CODE);
+  });
+
+  it("refuse l'ancien compte dès qu'il entre dans la réponse attendue", () => {
+    const payload = currentSpreadPayload({
+      expectedLines: [
+        {
+          accountNumber: "6812",
+          accountLabel: "Dotations aux amortissements des charges à répartir",
+          debit: 20000,
+          credit: 0,
+          lineExplanation: "Quote-part de l'exercice."
+        },
+        {
+          accountNumber: "481",
+          accountLabel: "Charges à répartir sur plusieurs exercices",
+          debit: 0,
+          credit: 20000,
+          lineExplanation: "Amortissement des frais étalés."
+        }
+      ],
+      requiredAccounts: ["481", "6812"],
+      expectedTotalDebit: 20000,
+      expectedTotalCredit: 20000
+    });
+
+    const result = checkNormativeContext({
+      payload,
+      normativeContext: context({ versionConflictNotes: [LEGACY_CONFLICT_NOTE] })
+    });
+
+    expect(codesOf(result)).toContain(NORMATIVE_MISMATCH_CODE);
+  });
+});
+
 describe("sous-comptes — déclarés ou refusés", () => {
   it("exige que 4816 soit déclaré comme subdivision de 481", () => {
     const undeclared = checkNormativeContext({
@@ -332,7 +390,9 @@ describe("sous-comptes — déclarés ou refusés", () => {
     expect(declared.errors).toEqual([]);
   });
 
-  it("refuse un sous-compte du support dans le profil en vigueur", () => {
+  it("admet dans le profil en vigueur une subdivision déclarée qui ne double aucun compte", () => {
+    // 4671 nomme un usage que 467 ne nomme pas : le plan 2026 admet la
+    // subdivision, et rien n'y contredit son emploi. La déclarer suffit.
     const result = checkNormativeContext({
       payload: journalEntryPayload({ sourceReferences: [validReference, officialReference] }),
       normativeContext: context({
@@ -347,7 +407,56 @@ describe("sous-comptes — déclarés ou refusés", () => {
       })
     });
 
+    expect(result.errors).toEqual([]);
+  });
+
+  it("refuse dans le profil en vigueur une subdivision qui double un compte officiel", () => {
+    // 4816 porte l'intitulé exact de 481 : deux numéros pour une seule chose.
+    const result = checkNormativeContext({
+      payload: legacySpreadPayload({ sourceReferences: [validReference, officialReference] }),
+      normativeContext: context({
+        customAccountDisclosures: [
+          {
+            accountNumber: "4816",
+            parentAccount: "481",
+            source: "course",
+            label: "Frais d'émission des emprunts"
+          }
+        ],
+        versionConflictNotes: [LEGACY_CONFLICT_NOTE]
+      })
+    });
+
     expect(codesOf(result)).toContain(NORMATIVE_MISMATCH_CODE);
+    expect(result.errors.some((problem) => problem.message.includes("employer 481"))).toBe(true);
+  });
+
+  it("admet qu'un encart comparatif nomme un sous-compte daté sans l'employer", () => {
+    // C'est la fiche du chapitre : elle applique 481 et 6862, et explique que le
+    // support numérote 4816. Exiger une déclaration pour cette phrase aurait
+    // interdit d'écrire la comparaison.
+    const payload = currentSpreadPayload({
+      explanation:
+        "Le support d'origine porte ces frais au compte 4816 et les amortit par 6812 ; le plan en vigueur retient 481 et 6862."
+    });
+
+    const result = checkNormativeContext({
+      payload,
+      normativeContext: context({ versionConflictNotes: [LEGACY_CONFLICT_NOTE] })
+    });
+
+    expect(result.errors).toEqual([]);
+  });
+
+  it("exige une note de divergence dès qu'un sous-compte daté est nommé", () => {
+    const payload = currentSpreadPayload({
+      explanation: "Le compte 4816 reçoit les frais d'émission étalés."
+    });
+
+    const result = checkNormativeContext({ payload, normativeContext: context() });
+
+    expect(codesOf(result)).toContain(NORMATIVE_MISMATCH_CODE);
+    expect(result.errors.some((problem) => problem.message.includes("note de divergence"))).toBe(true);
   });
 
   it("refuse une déclaration qui ne correspond à aucun compte employé", () => {
@@ -553,6 +662,12 @@ describe("classement automatique", () => {
     );
 
     expect(bankWithoutReference.ambiguous).toBe(true);
+  });
+
+  it("tient une flashcard et une fiche pour notables", () => {
+    // La file de révision espacée ne propose que du « graded » : classer les
+    // cartes « non notables » l'aurait laissée vide sans que rien ne le dise.
+    expect(classifyNormativeContext(flashcardPayload()).proposedScoringPolicy).toBe("graded");
   });
 
   it("ne touche jamais à la réponse attendue", () => {

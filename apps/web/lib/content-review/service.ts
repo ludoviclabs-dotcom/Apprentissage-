@@ -12,7 +12,7 @@ import {
   validateContent,
   writeDraft,
   CorpusIndex,
-  loadCorpus,
+  loadCorpusWithReferences,
   materialKindForCategory,
   type ContentDraft,
   type ContentDraftStatus,
@@ -117,10 +117,15 @@ export async function findDraft(draftId: string): Promise<DraftWithLocation | un
  * Corpus du pack, pour revérifier les références et afficher au relecteur le
  * texte source réellement cité. Chargé à la demande : la revue d'un brouillon
  * n'oblige pas à charger tous les packs.
+ *
+ * Les référentiels transversaux — le plan comptable — sont joints au pack du
+ * chapitre : ils n'appartiennent à aucun chapitre, et un contenu qui cite le
+ * PCG doit pouvoir être vérifié comme les autres. Les packs de chapitres, eux,
+ * restent étanches entre eux.
  */
 export async function loadCorpusIndex(packId: string): Promise<CorpusIndex | undefined> {
   try {
-    return (await loadCorpus(EXTRACTED_ROOT, packId)).index;
+    return (await loadCorpusWithReferences(EXTRACTED_ROOT, packId)).index;
   } catch {
     // Corpus absent (extraction non lancée sur cette machine) : la revue reste
     // possible, les références sont simplement affichées sans leur texte.

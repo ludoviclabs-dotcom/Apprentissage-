@@ -106,12 +106,24 @@ function pathOf(occurrences: readonly AccountOccurrence[], accountNumber: string
  *
  * 6862 et 6812 : deux dotations pour un seul étalement. L'une remplace l'autre,
  * elles ne s'ajoutent pas.
+ *
+ * LE CONTRÔLE PORTE SUR LES CHAMPS TYPÉS, PAS SUR LA PROSE. Un mélange est une
+ * *écriture* qui additionne deux mécanismes : deux lignes, deux comptes requis.
+ * Une phrase qui compare les deux traitements les nomme tous les deux sans rien
+ * additionner, et c'est exactement ce qu'un encart comparatif doit faire.
+ * L'appliquer au texte aurait rendu la comparaison impossible à écrire — or
+ * comprendre ce qui a changé fait partie de ce qu'un apprenant doit savoir. Une
+ * mention en prose reste soumise à {@link checkConflictIsDeclared} : nommer un
+ * compte remplacé oblige à dater la divergence.
  */
 function checkProfileIndependentHybrids(
-  present: ReadonlySet<string>,
   occurrences: readonly AccountOccurrence[],
   errors: ValidationIssue[]
 ): void {
+  const present = new Set(
+    occurrences.filter((occurrence) => occurrence.structured).map((occurrence) => occurrence.accountNumber)
+  );
+
   if (present.has("481") && present.has("791")) {
     errors.push(
       issue(
@@ -158,10 +170,28 @@ function checkCurrentProfile(
     );
   }
 
+  const structured = new Set(
+    occurrences.filter((occurrence) => occurrence.structured).map((occurrence) => occurrence.accountNumber)
+  );
+
   for (const accountNumber of present) {
     const account = versionedAccount(accountNumber);
 
     if (account?.kind === "legacy") {
+      // NOMMER L'ANCIEN TRAITEMENT N'EST PAS L'APPLIQUER. Une fiche du profil en
+      // vigueur doit pouvoir dire ce qui a changé — c'est même la seule façon
+      // qu'a un apprenant de comprendre un support antérieur qu'il a sous les
+      // yeux. Ce qui est interdit, c'est de l'employer : de le mettre dans une
+      // carte des comptes, une chronologie, une ligne d'écriture ou une liste de
+      // comptes requis, c'est-à-dire là où il devient la réponse.
+      //
+      // Une simple mention en prose reste soumise à `checkConflictIsDeclared` :
+      // elle exige une note de divergence, faute de quoi le lecteur ne peut pas
+      // savoir que le compte cité appartient à un état antérieur du droit.
+      if (!structured.has(accountNumber)) {
+        continue;
+      }
+
       errors.push(
         issue(
           "error",
@@ -174,22 +204,21 @@ function checkCurrentProfile(
       continue;
     }
 
-    if (account?.kind !== "custom-subdivision") {
+    if (account?.kind !== "custom-subdivision" || !structured.has(accountNumber)) {
       continue;
     }
 
-    // Une subdivision reste possible dans le référentiel courant — un plan de
-    // comptes d'entreprise en comporte légitimement — mais seulement si elle
-    // vient d'une entité. Une subdivision *du support* appartient au traitement
-    // historique par construction : elle n'a pas d'autre existence.
-    const disclosure = disclosureFor(context.customAccountDisclosures, accountNumber);
-
-    if (disclosure?.source === "course") {
+    // Une subdivision déclarée reste employable dans le référentiel en vigueur :
+    // le plan admet les subdivisions, et 4671 nomme un usage que 467 ne nomme
+    // pas. Ce qui est refusé est la subdivision qui *double* un compte officiel
+    // — 4816 porte l'intitulé exact de 481 — parce qu'il faudrait alors deux
+    // numéros pour une seule chose, et que le plan en a tranché un.
+    if (account.duplicatesOfficialAccount) {
       errors.push(
         issue(
           "error",
           NORMATIVE_MISMATCH_CODE,
-          `le compte ${accountNumber} est une subdivision du support d'origine : il relève du profil « Support d'origine — historique » ou « Sous-compte propre au cas », jamais du plan officiel 2026, qui ne le prescrit pas`,
+          `le compte ${accountNumber} porte l'intitulé du compte ${account.duplicatesOfficialAccount} du plan 2026 sous un numéro que ce plan ne prescrit pas : dans le référentiel en vigueur, employer ${account.duplicatesOfficialAccount}. Le numéro ${accountNumber} relève du profil « Support d'origine — historique ».`,
           pathOf(occurrences, accountNumber)
         )
       );
@@ -251,7 +280,17 @@ function checkDisclosures(
   context: NormativeContext,
   errors: ValidationIssue[]
 ): void {
-  for (const accountNumber of present) {
+  // L'obligation de déclarer porte sur l'EMPLOI, pas sur la citation. Un
+  // sous-compte devient trompeur quand il figure dans une carte des comptes, une
+  // ligne d'écriture ou une liste de comptes requis : le lecteur le prend alors
+  // pour un compte du plan. Une phrase qui le nomme pour dire d'où il vient ne
+  // le présente comme obligatoire à personne — et l'exiger aurait interdit
+  // d'expliquer la différence entre deux numérotations.
+  const used = new Set(
+    occurrences.filter((occurrence) => occurrence.structured).map((occurrence) => occurrence.accountNumber)
+  );
+
+  for (const accountNumber of used) {
     const account = versionedAccount(accountNumber);
 
     if (account?.kind !== "custom-subdivision") {
@@ -338,9 +377,17 @@ function checkConflictIsDeclared(
   context: NormativeContext,
   errors: ValidationIssue[]
 ): void {
-  const legacy = [...present].filter((accountNumber) => versionedAccount(accountNumber)?.kind === "legacy");
+  // Deux façons d'être daté : un compte dont le traitement a été remplacé (791,
+  // 6812, 16883), et un sous-compte qui porte l'intitulé d'un compte officiel
+  // sous un numéro antérieur (4816). Les deux appellent la même obligation :
+  // nommer un numéro daté sans dire qu'il l'est le fait passer pour courant.
+  const dated = [...present].filter((accountNumber) => {
+    const account = versionedAccount(accountNumber);
 
-  if (legacy.length === 0 || context.versionConflictNotes.length > 0) {
+    return account?.kind === "legacy" || Boolean(account?.duplicatesOfficialAccount);
+  });
+
+  if (dated.length === 0 || context.versionConflictNotes.length > 0) {
     return;
   }
 
@@ -348,7 +395,7 @@ function checkConflictIsDeclared(
     issue(
       "error",
       NORMATIVE_MISMATCH_CODE,
-      `le contenu emploie ${legacy.join(", ")}, dont le traitement a été remplacé, sans aucune note de divergence : présenter l'ancien traitement sans avertissement le fait passer pour toujours applicable`,
+      `le contenu nomme ${dated.join(", ")}, dont le traitement ou la numérotation a été remplacé, sans aucune note de divergence : présenter l'ancien traitement sans avertissement le fait passer pour toujours applicable`,
       "normativeContext.versionConflictNotes"
     )
   );
@@ -445,7 +492,7 @@ export function checkNormativeContext(input: NormativeCheckInput): NormativeChec
   const present = new Set(distinctAccountNumbers(occurrences));
   const context = input.normativeContext ?? null;
 
-  checkProfileIndependentHybrids(present, occurrences, errors);
+  checkProfileIndependentHybrids(occurrences, errors);
 
   if (!context) {
     if (present.size > 0) {
@@ -494,7 +541,27 @@ export interface NormativeClassification {
   reasons: string[];
 }
 
+/**
+ * Les types dont la réponse attendue fait foi.
+ *
+ * LA FLASHCARD EN FAIT PARTIE, ET L'OUBLIER VIDAIT LA FILE DE RÉVISION. Une
+ * carte porte une réponse au verso, l'apprenant s'auto-évalue dessus, et
+ * `flashcard_reviewed` est l'une des sept dimensions de la maîtrise d'un
+ * chapitre. La classer « non notable » la faisait écarter par
+ * `filterGradedVersions` : un chapitre entièrement classé par cette commande
+ * serait arrivé en production avec une répétition espacée vide, sans qu'aucun
+ * contrôle ne s'en plaigne.
+ *
+ * La fiche de révision aussi : ses questions de rappel actif sont notées, et
+ * c'est la dimension `active_recall`.
+ *
+ * `not-gradable` reste disponible pour un contenu sans réponse attendue
+ * exploitable. Qu'aucun type n'y tombe aujourd'hui est un fait sur ce chapitre,
+ * pas une raison de retirer la valeur.
+ */
 const GRADABLE_CONTENT_TYPES = new Set<ContentPayload["contentType"]>([
+  "smart_revision_sheet",
+  "flashcard",
   "calculation_exercise",
   "journal_entry_exercise",
   "error_diagnosis_exercise",
@@ -562,10 +629,19 @@ export function classifyNormativeContext(payload: ContentPayload): NormativeClas
     proposedScoringPolicy = "not-gradable";
   }
 
-  // Ce qui demande un humain : un contenu qui mélange les deux traitements, ou
-  // qui emploie un compte officiel non sourcé. Le classement ne tranche pas.
-  const mixesTreatments = accountsFound.includes("481") && accountsFound.includes("791");
-  const doubleDotation = accountsFound.includes("6862") && accountsFound.includes("6812");
+  // Ce qui demande un humain : une écriture qui mélange les deux traitements, ou
+  // un compte officiel non sourcé. Le classement ne tranche pas.
+  //
+  // Le mélange se juge sur les champs typés, comme le refus correspondant : une
+  // fiche qui *compare* les deux traitements les nomme tous les deux en prose
+  // sans rien additionner, et c'est précisément ce qu'un encart comparatif doit
+  // faire. La signaler comme ambiguë l'aurait envoyée en arbitrage humain à
+  // chaque passage, y compris une fois corrigée.
+  const inAnswer = new Set(
+    occurrences.filter((occurrence) => occurrence.structured).map((occurrence) => occurrence.accountNumber)
+  );
+  const mixesTreatments = inAnswer.has("481") && inAnswer.has("791");
+  const doubleDotation = inAnswer.has("6862") && inAnswer.has("6812");
   const unsourced512 =
     accountsFound.includes("512") && !citedMaterialKinds(payload).has("official-reference");
 

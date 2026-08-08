@@ -29,6 +29,15 @@ data/generated/*
 data/generated/drafts/*
 !data/generated/drafts/.gitkeep
 
+# Worktrees d'agents et magasin pnpm local : des dossiers de travail, pas du
+# dépôt. Ils n'étaient couverts que par `.git/info/exclude`, qui est local — si
+# bien qu'un `git add -A` sur une machine neuve proposait de commiter plusieurs
+# milliers de fichiers de cache. Un garde-fou qui ne voyage pas avec le dépôt
+# n'en est pas un.
+.claude/worktrees/
+.codex/worktrees/
+.pnpm-store/
+
 # Sources pédagogiques privées : jamais dans Git, jamais servies publiquement.
 content-private/
 # Garde-fou : aucun PDF ne doit être commité, où qu'il soit.
