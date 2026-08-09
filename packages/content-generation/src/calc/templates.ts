@@ -220,6 +220,162 @@ const TEMPLATE_LIST: readonly CalculationTemplate[] = [
     unit: "€",
     defaultRounding: "cent",
     compute: ({ montantEmission, fraisEmission }) => ({ ok: true, value: montantEmission - fraisEmission })
+  },
+
+  // --- Calculs transverses ---------------------------------------------------
+  //
+  // CE QUI LES SÉPARE DES ONZE PRÉCÉDENTS. Les templates ci-dessus nomment leurs
+  // entrées d'après le chapitre qui les a fait naître — `valeurNominale`,
+  // `nombreObligations`, `couponAnnuelTotal`. Ce n'était pas un défaut tant qu'un
+  // seul chapitre existait ; ça l'est devenu quand trois autres ont eu besoin des
+  // mêmes formes de calcul sous d'autres noms. Le moteur confronte
+  // `templateInputs` aux variables déclarées de l'énoncé : un pourcentage
+  // d'avancement passé dans une entrée appelée `tauxInteret` produirait un
+  // exercice juste dans son résultat et faux dans sa lecture.
+  //
+  // Ceux qui suivent nomment donc des rôles, pas des objets comptables : un
+  // montant, une quantité, un taux, une valeur unitaire. Ils servent les contrats
+  // à long terme, la constitution des sociétés et les variations du capital sans
+  // qu'aucun de ces chapitres n'apparaisse dans leur identifiant.
+  //
+  // CE QU'ILS NE FONT PAS. Ils ne composent pas. Une prime d'émission totale est
+  // un écart puis un produit, une perte à terminaison ventilée est une fraction
+  // puis un écart : deux exercices, deux étapes vérifiables, plutôt qu'un
+  // template de plus dont la formule serait invisible au relecteur.
+  {
+    id: "ecart-entre-deux-montants",
+    version: "v1",
+    label: "Écart entre deux montants",
+    description:
+      "Différence entre un montant et un autre. Sert au résultat à terminaison, au bénéfice partiel, au capital restant à appeler, à l'apport net du passif pris en charge et à la valeur théorique d'un droit de souscription ou d'attribution.",
+    inputs: [
+      { name: "montantInitial", meaning: "montant dont on retranche", unit: "€", min: 0 },
+      { name: "montantSoustrait", meaning: "montant retranché", unit: "€", min: 0 }
+    ],
+    unit: "€",
+    defaultRounding: "cent",
+    // LE RÉSULTAT PEUT ÊTRE NÉGATIF, ET C'EST LE POINT. Un contrat déficitaire
+    // dégage un résultat à terminaison négatif ; le borner à zéro effacerait
+    // précisément le cas que le chapitre enseigne.
+    compute: ({ montantInitial, montantSoustrait }) => ({
+      ok: true,
+      value: montantInitial - montantSoustrait
+    })
+  },
+  {
+    id: "produit-montant-quantite",
+    version: "v1",
+    label: "Montant total d'une quantité",
+    description:
+      "Montant unitaire multiplié par une quantité. Sert au capital social souscrit, à la prime d'émission totale à partir de la prime unitaire, et à tout total obtenu par dénombrement.",
+    inputs: [
+      { name: "montantUnitaire", meaning: "montant rattaché à une unité", unit: "€", min: 0 },
+      { name: "quantite", meaning: "nombre d'unités", unit: "unités", min: 0 }
+    ],
+    unit: "€",
+    defaultRounding: "cent",
+    compute: ({ montantUnitaire, quantite }) => ({ ok: true, value: montantUnitaire * quantite })
+  },
+  {
+    id: "fraction-d-un-montant",
+    version: "v1",
+    label: "Fraction d'un montant",
+    description:
+      "Montant multiplié par un taux compris entre 0 et 1. Sert au chiffre d'affaires reconnu à l'avancement, à la dépréciation d'un stock au prorata de l'avancement et à la fraction légalement appelée d'un capital.",
+    inputs: [
+      { name: "montantBase", meaning: "montant auquel le taux s'applique", unit: "€", min: 0 },
+      {
+        name: "taux",
+        meaning: "taux exprimé en ratio (0,375 pour 37,5 %)",
+        unit: "ratio",
+        min: 0,
+        max: 1
+      }
+    ],
+    unit: "€",
+    defaultRounding: "cent",
+    compute: ({ montantBase, taux }) => ({ ok: true, value: montantBase * taux })
+  },
+  {
+    id: "taux-de-realisation",
+    version: "v1",
+    label: "Taux de réalisation",
+    description:
+      "Part réalisée rapportée au total prévu. Sert au pourcentage d'avancement d'un contrat à long terme et à toute quotité mesurée par un rapport de montants.",
+    inputs: [
+      { name: "montantRealise", meaning: "part déjà réalisée et acceptée", unit: "€", min: 0 },
+      { name: "montantTotalPrevu", meaning: "total prévu à terminaison", unit: "€", min: 0 }
+    ],
+    unit: "ratio",
+    defaultRounding: "none",
+    compute: ({ montantRealise, montantTotalPrevu }) => {
+      const quotient = divide(montantRealise, montantTotalPrevu, "montant total prévu nul");
+
+      if (!quotient.ok) {
+        return quotient;
+      }
+
+      // UN TAUX DE RÉALISATION SUPÉRIEUR À 100 % EST UNE ERREUR DE DONNÉES,
+      // REFUSÉE PLUTÔT QUE PLAFONNÉE. Plafonner rendrait l'exercice juste en
+      // apparence sur des entrées fausses, ce qui est exactement la correction
+      // silencieuse que ce registre interdit.
+      if (quotient.value > 1) {
+        return {
+          ok: false,
+          error: `le montant réalisé (${montantRealise}) dépasse le total prévu (${montantTotalPrevu}) : un taux de réalisation supérieur à 100 % n'est pas recevable`
+        };
+      }
+
+      return quotient;
+    }
+  },
+  {
+    id: "montant-unitaire-par-repartition",
+    version: "v1",
+    label: "Montant unitaire après répartition",
+    description:
+      "Montant global réparti sur un nombre d'unités. Sert à la hausse de valeur nominale obtenue en incorporant des réserves sur les actions existantes.",
+    inputs: [
+      { name: "montantGlobal", meaning: "montant à répartir", unit: "€", min: 0 },
+      { name: "nombreUnites", meaning: "nombre d'unités entre lesquelles répartir", unit: "unités", min: 1 }
+    ],
+    unit: "€",
+    defaultRounding: "cent",
+    compute: ({ montantGlobal, nombreUnites }) =>
+      divide(montantGlobal, nombreUnites, "nombre d'unités nul")
+  },
+  {
+    id: "nombre-de-titres",
+    version: "v1",
+    label: "Nombre de titres à créer",
+    description:
+      "Montant total rapporté à la valeur unitaire d'un titre. Sert au nombre d'actions à émettre à partir des apports et du prix d'émission, des réserves incorporées et de la valeur nominale, ou d'un apport en nature et de la valeur réelle du titre.",
+    inputs: [
+      { name: "montantTotal", meaning: "montant total à convertir en titres", unit: "€", min: 0 },
+      { name: "valeurUnitaire", meaning: "valeur d'un titre", unit: "€", min: 0 }
+    ],
+    unit: "titres",
+    defaultRounding: "unit",
+    compute: ({ montantTotal, valeurUnitaire }) => {
+      const quotient = divide(montantTotal, valeurUnitaire, "valeur unitaire nulle");
+
+      if (!quotient.ok) {
+        return quotient;
+      }
+
+      // UN NOMBRE DE TITRES FRACTIONNAIRE EST REFUSÉ, PAS ARRONDI. L'arrondi à
+      // l'unité est la règle de présentation du résultat ; l'employer pour
+      // rattraper des données qui ne tombent pas juste masquerait une erreur
+      // d'énoncé derrière un entier plausible.
+      if (!Number.isInteger(quotient.value)) {
+        return {
+          ok: false,
+          error: `le rapport ${montantTotal} / ${valeurUnitaire} ne donne pas un nombre entier de titres (${quotient.value})`
+        };
+      }
+
+      return quotient;
+    }
   }
 ] as const;
 

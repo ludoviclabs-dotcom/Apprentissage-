@@ -217,9 +217,28 @@ mais il est orienté cellules A1 : il sert à noter une grille Excel. Faire tran
 un nominal, un taux et un prorata par des références de cellules rendrait l'énoncé
 illisible. Ce moteur reste la solution du lab Excel et n'est pas dupliqué ici.
 
-### Les onze calculs autorisés
+### Les dix-sept calculs autorisés
 
 Tous en version `v1` ; l'identifiant complet est `<id>.v1`.
+
+Ils se lisent en deux groupes. Les onze premiers nomment leurs entrées d'après le
+chapitre qui les a fait naître — les emprunts obligataires. Les six suivants
+nomment des **rôles** : un montant, une quantité, un taux, une valeur unitaire.
+
+**Pourquoi les seconds existent.** Trois chapitres — contrats à long terme,
+constitution des sociétés, variations du capital — ont eu besoin des mêmes formes
+de calcul sous d'autres noms. Le moteur confronte `templateInputs` aux variables
+déclarées de l'énoncé : un pourcentage d'avancement passé dans une entrée appelée
+`tauxInteret` aurait produit un exercice juste dans son résultat et faux dans sa
+lecture. Aucun de ces six ne porte de chapitre dans son identifiant, et un test
+le vérifie.
+
+**Ils ne composent pas.** Une prime d'émission totale est un écart puis un
+produit ; une perte à terminaison ventilée est une fraction puis un écart. Deux
+exercices, deux étapes vérifiables par le relecteur, plutôt qu'un template de
+plus dont la formule serait invisible.
+
+#### Calculs propres aux emprunts obligataires
 
 | Identifiant | Calcul |
 | --- | --- |
@@ -234,6 +253,29 @@ Tous en version `v1` ; l'identifiant complet est `<id>.v1`.
 | `amortissement-lineaire-periode` | montant à étaler × mois écoulés ÷ durée en mois |
 | `amortissement-prorata-interets` | montant à étaler × intérêts courus ÷ intérêts totaux |
 | `frais-emission-nets-encaisses` | montant d'émission − frais d'émission |
+
+#### Calculs transverses
+
+| Identifiant | Calcul | Unité | Sert notamment à |
+| --- | --- | --- | --- |
+| `ecart-entre-deux-montants` | montant initial − montant soustrait | € | résultat à terminaison, bénéfice partiel, capital restant à appeler, apport net du passif pris en charge, valeur théorique d'un droit de souscription ou d'attribution |
+| `produit-montant-quantite` | montant unitaire × quantité | € | capital social souscrit, prime d'émission totale à partir de la prime unitaire |
+| `fraction-d-un-montant` | montant × taux (0 à 1) | € | chiffre d'affaires reconnu à l'avancement, dépréciation au prorata de l'avancement, fraction légalement appelée d'un capital |
+| `taux-de-realisation` | montant réalisé ÷ total prévu | ratio | pourcentage d'avancement d'un contrat à long terme |
+| `montant-unitaire-par-repartition` | montant global ÷ nombre d'unités | € | hausse du nominal par incorporation de réserves |
+| `nombre-de-titres` | montant total ÷ valeur unitaire | titres | actions à émettre d'après les apports et le prix d'émission, les réserves et le nominal, ou un apport en nature et la valeur réelle du titre |
+
+Deux refus méritent d'être connus, parce qu'ils auraient pu être des arrondis :
+
+- `taux-de-realisation` **refuse** un ratio supérieur à 1 au lieu de le plafonner.
+  Plafonner rendrait l'exercice juste en apparence sur des entrées fausses ;
+- `nombre-de-titres` **refuse** un quotient fractionnaire au lieu de l'arrondir à
+  l'unité. L'arrondi est une règle de présentation du résultat, pas un moyen de
+  rattraper un énoncé qui ne tombe pas juste.
+
+`ecart-entre-deux-montants` peut en revanche rendre un résultat **négatif**, et
+c'est délibéré : un contrat déficitaire dégage un résultat à terminaison négatif,
+que le borner à zéro effacerait.
 
 ### Ce que `runTemplate` refuse
 
