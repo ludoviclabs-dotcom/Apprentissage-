@@ -6,6 +6,7 @@ import {
   type CorpusIndex,
   type SourceMaterialKind
 } from "../types/source-reference";
+import type { PageUsability } from "../sources/page-usability";
 
 /**
  * Construction déterministe de l'enveloppe envoyée au générateur.
@@ -71,6 +72,15 @@ export interface BuildEnvelopeOptions {
   maxInputChars?: number;
   /** Restreint aux catégories utiles (course, exercise, correction…). */
   includeCategories?: readonly string[];
+  /**
+   * Classement des pages dont le texte extrait ne fait pas foi.
+   *
+   * L'enveloppe est le seul endroit où le texte du corpus entre dans une
+   * génération : c'est donc ici, et pas dans le générateur, que se refuse une
+   * page dont la couche texte porte autre chose que ce qu'elle affiche. Le
+   * filtrer plus tard laisserait le texte transiter par le prompt.
+   */
+  pageUsability?: ReadonlyMap<string, PageUsability>;
 }
 
 /**
@@ -141,6 +151,29 @@ export function buildSourceEnvelope(
           chunkId: chunk.id,
           documentId: candidate.documentId,
           reason: "chunk en double (même contenu déjà inclus)"
+        });
+        continue;
+      }
+
+      // UN CHUNK QUI TOUCHE UNE PAGE NON FIABLE EST ÉCARTÉ EN ENTIER. Il
+      // pourrait ne porter que du texte visible, mais rien dans le chunk ne
+      // permet de le dire : `mixed` est traité comme les autres, faute de
+      // pouvoir séparer les portions fiables au niveau du chunk. Retenir le
+      // doute est ce qui empêche un corrigé invisible d'atteindre le prompt.
+      const unreliablePage = options.pageUsability
+        ? Array.from(
+            { length: chunk.pageEnd - chunk.pageStart + 1 },
+            (_, offset) => chunk.pageStart + offset
+          )
+            .map((pageNumber) => options.pageUsability?.get(`${candidate.documentId}:${pageNumber}`))
+            .find((entry) => entry !== undefined && entry.usability !== "reliable")
+        : undefined;
+
+      if (unreliablePage) {
+        excluded.push({
+          chunkId: chunk.id,
+          documentId: candidate.documentId,
+          reason: `page ${unreliablePage.pageNumber} classée « ${unreliablePage.usability} » : ${unreliablePage.reason}. Une annotation visuelle approuvée est requise pour cette page.`
         });
         continue;
       }
