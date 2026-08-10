@@ -3,6 +3,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { PageHeader } from "@/components/ui/page-header";
 import { AnnotationActions } from "@/components/source-annotations/annotation-actions";
+import { PageImage } from "@/components/source-annotations/page-image";
 import {
   currentImageHash,
   findAnnotation,
@@ -96,6 +97,13 @@ export default async function AnnotationDetailPage({
         </p>
       </PageHeader>
 
+      {annotation.confidence === "low" ? (
+        <p className="muted" role="alert">
+          Confiance faible sur cette transcription — la comparer à l&apos;image avec attention avant
+          toute décision.
+        </p>
+      ) : null}
+
       {outdated ? (
         <p className="muted" role="alert">
           La source visuelle a changé — nouvelle revue requise. L&apos;approbation est refusée tant que
@@ -105,13 +113,7 @@ export default async function AnnotationDetailPage({
 
       <div className="annotation-review">
         <section aria-label="Source visuelle">
-          {/* Balise brute volontaire : l'optimiseur d'images mettrait ce rendu
-              privé en cache sur disque, hors de la garde d'administration. */}
-          <img
-            src={`/api/admin/source-annotations/${annotation.annotationId}/image`}
-            alt={`Page ${annotation.pageNumber} du document source`}
-            style={{ maxWidth: "100%", height: "auto", border: "1px solid var(--border, #ccc)" }}
-          />
+          <PageImage annotationId={annotation.annotationId} pageNumber={annotation.pageNumber} />
           <p className="muted">
             Page {annotation.pageNumber} · région {annotation.regionId}
           </p>
@@ -155,11 +157,8 @@ export default async function AnnotationDetailPage({
           </p>
 
           <AnnotationActions
-            annotationId={annotation.annotationId}
-            reviewStatus={annotation.reviewStatus}
-            nextHref={
-              nextPending ? `/admin/source-annotations/${nextPending.annotationId}` : null
-            }
+            annotation={annotation}
+            nextHref={nextPending ? `/admin/source-annotations/${nextPending.annotationId}` : null}
           />
         </section>
       </div>

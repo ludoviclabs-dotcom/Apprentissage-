@@ -237,3 +237,110 @@ describe("fiabilité du texte d'une page", () => {
     );
   });
 });
+
+describe("correction puis signature", () => {
+  const withFacts = () =>
+    annotation({
+      confidence: "low",
+      structuredFacts: [
+        {
+          factId: "net",
+          label: "Net à votre débit",
+          value: 30720,
+          unit: "EUR",
+          context: "ligne de total",
+          sourceRegion: "tableau",
+          confidence: "low"
+        }
+      ]
+    });
+
+  it("laisse l'annotation à relire : corriger n'est pas approuver", () => {
+    const corrected = correctAnnotation(withFacts(), { transcription: "Avis de débit n° 815603" });
+
+    expect(corrected.reviewStatus).toBe("needs_human_review");
+  });
+
+  it("n'enregistre ni relecteur ni date : une correction n'est pas une décision", () => {
+    const corrected = correctAnnotation(withFacts(), { confidence: "medium" });
+
+    expect(corrected.reviewedBy).toBeUndefined();
+    expect(corrected.reviewedAt).toBeUndefined();
+    expect(corrected.reviewedImageHash).toBeUndefined();
+  });
+
+  it("ne touche à aucun champ immuable", () => {
+    const before = withFacts();
+    const corrected = correctAnnotation(before, {
+      transcription: "autre texte",
+      confidence: "high",
+      structuredFacts: []
+    });
+
+    expect(corrected.annotationId).toBe(before.annotationId);
+    expect(corrected.documentId).toBe(before.documentId);
+    expect(corrected.pageNumber).toBe(before.pageNumber);
+    expect(corrected.pageImageHash).toBe(before.pageImageHash);
+    expect(corrected.regionId).toBe(before.regionId);
+    expect(corrected.priority).toBe(before.priority);
+    expect(corrected.createdAt).toBe(before.createdAt);
+  });
+
+  it("persiste les faits corrigés, valeur numérique comprise", () => {
+    const corrected = correctAnnotation(withFacts(), {
+      structuredFacts: [
+        {
+          factId: "net",
+          label: "Net à votre débit (corrigé)",
+          value: 30721,
+          unit: "EUR",
+          context: "ligne de total",
+          sourceRegion: "tableau",
+          confidence: "high"
+        }
+      ]
+    });
+
+    expect(corrected.structuredFacts[0].value).toBe(30721);
+    expect(typeof corrected.structuredFacts[0].value).toBe("number");
+    expect(corrected.structuredFacts[0].label).toContain("corrigé");
+  });
+
+  it("ne relève jamais la confiance d'office", () => {
+    const untouched = correctAnnotation(withFacts(), { transcription: "texte relu" });
+
+    expect(untouched.confidence).toBe("low");
+  });
+
+  it("enchaîne correction puis approbation en deux actes distincts", () => {
+    const corrected = correctAnnotation(withFacts(), { transcription: "texte relu", confidence: "high" });
+
+    expect(corrected.reviewStatus).toBe("needs_human_review");
+
+    const approved = applyAnnotationTransition({
+      annotation: corrected,
+      to: "approved",
+      actor: "installation-locale",
+      occurredAt: NOW,
+      renderedImageHash: HASH_A
+    });
+
+    expect(approved.reviewStatus).toBe("approved");
+    expect(approved.reviewedBy).toBe("installation-locale");
+    expect(approved.transcription).toBe("texte relu");
+  });
+
+  it("refuse toute correction d'une annotation signée : pas de contournement", () => {
+    const approved = applyAnnotationTransition({
+      annotation: withFacts(),
+      to: "approved",
+      actor: "installation-locale",
+      occurredAt: NOW,
+      renderedImageHash: HASH_A
+    });
+
+    expect(() => correctAnnotation(approved, { transcription: "réécriture" })).toThrowError(
+      InvalidAnnotationTransitionError
+    );
+  });
+});
