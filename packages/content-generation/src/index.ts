@@ -29,3 +29,6 @@ export * from "./providers";
 export * from "./corpus/load";
 export * from "./generate/orchestrator";
 export * from "./store/draft-store";
+
+export * from "./sources/visual-annotation";
+export * from "./sources/page-usability";

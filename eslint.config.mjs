@@ -16,7 +16,12 @@ export default [
       "data/**",
       "source-packs/**",
       "playwright-report/**",
-      "test-results/**"
+      "test-results/**",
+      // Agent worktrees are independent TypeScript projects and are linted in
+      // their own checkout. Only `worktrees/` is excluded: a legitimate config
+      // file living directly under `.claude` or `.codex` stays linted.
+      "**/.claude/worktrees/**",
+      "**/.codex/worktrees/**"
     ]
   },
   js.configs.recommended,
