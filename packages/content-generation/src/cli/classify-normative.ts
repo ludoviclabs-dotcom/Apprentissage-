@@ -1,9 +1,14 @@
 import { mkdir, writeFile } from "node:fs/promises";
 import { dirname, isAbsolute, join } from "node:path";
 import { listDrafts, writeDraft } from "../store/draft-store";
-import type { ContentDraft, ContentPayload } from "../types/artifact";
+import { collectSourceReferences, type ContentDraft, type ContentPayload } from "../types/artifact";
 import type { NormativeContext } from "../types/normative-context";
-import { checkNormativeContext, classifyNormativeContext } from "../validation/normative";
+import { materialKindForCategory, sourceReferenceSchema } from "../types/source-reference";
+import {
+  checkNormativeContext,
+  classifyNormativeContext,
+  normativeSourceVersionIds
+} from "../validation/normative";
 import { versionedAccount } from "../validation/normative-accounts";
 import { draftsRoot, fail, parseCommonOptions, repoRoot, resolveContext, UsageError } from "./shared";
 
@@ -27,7 +32,18 @@ import { draftsRoot, fail, parseCommonOptions, repoRoot, resolveContext, UsageEr
  * action humaine peut sortir un contenu de cet état.
  */
 
-const REPORT_PATH = join("data", "generated", "review", "emprunts-normative-migration-report.json");
+/**
+ * Le rapport porte le nom du chapitre classé.
+ *
+ * IL ÉTAIT FIGÉ SUR « emprunts », ET CHAQUE CHAPITRE ÉCRASAIT LE PRÉCÉDENT.
+ * Classer un deuxième chapitre effaçait donc le constat du premier, sans que
+ * rien ne le signale — un rapport qui se perd tout seul ne vaut pas mieux que
+ * pas de rapport.
+ */
+function reportPath(chapterSlug: string): string {
+  return join("data", "generated", "review", `${chapterSlug}-normative-migration-report.json`);
+}
+
 const BACKUP_DIR = join("data", "generated", "checkpoints", "normative-pre-apply");
 
 interface ReportEntry {
@@ -54,6 +70,25 @@ function resolvePath(candidate: string): string {
 
 function payloadOf(draft: ContentDraft): ContentPayload {
   return { contentType: draft.contentType, content: draft.content } as ContentPayload;
+}
+
+/**
+ * Les documents que le contenu cite. Une référence malformée est ignorée
+ * plutôt que devinée : elle est déjà refusée par la validation, et lui faire
+ * produire ici un identifiant approximatif poserait une provenance fausse.
+ */
+function citedDocumentIdsOf(payload: ContentPayload): string[] {
+  const cited = new Set<string>();
+
+  for (const { reference } of collectSourceReferences(payload)) {
+    const parsed = sourceReferenceSchema.safeParse(reference);
+
+    if (parsed.success) {
+      cited.add(parsed.data.documentId);
+    }
+  }
+
+  return [...cited].sort();
 }
 
 /**
@@ -119,7 +154,8 @@ function assess(
  * relisant les numéros de compte serait lui demander de refaire le travail.
  */
 function proposedContext(
-  classification: ReturnType<typeof classifyNormativeContext>
+  classification: ReturnType<typeof classifyNormativeContext>,
+  sourceVersionIds: readonly string[]
 ): NormativeContext {
   const legacy = classification.legacyAccounts;
 
@@ -134,7 +170,7 @@ function proposedContext(
     effectiveFrom: classification.proposedProfile === "anc-2026-current" ? "2026-01-01" : undefined,
     effectiveTo: classification.proposedProfile === "course-original" ? "2025-12-31" : undefined,
     scoringPolicy: classification.proposedScoringPolicy,
-    sourceVersionIds: [],
+    sourceVersionIds: [...sourceVersionIds],
     supersededByProfile:
       classification.proposedProfile === "course-original" ? "anc-2026-current" : undefined,
     customAccountDisclosures: classification.proposedDisclosures,
@@ -157,7 +193,21 @@ async function main(): Promise<void> {
   const argv = process.argv.slice(2);
   const apply = argv.includes("--apply");
   const options = parseCommonOptions(argv.filter((flag) => flag !== "--apply"));
-  const { chapter } = await resolveContext(options);
+  const { chapter, corpus } = await resolveContext(options);
+
+  // Les référentiels officiels réellement ingérés. La liste vient du corpus :
+  // si elle est vide, aucun contenu ne pourra nommer de version, et le rapport
+  // le dit au lieu de poser un identifiant que rien n'étaye.
+  const referenceDocumentIds = corpus.index
+    .listDocuments()
+    .filter((document) => materialKindForCategory(document.category) === "official-reference")
+    .map((document) => document.documentId);
+
+  if (referenceDocumentIds.length === 0) {
+    console.warn(
+      "\n⚠ Aucun référentiel officiel n'est extrait : les contenus du profil en vigueur resteront sans version nommée, donc non publiables. Ingérer le pack de référence avant de reprendre."
+    );
+  }
 
   const storeOptions = {
     rootDir: draftsRoot(options),
@@ -177,11 +227,19 @@ async function main(): Promise<void> {
   const now = new Date().toISOString();
   let applied = 0;
   let untouched = 0;
+  let deferred = 0;
 
   for (const draft of drafts) {
     const payload = payloadOf(draft);
     const classification = classifyNormativeContext(payload);
-    const context = proposedContext(classification);
+    const context = proposedContext(
+      classification,
+      normativeSourceVersionIds({
+        profile: classification.proposedProfile,
+        referenceDocumentIds,
+        citedDocumentIds: citedDocumentIdsOf(payload)
+      })
+    );
 
     // Le contrôle est rejoué *avec* le contexte proposé : c'est la seule façon
     // de dire si la proposition suffit, ou si le contenu reste en défaut une
@@ -228,24 +286,34 @@ async function main(): Promise<void> {
       continue;
     }
 
+    // UN CLASSEMENT QUI NE TIENT PAS N'EST PAS UN CLASSEMENT. Quand le contexte
+    // proposé est lui-même refusé par les contrôles — un compte officiel employé
+    // sans référence officielle, deux traitements mélangés — l'écrire ferait
+    // affirmer au contenu un référentiel qu'il ne peut pas soutenir, et le
+    // ferait tomber en `validation_failed`, c'est-à-dire hors de la file de
+    // revue. Le brouillon reste donc exactement dans l'état où il était, et le
+    // rapport porte le motif : c'est une reprise à la main, pas un classement.
+    if (withProposal.errors.length > 0 || classification.ambiguous) {
+      deferred += 1;
+      continue;
+    }
+
     const backupPath = join(resolvePath(BACKUP_DIR), `${draft.id}.json`);
     await mkdir(dirname(backupPath), { recursive: true });
     await writeFile(backupPath, `${JSON.stringify(draft, null, 2)}\n`, "utf8");
-
-    const blocked = withProposal.errors.length > 0 || classification.ambiguous;
 
     await writeDraft(storeOptions, {
       ...draft,
       normativeContext: context,
       // Le contenu reste intact : seuls le référentiel, le statut et la trace
       // changent. `content` n'apparaît nulle part dans cette écriture.
-      status: blocked ? "validation_failed" : "needs_review",
+      status: "needs_review",
       reviewMetadata: { ...draft.reviewMetadata, revision: draft.reviewMetadata.revision + 1 },
       history: [
         ...draft.history,
         {
           fromStatus: draft.status,
-          toStatus: blocked ? "validation_failed" : "needs_review",
+          toStatus: "needs_review",
           occurredAt: now,
           actor: "cli:classify-normative",
           comment: `Référentiel proposé : ${classification.proposedProfile} (${classification.proposedScoringPolicy}). ${assessment.actionRequired}`.slice(
@@ -275,23 +343,27 @@ async function main(): Promise<void> {
         tally[entry.risk] = (tally[entry.risk] ?? 0) + 1;
         return tally;
       }, {}),
-      withConflict: entries.filter((entry) => entry.conflict.length > 0).length
+      withConflict: entries.filter((entry) => entry.conflict.length > 0).length,
+      deferred
     },
     entries
   };
 
-  const reportPath = resolvePath(REPORT_PATH);
-  await mkdir(dirname(reportPath), { recursive: true });
-  await writeFile(reportPath, `${JSON.stringify(report, null, 2)}\n`, "utf8");
+  const relativeReportPath = reportPath(chapter.chapterSlug);
+  const absoluteReportPath = resolvePath(relativeReportPath);
+  await mkdir(dirname(absoluteReportPath), { recursive: true });
+  await writeFile(absoluteReportPath, `${JSON.stringify(report, null, 2)}\n`, "utf8");
 
   console.log(`\n${entries.length} contenu(s) classé(s) pour « ${chapter.chapterLabel} ».`);
   console.log(`Profils proposés : ${JSON.stringify(report.counts.byProposedProfile)}`);
   console.log(`Risque : ${JSON.stringify(report.counts.byRisk)}`);
   console.log(`Contenus en conflit : ${report.counts.withConflict}`);
-  console.log(`Rapport : ${REPORT_PATH}`);
+  console.log(`Rapport : ${relativeReportPath}`);
 
   if (apply) {
-    console.log(`Brouillons mis à jour : ${applied} · approuvés laissés intacts : ${untouched}`);
+    console.log(
+      `Brouillons mis à jour : ${applied} · approuvés laissés intacts : ${untouched} · classements différés : ${deferred}`
+    );
     console.log(`État antérieur conservé sous : ${BACKUP_DIR}`);
   } else {
     console.log("Aucun brouillon modifié. Relancer avec --apply pour poser les référentiels proposés.");
