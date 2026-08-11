@@ -106,6 +106,80 @@ export function assertTextChunkUsable(
   }
 }
 
+/** Le refus opposé à une génération qui exige une carte et n'en a pas. */
+export const PAGE_USABILITY_MAP_REQUIRED = "page-usability-map-required";
+/** Le refus opposé à une carte illisible ou malformée. */
+export const PAGE_USABILITY_MAP_INVALID = "page-usability-map-invalid";
+/** Le refus opposé à une enveloppe construite sans la carte qu'elle exige. */
+export const PAGE_USABILITY_MAP_NOT_APPLIED = "page-usability-map-not-applied";
+
+export class PageUsabilityMapRequiredError extends Error {
+  readonly code = PAGE_USABILITY_MAP_REQUIRED;
+
+  constructor(
+    readonly chapterSlug: string,
+    readonly expectedPath: string
+  ) {
+    super(
+      `le chapitre « ${chapterSlug} » comporte des pages dont l'extraction est dégradée : une carte de fiabilité est obligatoire, et elle est introuvable (${expectedPath}). Un fichier absent ne vaut pas « toutes les pages sont fiables ».`
+    );
+    this.name = "PageUsabilityMapRequiredError";
+  }
+}
+
+export class PageUsabilityMapInvalidError extends Error {
+  readonly code = PAGE_USABILITY_MAP_INVALID;
+
+  constructor(
+    readonly chapterSlug: string,
+    readonly detail: string
+  ) {
+    super(`la carte de fiabilité du chapitre « ${chapterSlug} » est inexploitable : ${detail}`);
+    this.name = "PageUsabilityMapInvalidError";
+  }
+}
+
+export class PageUsabilityMapNotAppliedError extends Error {
+  readonly code = PAGE_USABILITY_MAP_NOT_APPLIED;
+
+  constructor(readonly chapterSlug: string) {
+    super(
+      `l'enveloppe du chapitre « ${chapterSlug} » est construite sans carte de fiabilité alors que son corpus en exige une : la construction est refusée plutôt que de laisser passer le texte d'une page non vérifiée.`
+    );
+    this.name = "PageUsabilityMapNotAppliedError";
+  }
+}
+
+/**
+ * Le nom de fichier d'une carte. UN SEUL ENDROIT LE CONNAÎT.
+ *
+ * Le dupliquer dans le CLI, dans un test et dans un script suffirait à ce que
+ * l'un des trois cherche au mauvais endroit le jour où la convention change, et
+ * conclue « pas de carte » — c'est-à-dire « tout est fiable ».
+ */
+export function pageUsabilityFileName(chapterSlug: string): string {
+  return `${chapterSlug}-page-usability.json`;
+}
+
+/**
+ * Un chapitre exige-t-il une carte ?
+ *
+ * LA RÉPONSE VIENT DU CORPUS, PAS D'UNE LISTE. Inscrire « les-titres » dans une
+ * constante aurait marché aujourd'hui et raté le prochain chapitre dont
+ * l'extraction se dégrade. Le critère est celui que l'ingestion établit
+ * elle-même : dès qu'une page d'un document du chapitre est marquée dégradée,
+ * son texte ne peut plus être présumé fidèle, et le classement devient
+ * obligatoire.
+ *
+ * Les chapitres dont l'extraction est intacte n'ont donc rien à déclarer et
+ * continuent de fonctionner comme avant.
+ */
+export function requiresPageUsabilityMap(
+  documents: ReadonlyArray<{ pages: ReadonlyArray<{ degraded: boolean }> }>
+): boolean {
+  return documents.some((document) => document.pages.some((page) => page.degraded));
+}
+
 /** Nature d'un fait retenu par une génération : d'où il tire son autorité. */
 export const factOrigins = ["TEXT_SOURCE", "APPROVED_VISUAL_SOURCE"] as const;
 

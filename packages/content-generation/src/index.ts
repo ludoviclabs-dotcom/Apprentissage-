@@ -32,3 +32,4 @@ export * from "./store/draft-store";
 
 export * from "./sources/visual-annotation";
 export * from "./sources/page-usability";
+export * from "./sources/load-page-usability";

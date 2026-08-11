@@ -6,7 +6,7 @@ import {
   type CorpusIndex,
   type SourceMaterialKind
 } from "../types/source-reference";
-import type { PageUsability } from "../sources/page-usability";
+import { PageUsabilityMapNotAppliedError, type PageUsability } from "../sources/page-usability";
 
 /**
  * Construction déterministe de l'enveloppe envoyée au générateur.
@@ -81,6 +81,12 @@ export interface BuildEnvelopeOptions {
    * filtrer plus tard laisserait le texte transiter par le prompt.
    */
   pageUsability?: ReadonlyMap<string, PageUsability>;
+  /**
+   * Vrai quand le chapitre ne peut pas être construit sans sa carte. Posé par
+   * le chargeur, jamais deviné ici : c'est lui qui a vu le corpus et le
+   * classement.
+   */
+  requirePageUsability?: boolean;
 }
 
 /**
@@ -129,6 +135,20 @@ export function buildSourceEnvelope(
     throw new Error(
       `le chapitre « ${options.chapterSlug} » couvre plusieurs domaines (${[...domains].join(", ")}) — un mélange de domaines produirait des citations incohérentes`
     );
+  }
+
+  // LA GARDE EST ICI, PAS SEULEMENT DANS L'APPELANT. Réparer le seul CLI aurait
+  // laissé la prochaine commande refaire la même omission — et une omission,
+  // ici, ne se voit pas : l'enveloppe se construit, simplement elle porte le
+  // texte d'une page que personne n'a vérifiée.
+  //
+  // Le drapeau est explicite plutôt que déduit du corpus : une page dégradée
+  // signale une extraction imparfaite, ce que plusieurs chapitres historiques
+  // connaissent sans que leur texte soit pour autant mensonger. C'est
+  // `loadChapterPageUsability` qui établit l'exigence, et il la transmet ici —
+  // de sorte qu'un appelant ne peut pas la reconnaître puis l'ignorer.
+  if (options.requirePageUsability && !options.pageUsability) {
+    throw new PageUsabilityMapNotAppliedError(options.chapterSlug);
   }
 
   const documents: EnvelopeDocument[] = [];

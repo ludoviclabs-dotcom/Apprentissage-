@@ -4,7 +4,8 @@ import { createContentProvider, resolveMaxInputChars } from "../providers";
 import { saveDrafts } from "../store/draft-store";
 import type { ContentPayload } from "../types/artifact";
 import { listDrafts } from "../store/draft-store";
-import { draftsRoot, fail, manualOptions, parseCommonOptions, resolveContext, UsageError } from "./shared";
+import { loadChapterPageUsability } from "../sources/load-page-usability";
+import { dataDir, draftsRoot, fail, manualOptions, parseCommonOptions, resolveContext, UsageError } from "./shared";
 
 /**
  * `pnpm content:generate --chapter "Emprunts obligataires" --mode mock`
@@ -23,17 +24,34 @@ async function main(): Promise<void> {
   const restriction = restrictKindsForDomain(requestedKinds, chapter.domainId, process.env);
   const kinds = restriction.allowed;
 
+  // LE CLASSEMENT DE FIABILITÉ EST CHARGÉ AVANT L'ENVELOPPE, ET SON ABSENCE
+  // ARRÊTE LA COMMANDE. Un chapitre dont l'extraction est dégradée porte des
+  // pages dont le texte n'est pas nécessairement ce que la page affiche ;
+  // générer sans son classement reviendrait à citer une couche invisible.
+  const usability = await loadChapterPageUsability({
+    dataDir: dataDir(),
+    chapterSlug: chapter.chapterSlug,
+    documents: corpus.index
+      .listDocuments()
+      .filter((document) => document.chapterSlug === chapter.chapterSlug)
+  });
+
   const envelope = buildSourceEnvelope(corpus.index, {
     chapterSlug: chapter.chapterSlug,
     chapterLabel: chapter.chapterLabel,
     sourcePackId: options.sourcePack,
-    maxInputChars: resolveMaxInputChars(process.env, DEFAULT_MAX_INPUT_CHARS)
+    maxInputChars: resolveMaxInputChars(process.env, DEFAULT_MAX_INPUT_CHARS),
+    pageUsability: usability.pageUsability,
+    requirePageUsability: usability.required
   });
 
   console.log(`Chapitre        : ${chapter.chapterLabel} (${chapter.chapterSlug})`);
   console.log(`Domaine         : ${envelope.domainId}`);
   console.log(`Pack            : ${options.sourcePack}`);
   console.log(`Mode            : ${options.mode}`);
+  console.log(
+    `Fiabilité pages : ${usability.configured ? `carte appliquée (${usability.required ? "obligatoire" : "facultative"})` : "aucune carte — corpus intact"}`
+  );
   console.log(`Types demandés  : ${requestedKinds.join(", ")}`);
 
   if (restriction.refused.length > 0) {
