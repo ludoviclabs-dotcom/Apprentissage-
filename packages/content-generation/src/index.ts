@@ -33,3 +33,5 @@ export * from "./store/draft-store";
 export * from "./sources/visual-annotation";
 export * from "./sources/page-usability";
 export * from "./sources/load-page-usability";
+export * from "./sources/editorial-scope";
+export * from "./sources/load-editorial-scope";

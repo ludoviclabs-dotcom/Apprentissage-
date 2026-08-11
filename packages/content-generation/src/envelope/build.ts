@@ -7,6 +7,7 @@ import {
   type SourceMaterialKind
 } from "../types/source-reference";
 import { PageUsabilityMapNotAppliedError, type PageUsability } from "../sources/page-usability";
+import { findScopeViolation, type EditorialScopeExclusion } from "../sources/editorial-scope";
 
 /**
  * Construction déterministe de l'enveloppe envoyée au générateur.
@@ -87,6 +88,11 @@ export interface BuildEnvelopeOptions {
    * classement.
    */
   requirePageUsability?: boolean;
+  /**
+   * Périmètre éditorial. Distinct de la fiabilité : une page peut être exacte
+   * et pourtant hors sujet pour cette version du chapitre.
+   */
+  scopeExclusions?: readonly EditorialScopeExclusion[];
 }
 
 /**
@@ -194,6 +200,27 @@ export function buildSourceEnvelope(
           chunkId: chunk.id,
           documentId: candidate.documentId,
           reason: `page ${unreliablePage.pageNumber} classée « ${unreliablePage.usability} » : ${unreliablePage.reason}. Une annotation visuelle approuvée est requise pour cette page.`
+        });
+        continue;
+      }
+
+      // PREMIER VERROU DU PÉRIMÈTRE : la source exclue n'atteint pas le prompt.
+      // Le second — la validation des références d'un contenu déjà rédigé —
+      // vit ailleurs, parce qu'une charge utile manuelle ne passe pas par ici.
+      const outOfScope = options.scopeExclusions?.length
+        ? findScopeViolation(options.scopeExclusions, {
+            documentId: candidate.documentId,
+            pageStart: chunk.pageStart,
+            pageEnd: chunk.pageEnd,
+            chunkId: chunk.id
+          })
+        : undefined;
+
+      if (outOfScope) {
+        excluded.push({
+          chunkId: chunk.id,
+          documentId: candidate.documentId,
+          reason: `hors périmètre éditorial — ${outOfScope.caseLabel ?? outOfScope.exclusionId} : ${outOfScope.reason}`
         });
         continue;
       }
