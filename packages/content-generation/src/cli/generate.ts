@@ -5,6 +5,10 @@ import { saveDrafts } from "../store/draft-store";
 import type { ContentPayload } from "../types/artifact";
 import { listDrafts } from "../store/draft-store";
 import { loadChapterPageUsability } from "../sources/load-page-usability";
+import { loadChapterEditorialScope } from "../sources/load-editorial-scope";
+import { assertReferencesWithinScope } from "../sources/editorial-scope";
+import { sourceReferenceSchema } from "../types/source-reference";
+import { collectSourceReferences } from "../types/artifact";
 import { dataDir, draftsRoot, fail, manualOptions, parseCommonOptions, resolveContext, UsageError } from "./shared";
 
 /**
@@ -36,19 +40,28 @@ async function main(): Promise<void> {
       .filter((document) => document.chapterSlug === chapter.chapterSlug)
   });
 
+  const scope = await loadChapterEditorialScope({
+    dataDir: dataDir(),
+    chapterSlug: chapter.chapterSlug
+  });
+
   const envelope = buildSourceEnvelope(corpus.index, {
     chapterSlug: chapter.chapterSlug,
     chapterLabel: chapter.chapterLabel,
     sourcePackId: options.sourcePack,
     maxInputChars: resolveMaxInputChars(process.env, DEFAULT_MAX_INPUT_CHARS),
     pageUsability: usability.pageUsability,
-    requirePageUsability: usability.required
+    requirePageUsability: usability.required,
+    scopeExclusions: scope.exclusions
   });
 
   console.log(`Chapitre        : ${chapter.chapterLabel} (${chapter.chapterSlug})`);
   console.log(`Domaine         : ${envelope.domainId}`);
   console.log(`Pack            : ${options.sourcePack}`);
   console.log(`Mode            : ${options.mode}`);
+  console.log(
+    `Périmètre      : ${scope.configured ? `${scope.scopeLabel} — ${scope.exclusions.length} exclusion(s)` : "aucune exclusion éditoriale"}`
+  );
   console.log(
     `Fiabilité pages : ${usability.configured ? `carte appliquée (${usability.required ? "obligatoire" : "facultative"})` : "aucune carte — corpus intact"}`
   );
@@ -122,6 +135,25 @@ async function main(): Promise<void> {
   });
 
   const limited = options.limit ? drafts.slice(0, options.limit) : drafts;
+
+  // SECOND VERROU DU PÉRIMÈTRE, AVANT TOUTE ÉCRITURE. Le filtrage de
+  // l'enveloppe protège ce que le générateur a vu ; il ne protège rien quand la
+  // charge utile est rédigée à la main, où rien n'oblige à ne citer que ce que
+  // l'enveloppe contenait. On refuse ici en bloc plutôt que d'écrire des
+  // brouillons qu'il faudrait ensuite retrouver et retirer.
+  for (const draft of limited) {
+    const references = collectSourceReferences({
+      contentType: draft.contentType,
+      content: draft.content
+    } as ContentPayload)
+      .flatMap((entry) => {
+        const parsed = sourceReferenceSchema.safeParse(entry.reference);
+        return parsed.success ? [parsed.data] : [];
+      });
+
+    assertReferencesWithinScope(scope.exclusions, references);
+  }
+
   const summary = await saveDrafts(storeOptions, limited, { force: options.force });
 
   console.log("");
