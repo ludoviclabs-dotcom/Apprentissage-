@@ -157,8 +157,48 @@ describe("taxonomie et routes", () => {
     expect(resolvePublicChapter("emprunts-obligataires")?.slug).toBe("emprunts-obligataires");
   });
 
+  /**
+   * LE SLUG DÉRIVÉ D'UN NOM DE FICHIER NE RESSEMBLE PAS AU SLUG PUBLIC, ET
+   * C'EST LA RAISON D'ÊTRE DE CETTE TABLE. Les quatre chapitres généralisés
+   * portaient un alias manquant : leur contenu passait le garde de publication
+   * puis échouait à la construction de l'instantané, sur un chapitre « hors
+   * programme » qui est pourtant au programme.
+   */
+  it.each([
+    ["les-titres", "titres"],
+    ["les-contrats-a-long-terme", "contrats-a-long-terme"],
+    ["la-constitution-des-entreprises", "constitution-des-societes"],
+    ["les-variations-du-capital-des-societes", "variations-du-capital"]
+  ])("résout le slug source « %s » vers le chapitre public « %s »", (source, expected) => {
+    expect(resolvePublicChapter(source)?.slug).toBe(expected);
+  });
+
+  it.each(["titres", "contrats-a-long-terme", "constitution-des-societes", "variations-du-capital"])(
+    "résout le slug public canonique « %s » vers lui-même",
+    (slug) => {
+      expect(resolvePublicChapter(slug)?.slug).toBe(slug);
+    }
+  );
+
   it("refuse un chapitre hors programme plutôt que de le ranger au hasard", () => {
     expect(resolvePublicChapter("chapitre-invente")).toBeUndefined();
+  });
+
+  /**
+   * La correspondance reste exacte : ajouter des alias ne doit pas ouvrir la
+   * porte à une résolution approximative. Ces slugs ressemblent à des chapitres
+   * déclarés sans en être — un `startsWith`, un `includes` ou un retrait
+   * d'article les rangerait quelque part.
+   */
+  it.each([
+    "les-titre",
+    "titres-non-cotes",
+    "la-constitution",
+    "variations-du-capital-social",
+    "contrats",
+    "LES-TITRES"
+  ])("refuse « %s », qui ressemble à un chapitre sans en être un", (slug) => {
+    expect(resolvePublicChapter(slug)).toBeUndefined();
   });
 
   it("déclare les cinq chapitres à venir de la généralisation", () => {
