@@ -149,6 +149,11 @@ export function extractedDir(): string {
   return join(repoRoot, "data", "extracted");
 }
 
+/** Racine des données du dépôt. Le chargeur de cartes en dérive son chemin. */
+export function dataDir(): string {
+  return join(repoRoot, "data");
+}
+
 export function draftsRoot(options: CommonOptions): string {
   return resolvePath(options.output);
 }
