@@ -71,25 +71,32 @@ export const COMPTA_APPROFONDIE: PublicModuleDefinition = {
       slug: "titres",
       label: "Titres",
       summary: "Acquisition, valorisation à l'inventaire et cession des titres de participation et de placement.",
-      sourceChapterSlugs: ["titres"]
+      sourceChapterSlugs: ["titres", "les-titres"]
     },
     {
       slug: "constitution-des-societes",
       label: "Constitution des sociétés",
       summary: "Promesses d'apport, libération, apports en nature et frais de constitution.",
-      sourceChapterSlugs: ["constitution-des-societes", "constitution"]
+      // Le support s'intitule « La constitution des entreprises » : le slug
+      // dérivé ne partage ni l'article, ni le nom commun, avec le slug public.
+      // C'est exactement ce que cette table est là pour absorber.
+      sourceChapterSlugs: ["constitution-des-societes", "constitution", "la-constitution-des-entreprises"]
     },
     {
       slug: "variations-du-capital",
       label: "Variations du capital",
       summary: "Augmentation, réduction et amortissement du capital.",
-      sourceChapterSlugs: ["variations-du-capital", "augmentation-de-capital"]
+      sourceChapterSlugs: [
+        "variations-du-capital",
+        "augmentation-de-capital",
+        "les-variations-du-capital-des-societes"
+      ]
     },
     {
       slug: "contrats-a-long-terme",
       label: "Contrats à long terme",
       summary: "Méthode à l'avancement, méthode à l'achèvement et perte à terminaison.",
-      sourceChapterSlugs: ["contrats-a-long-terme"]
+      sourceChapterSlugs: ["contrats-a-long-terme", "les-contrats-a-long-terme"]
     },
     {
       slug: "travaux-de-cloture",
@@ -109,6 +116,16 @@ export function getPublicChapter(slug: string): PublicChapterDefinition | undefi
  *
  * Retourne `undefined` plutôt que d'inventer un chapitre : publier un contenu
  * dont le chapitre n'est pas au programme doit être refusé, pas rangé au hasard.
+ *
+ * LA CORRESPONDANCE EST EXACTE, ET LE RESTERA. Il serait tentant de retirer les
+ * articles et de comparer les radicaux — « les-titres » et « titres » ne
+ * diffèrent que par là. Mais « la-constitution-des-entreprises » et
+ * « constitution-des-societes » ne se ressemblent pas assez pour qu'aucune
+ * règle ne les rapproche sans en rapprocher d'autres par accident, et une
+ * heuristique qui range un chapitre inconnu sous un chapitre voisin publie du
+ * contenu au mauvais endroit sans que rien ne proteste. Chaque alias est donc
+ * écrit à la main et relu comme tel : la liste est plus longue, et c'est le
+ * prix d'un refus qui reste un refus.
  */
 export function resolvePublicChapter(sourceChapterSlug: string): PublicChapterDefinition | undefined {
   return COMPTA_APPROFONDIE.chapters.find(
