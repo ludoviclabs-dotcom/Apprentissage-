@@ -359,6 +359,126 @@ export function correctAnnotation(
   return visualAnnotationSchema.parse({ ...annotation, ...changes });
 }
 
+/** Le refus opposé à une provenance visuelle qui désigne une annotation inconnue. */
+export const VISUAL_ANNOTATION_UNKNOWN = "visual-source-annotation-unknown";
+/** Le refus opposé à une provenance visuelle qu'aucun magasin ne permet de vérifier. */
+export const VISUAL_ANNOTATION_UNVERIFIABLE = "visual-source-annotation-unverifiable";
+
+export type VisualBackingRefusal =
+  | typeof VISUAL_ANNOTATION_NOT_APPROVED
+  | typeof VISUAL_ANNOTATION_STALE_IMAGE
+  | typeof VISUAL_ANNOTATION_UNKNOWN
+  | typeof VISUAL_ANNOTATION_UNVERIFIABLE;
+
+export type VisualBackingResult =
+  | { backed: true }
+  | { backed: false; code: VisualBackingRefusal; message: string };
+
+export interface VisualBackingInput {
+  /** Les annotations que la référence invoque pour cette page. */
+  annotationIds: readonly string[];
+  documentId: string;
+  pageNumber: number;
+  /**
+   * Le magasin d'annotations. `undefined` quand il n'a pas été chargé — et
+   * c'est un refus, jamais un succès : invoquer une transcription qu'on ne
+   * peut pas produire ne vaut pas mieux que ne rien invoquer.
+   */
+  annotations: readonly VisualAnnotation[] | undefined;
+  /** Empreintes des rendus courants, quand on en dispose (`documentId:page`). */
+  renderedImageHashes?: ReadonlyMap<string, string>;
+}
+
+/**
+ * Une page dont le texte ne fait pas foi est-elle couverte par une annotation
+ * visuelle réellement signée ?
+ *
+ * C'EST LA SEULE PORTE, ET ELLE EST FERMÉE PAR DÉFAUT. Quatre refus distincts
+ * plutôt qu'un booléen : « aucune annotation ne porte ce nom », « elle n'est pas
+ * approuvée », « elle décrit un rendu qui n'existe plus » et « rien ici ne
+ * permet de le vérifier » appellent des corrections différentes, et les
+ * confondre ferait relire la mauvaise chose.
+ *
+ * L'obsolescence se constate de deux façons, et les deux comptent. Le magasin
+ * peut fournir l'empreinte du rendu courant : elle doit correspondre. À défaut,
+ * l'annotation se contredit elle-même quand la signature (`reviewedImageHash`)
+ * ne porte pas sur l'image qu'elle décrit (`pageImageHash`) — cette
+ * vérification-là ne demande aucune image et reste donc toujours possible.
+ */
+export function verifyVisualBacking(input: VisualBackingInput): VisualBackingResult {
+  if (input.annotationIds.length === 0) {
+    return {
+      backed: false,
+      code: VISUAL_ANNOTATION_UNKNOWN,
+      message: `aucune annotation visuelle n'est invoquée pour la page ${input.pageNumber} de « ${input.documentId} »`
+    };
+  }
+
+  if (!input.annotations) {
+    return {
+      backed: false,
+      code: VISUAL_ANNOTATION_UNVERIFIABLE,
+      message:
+        `la référence invoque une source visuelle approuvée pour la page ${input.pageNumber} de ` +
+        `« ${input.documentId} », mais aucun magasin d'annotations n'est disponible : la provenance ne peut pas être établie`
+    };
+  }
+
+  for (const annotationId of input.annotationIds) {
+    const annotation = input.annotations.find((candidate) => candidate.annotationId === annotationId);
+
+    if (!annotation) {
+      return {
+        backed: false,
+        code: VISUAL_ANNOTATION_UNKNOWN,
+        message: `l'annotation « ${annotationId} » n'existe pas dans le magasin`
+      };
+    }
+
+    // La page annoncée doit être celle qui est couverte : une annotation
+    // approuvée sur une autre page ne dit rien de celle-ci.
+    if (annotation.documentId !== input.documentId || annotation.pageNumber !== input.pageNumber) {
+      return {
+        backed: false,
+        code: VISUAL_ANNOTATION_UNKNOWN,
+        message:
+          `l'annotation « ${annotationId} » porte sur la page ${annotation.pageNumber} de ` +
+          `« ${annotation.documentId} », pas sur la page ${input.pageNumber} de « ${input.documentId} »`
+      };
+    }
+
+    if (annotation.reviewStatus !== "approved") {
+      return {
+        backed: false,
+        code: VISUAL_ANNOTATION_NOT_APPROVED,
+        message: new VisualAnnotationNotApprovedError(annotationId, annotation.reviewStatus).message
+      };
+    }
+
+    const rendered = input.renderedImageHashes?.get(`${annotation.documentId}:${annotation.pageNumber}`);
+
+    if (rendered !== undefined && rendered !== annotation.pageImageHash) {
+      return {
+        backed: false,
+        code: VISUAL_ANNOTATION_STALE_IMAGE,
+        message: new VisualAnnotationStaleImageError(annotationId, annotation.pageImageHash, rendered).message
+      };
+    }
+
+    if (annotation.reviewedImageHash !== annotation.pageImageHash) {
+      return {
+        backed: false,
+        code: VISUAL_ANNOTATION_STALE_IMAGE,
+        message:
+          `l'annotation « ${annotationId} » a été signée sur un rendu (${annotation.reviewedImageHash ?? "aucun"}) ` +
+          `qui n'est pas celui qu'elle décrit (${annotation.pageImageHash ?? "aucun"}) : la signature ne porte plus sur cette transcription`
+      };
+    }
+  }
+
+  return { backed: true };
+}
+
 export function factsOf(annotations: readonly VisualAnnotation[]): AttributedFact[] {
   return annotations.flatMap((annotation) =>
     annotation.structuredFacts.map((fact) => ({

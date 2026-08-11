@@ -1,11 +1,13 @@
 import {
   CorpusIndex,
+  visualAnnotationSchema,
   type ContentDraft,
   type ContentDraftStatus,
   type ContentPayload,
   type CorpusDocument,
   type GenerationMode,
-  type NormativeContext
+  type NormativeContext,
+  type VisualAnnotation
 } from "@finance/content-generation";
 
 /**
@@ -101,7 +103,111 @@ const documents: CorpusDocument[] = [
   }
 ];
 
+/**
+ * Une fiche dont une planche est rastérisée : page 1 lisible, page 2 dégradée
+ * et sans le moindre fragment de texte. C'est la forme que prend une page
+ * d'arbre de décision ou de tableau scanné — la seule qu'une annotation
+ * visuelle puisse rendre citable.
+ */
+export const RASTER_DOC_ID = "e2e-pack-raster";
+export const CHUNK_RASTER_TEXT = "e2e-chunk-raster-text";
+export const RASTER_ANNOTATION_ID = "e2e-annotation-raster-p02";
+const HASH_RASTER = "e".repeat(64);
+export const RASTER_IMAGE_HASH = "f".repeat(64);
+const OTHER_IMAGE_HASH = "1".repeat(64);
+
+documents.push({
+  documentId: RASTER_DOC_ID,
+  packId: "e2e-pack",
+  title: "[Fixture e2e] Classement des titres - Fiche de cours",
+  relativePath: "fixture/raster",
+  category: "course",
+  domainId: "comptabilite",
+  chapterSlug: "les-titres",
+  pages: [
+    { pageNumber: 1, degraded: false },
+    { pageNumber: 2, degraded: true }
+  ],
+  chunks: [
+    {
+      id: CHUNK_RASTER_TEXT,
+      documentId: RASTER_DOC_ID,
+      pageStart: 1,
+      pageEnd: 1,
+      contentHash: HASH_RASTER,
+      content: "Le PCG distingue quatre catégories comptables de titres.",
+      sectionTitle: "Catégories"
+    }
+  ]
+});
+
 export const testCorpus = new CorpusIndex(documents);
+
+/**
+ * Une référence qui couvre la planche rastérisée sans en citer le texte : le
+ * savoir vient de la transcription signée, pas de la couche texte.
+ */
+export const visualBackedReference = {
+  pack: "e2e-pack",
+  documentId: RASTER_DOC_ID,
+  documentTitle: "[Fixture e2e] Classement des titres - Fiche de cours",
+  sourceType: "course" as const,
+  pageStart: 1,
+  pageEnd: 2,
+  chunkIds: [CHUNK_RASTER_TEXT],
+  sectionTitle: "Catégories",
+  excerpt: "Le PCG distingue quatre catégories comptables de titres.",
+  excerptHash: HASH_RASTER,
+  visualAnnotationIds: [RASTER_ANNOTATION_ID]
+};
+
+/** La même, qui n'invoque rien : la page dégradée reste alors non approuvable. */
+export const unbackedRasterReference = {
+  ...visualBackedReference,
+  visualAnnotationIds: undefined
+};
+
+function annotation(overrides: Record<string, unknown> = {}): VisualAnnotation {
+  return visualAnnotationSchema.parse({
+    annotationId: RASTER_ANNOTATION_ID,
+    documentId: RASTER_DOC_ID,
+    pageNumber: 2,
+    pageImageHash: RASTER_IMAGE_HASH,
+    regionId: "region-1",
+    annotationType: "decision_tree",
+    expectedInformation: "Arbre de décision de classement comptable des titres.",
+    transcription: "Arbre de décision : losanges de décision, rectangles de catégories terminales.",
+    structuredFacts: [],
+    confidence: "high",
+    transcriptionMethod: "visual",
+    reviewStatus: "approved",
+    priority: "BLOCKING",
+    warnings: [],
+    createdAt: "2026-01-01T00:00:00.000Z",
+    reviewedBy: "installation-locale",
+    reviewedAt: "2026-01-02T00:00:00.000Z",
+    reviewedImageHash: RASTER_IMAGE_HASH,
+    ...overrides
+  });
+}
+
+/** Approuvée, signée sur le rendu qu'elle décrit. */
+export const approvedAnnotation = annotation();
+
+/** Transcrite, jamais signée. */
+export const pendingAnnotation = annotation({
+  reviewStatus: "needs_human_review",
+  reviewedBy: undefined,
+  reviewedAt: undefined,
+  reviewedImageHash: undefined
+});
+
+/** Signée sur un rendu qui n'est plus celui qu'elle décrit. */
+export const staleAnnotation = annotation({ reviewedImageHash: OTHER_IMAGE_HASH });
+
+/** L'empreinte du rendu courant, quand le magasin d'images est disponible. */
+export const currentRenderedImages = new Map([[`${RASTER_DOC_ID}:2`, RASTER_IMAGE_HASH]]);
+export const changedRenderedImages = new Map([[`${RASTER_DOC_ID}:2`, OTHER_IMAGE_HASH]]);
 
 /** Un corpus vide : tout y est introuvable, ce qui exerce le refus « source morte ». */
 export const emptyCorpus = new CorpusIndex([]);

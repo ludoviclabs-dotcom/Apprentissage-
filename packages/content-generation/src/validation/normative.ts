@@ -626,6 +626,48 @@ const GRADABLE_CONTENT_TYPES = new Set<ContentPayload["contentType"]>([
  * barème, c'est-à-dire réécrire l'exercice. Le classement rend un constat ; la
  * réécriture est un autre travail, qui se fait à la main et se relit.
  */
+export interface NormativeSourceVersionInput {
+  profile: NormativeProfile;
+  /**
+   * Les référentiels officiels réellement présents dans le corpus extrait.
+   *
+   * ILS VIENNENT DU CORPUS, JAMAIS D'UNE CONSTANTE. Écrire l'identifiant du
+   * plan comptable en dur ici produirait un contenu qui nomme une version que
+   * personne n'a ingérée : le champ existe pour dire selon quel texte le
+   * contenu est vrai, et un texte absent ne peut pas remplir cet office.
+   */
+  referenceDocumentIds: readonly string[];
+  /** Les documents que le contenu cite, hors référentiels officiels. */
+  citedDocumentIds: readonly string[];
+}
+
+/**
+ * Les versions de référentiel qu'un profil doit nommer.
+ *
+ * Un profil courant s'appuie sur le référentiel officiel en vigueur, et sur lui
+ * seul : le support de cours n'est pas une version du plan comptable. Un profil
+ * historique en nomme deux — le support qui porte le traitement d'origine, et
+ * le référentiel actuel qui l'a remplacé — parce que c'est entre ces deux
+ * pièces que la divergence se constate, et qu'une comparaison qui ne nomme
+ * qu'un seul terme n'est pas une comparaison.
+ *
+ * ELLE PEUT RENDRE UNE LISTE VIDE, ET C'EST UN RÉSULTAT. Aucun référentiel
+ * ingéré veut dire aucune version nommable : le contenu reste alors bloqué avec
+ * son motif, ce qui est la seule réponse honnête. Inventer un identifiant
+ * plausible ferait passer le contrôle et mentirait sur la provenance.
+ */
+export function normativeSourceVersionIds(input: NormativeSourceVersionInput): string[] {
+  const official = [...new Set(input.referenceDocumentIds)].sort();
+
+  if (input.profile !== "course-original") {
+    return official;
+  }
+
+  const supporting = [...new Set(input.citedDocumentIds)].filter((id) => !official.includes(id)).sort();
+
+  return [...supporting, ...official];
+}
+
 export function classifyNormativeContext(payload: ContentPayload): NormativeClassification {
   const occurrences = collectVersionedAccounts(payload);
   const accountsFound = distinctAccountNumbers(occurrences);

@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { verifyVisualBacking, type VisualAnnotation, type VisualBackingRefusal } from "../sources/visual-annotation";
 
 /**
  * Référence de source vérifiable.
@@ -50,7 +51,19 @@ export const sourceReferenceSchema = z
     /** Extrait court affiché au relecteur ; jamais un document entier. */
     excerpt: z.string().max(1200).optional(),
     /** Hash du chunk cité, pour détecter une source qui a changé sous le contenu. */
-    excerptHash: z.string().regex(/^[a-f0-9]{64}$/, "SHA-256 hexadécimal attendu").optional()
+    excerptHash: z.string().regex(/^[a-f0-9]{64}$/, "SHA-256 hexadécimal attendu").optional(),
+    /**
+     * Les annotations visuelles approuvées par lesquelles cette référence tient,
+     * pour les pages dont le texte extrait ne fait pas foi.
+     *
+     * ELLE EST OPTIONNELLE ET LE RESTE, SANS VALEUR PAR DÉFAUT. Un `.default([])`
+     * ajouterait un tableau vide à chaque référence déjà écrite, donc à chaque
+     * charge utile analysée, donc à chaque empreinte de contenu : les contenus
+     * déjà approuvés changeraient de hash sans que personne ait touché à leur
+     * texte, et le contrôle « le contenu a-t-il bougé depuis la relecture ? »
+     * accuserait tout le corpus d'un coup.
+     */
+    visualAnnotationIds: z.array(z.string().min(1)).optional()
   })
   .refine((reference) => reference.pageEnd >= reference.pageStart, {
     message: "pageEnd doit être supérieur ou égal à pageStart",
@@ -153,7 +166,8 @@ export interface ReferenceProblem {
     | "chunk-inconnu"
     | "chunk-hors-intervalle"
     | "hash-divergent"
-    | "page-degradee";
+    | "page-degradee"
+    | VisualBackingRefusal;
   message: string;
 }
 
@@ -165,15 +179,42 @@ export interface ReferenceVerification {
   warnings: ReferenceProblem[];
 }
 
+export interface ReferenceVerificationOptions {
+  /**
+   * Le magasin d'annotations visuelles, quand l'appelant en dispose.
+   *
+   * Son absence ne dégrade rien pour les références ordinaires : elle ne
+   * devient un refus que pour une référence qui *invoque* une provenance
+   * visuelle, et qu'on ne peut donc pas vérifier.
+   */
+  annotations?: readonly VisualAnnotation[];
+  /** Empreintes des rendus courants (`documentId:page`), pour l'obsolescence. */
+  renderedImageHashes?: ReadonlyMap<string, string>;
+}
+
 /**
  * Confronte une référence au corpus. Sépare délibérément les problèmes
  * (la référence est fausse) des avertissements (la référence est exacte mais
  * s'appuie sur une page dont l'extraction est dégradée) : le premier cas est un
  * échec de validation, le second interdit seulement l'approbation.
+ *
+ * UNE PAGE DÉGRADÉE N'EST PAS UNE PAGE INTERDITE : ELLE EST UNE PAGE DONT LE
+ * TEXTE NE FAIT PAS FOI. La distinction décide de tout. Citer le texte extrait
+ * d'une telle page, c'est citer ce que la page n'affiche pas — refus. S'appuyer
+ * sur une transcription qu'une personne a confrontée à l'image et signée, c'est
+ * citer la page elle-même — et le refuser reviendrait à déclarer inutilisable
+ * la seule chose qui rende ces pages utilisables.
+ *
+ * L'invariant est donc générique et se lit sur la référence : une page dégradée
+ * dont un `chunk` cité porte le texte est un `TEXT_SOURCE` et reste refusée,
+ * quoi qu'elle invoque par ailleurs — une annotation ne blanchit pas du texte.
+ * Une page dégradée qu'aucun `chunk` ne touche et qu'une annotation approuvée
+ * couvre est un `APPROVED_VISUAL_SOURCE` et passe.
  */
 export function verifyReference(
   reference: StrictSourceReference,
-  corpus: CorpusIndex
+  corpus: CorpusIndex,
+  options: ReferenceVerificationOptions = {}
 ): ReferenceVerification {
   const problems: ReferenceProblem[] = [];
   const warnings: ReferenceProblem[] = [];
@@ -227,6 +268,43 @@ export function verifyReference(
     }
 
     if (page.degraded) {
+      const backedByText = reference.chunkIds.some((chunkId) => {
+        const chunk = corpus.getChunk(reference.documentId, chunkId);
+        return chunk !== undefined && chunk.pageStart <= pageNumber && pageNumber <= chunk.pageEnd;
+      });
+
+      if (backedByText) {
+        // TEXT_SOURCE sur page dégradée : le cas que la règle vise. Aucune
+        // provenance visuelle ne le rachète — le texte cité reste du texte.
+        warnings.push({
+          code: "page-degradee",
+          message: `la page ${pageNumber} de « ${document.title} » a une extraction dégradée et un fragment cité en provient — à vérifier avant approbation`
+        });
+        continue;
+      }
+
+      const backing = verifyVisualBacking({
+        annotationIds: reference.visualAnnotationIds ?? [],
+        documentId: reference.documentId,
+        pageNumber,
+        annotations: options.annotations,
+        renderedImageHashes: options.renderedImageHashes
+      });
+
+      if (backing.backed) {
+        // APPROVED_VISUAL_SOURCE : la page entre par une transcription signée.
+        continue;
+      }
+
+      // Invoquer une provenance visuelle qui ne tient pas est pire que ne rien
+      // invoquer : c'est une affirmation fausse sur l'origine d'un savoir. Elle
+      // est donc bloquante, là où l'absence de provenance reste un
+      // avertissement — c'est-à-dire le comportement d'avant cette règle.
+      if ((reference.visualAnnotationIds ?? []).length > 0) {
+        problems.push({ code: backing.code, message: backing.message });
+        continue;
+      }
+
       warnings.push({
         code: "page-degradee",
         message: `la page ${pageNumber} de « ${document.title} » a une extraction dégradée — à vérifier avant approbation`
@@ -275,13 +353,14 @@ export function verifyReference(
 /** Toutes les références d'un contenu, vérifiées d'un coup. */
 export function verifyReferences(
   references: readonly StrictSourceReference[],
-  corpus: CorpusIndex
+  corpus: CorpusIndex,
+  options: ReferenceVerificationOptions = {}
 ): ReferenceVerification {
   const problems: ReferenceProblem[] = [];
   const warnings: ReferenceProblem[] = [];
 
   for (const reference of references) {
-    const result = verifyReference(reference, corpus);
+    const result = verifyReference(reference, corpus, options);
     problems.push(...result.problems);
     warnings.push(...result.warnings);
   }

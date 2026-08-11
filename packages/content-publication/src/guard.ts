@@ -12,7 +12,9 @@ import {
   verifyReference,
   type ContentDraft,
   type ContentPayload,
-  type CorpusIndex
+  type CorpusIndex,
+  type ReferenceVerificationOptions,
+  type VisualAnnotation
 } from "@finance/content-generation";
 import { contentHash } from "./hash";
 import { stripSourceExcerpts } from "./sanitize";
@@ -78,6 +80,16 @@ export interface PublicationGuardInput {
    * signifie que le contenu a bougé depuis l'approbation.
    */
   reviewedContentHash?: string;
+  /**
+   * Les annotations visuelles du chapitre, quand l'appelant les a chargées.
+   *
+   * Elles ne servent qu'aux pages dont l'extraction est dégradée : leur absence
+   * ne change rien à un contenu qui n'en cite aucune, et vaut refus pour un
+   * contenu qui prétend s'appuyer dessus.
+   */
+  visualAnnotations?: readonly VisualAnnotation[];
+  /** Empreintes des rendus courants (`documentId:page`), pour l'obsolescence. */
+  renderedImageHashes?: ReadonlyMap<string, string>;
 }
 
 /**
@@ -294,7 +306,8 @@ function runDeterministicChecks(payload: ContentPayload): DeterministicValidatio
 
 function checkSourceIntegrity(
   payload: ContentPayload,
-  corpus: CorpusIndex | undefined
+  corpus: CorpusIndex | undefined,
+  references: ReferenceVerificationOptions
 ): SourceIntegrityReport {
   const collected = collectSourceReferences(payload);
   const problems: PublicationIssue[] = [];
@@ -330,7 +343,7 @@ function checkSourceIntegrity(
     }
 
     documents.add(parsed.data.documentId);
-    const verification = verifyReference(parsed.data, corpus);
+    const verification = verifyReference(parsed.data, corpus, references);
 
     for (const problem of verification.problems) {
       problems.push(issue(problem.code, problem.message, path));
@@ -475,7 +488,11 @@ export function inspectForPublication(input: PublicationGuardInput): Publication
   }
 
   // --- 6. Sources ----------------------------------------------------------
-  const sourceIntegrity = checkSourceIntegrity(payload, input.corpus);
+  const referenceOptions: ReferenceVerificationOptions = {
+    annotations: input.visualAnnotations,
+    renderedImageHashes: input.renderedImageHashes
+  };
+  const sourceIntegrity = checkSourceIntegrity(payload, input.corpus, referenceOptions);
   errors.push(...sourceIntegrity.problems);
 
   // --- 7. Contrôles déterministes rejoués ----------------------------------
@@ -492,7 +509,11 @@ export function inspectForPublication(input: PublicationGuardInput): Publication
     const revalidated = validateContent({
       payload,
       corpus: input.corpus,
-      normativeContext: draft.normativeContext
+      normativeContext: draft.normativeContext,
+      // Le moteur rejoué doit voir la même provenance que l'étape 6, sans quoi
+      // il redemanderait à vérifier des annotations qu'on ne lui a pas données
+      // et refuserait un contenu que le garde vient d'accepter.
+      references: referenceOptions
     });
 
     for (const problem of revalidated.errors) {

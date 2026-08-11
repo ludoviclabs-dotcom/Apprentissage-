@@ -9,7 +9,8 @@ import type { NormativeContext } from "../types/normative-context";
 import {
   sourceReferenceSchema,
   verifyReference,
-  type CorpusIndex
+  type CorpusIndex,
+  type ReferenceVerificationOptions
 } from "../types/source-reference";
 import { checkNormativeContext } from "./normative";
 import { answerAddsNothingNew, answerLeakRatio, jaccardSimilarity, normalizeForComparison } from "./text";
@@ -45,6 +46,14 @@ export interface ValidationInput {
    * avertissent au lieu de refuser — voir `checkNormativeContext`.
    */
   normativeContext?: NormativeContext | null;
+  /**
+   * De quoi vérifier une provenance visuelle, quand l'appelant en dispose.
+   *
+   * Une référence qui n'en invoque aucune ne s'en aperçoit pas. Une référence
+   * qui en invoque une et qu'on ne peut pas confronter au magasin est refusée :
+   * la validation ne certifie pas ce qu'elle n'a pas pu regarder.
+   */
+  references?: ReferenceVerificationOptions;
 }
 
 export interface ValidationResult {
@@ -88,7 +97,8 @@ function checkReferences(
   payload: ContentPayload,
   corpus: CorpusIndex,
   errors: ValidationIssue[],
-  warnings: ValidationIssue[]
+  warnings: ValidationIssue[],
+  references: ReferenceVerificationOptions
 ): void {
   const collected = collectSourceReferences(payload);
 
@@ -107,7 +117,7 @@ function checkReferences(
       continue;
     }
 
-    const verification = verifyReference(parsed.data, corpus);
+    const verification = verifyReference(parsed.data, corpus, references);
 
     for (const problem of verification.problems) {
       errors.push(error(problem.code, problem.message, path));
@@ -599,7 +609,7 @@ export function validateContent(input: ValidationInput): ValidationResult {
   const payload = parsed.data;
 
   checkForbiddenStrings(payload, errors);
-  checkReferences(payload, input.corpus, errors, warnings);
+  checkReferences(payload, input.corpus, errors, warnings, input.references ?? {});
   checkSheet(payload, warnings);
   checkCompetencyTags(payload, errors);
   checkFlashcard(payload, errors, warnings);
